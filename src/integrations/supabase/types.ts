@@ -2486,6 +2486,7 @@ export type Database = {
           id: string
           text: string
           workshop_id: string
+          metadata: Json | null
         }[]
       }
       get_invite_by_token: {
