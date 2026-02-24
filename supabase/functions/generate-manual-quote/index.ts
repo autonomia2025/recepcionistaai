@@ -148,6 +148,13 @@ Responde ÚNICAMENTE con un JSON: { "items": [...] }`
         });
 
         const aiData = await aiResponse.json();
+        console.log('AI response status:', aiResponse.status, 'has choices:', !!aiData?.choices);
+        
+        if (!aiResponse.ok || !aiData?.choices?.[0]?.message?.content) {
+            console.error('AI gateway error:', JSON.stringify(aiData));
+            throw new Error('AI gateway returned invalid response: ' + (aiData?.error?.message || aiResponse.status));
+        }
+        
         const result = JSON.parse(aiData.choices[0].message.content);
         const items = Array.isArray(result) ? result : (result.items || []);
 
