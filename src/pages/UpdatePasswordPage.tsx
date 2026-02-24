@@ -17,19 +17,49 @@ export default function UpdatePasswordPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for recovery token in URL hash
+    let resolved = false;
+
+    // Listen for PASSWORD_RECOVERY event (PKCE flow)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (resolved) return;
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        resolved = true;
+        setTokenValid(true);
+      }
+    });
+
+    // Also check hash params (legacy/implicit flow fallback)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     const accessToken = hashParams.get('access_token');
 
     if (type === 'recovery' && accessToken) {
+      resolved = true;
       setTokenValid(true);
-    } else {
-      // Also check if user is already authenticated via recovery flow
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setTokenValid(!!session);
-      });
     }
+
+    // Check if already authenticated via recovery (page reload after token exchange)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (resolved) return;
+      if (session) {
+        // User has a valid session — allow password update
+        resolved = true;
+        setTokenValid(true);
+      }
+    });
+
+    // Timeout: if nothing resolves in 5 seconds, show invalid
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        setTokenValid(false);
+      }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,7 +93,10 @@ export default function UpdatePasswordPage() {
   if (tokenValid === null) {
     return (
       <div className="min-h-screen flex items-center justify-center app-surface">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="text-sm text-muted-foreground">Verificando enlace...</p>
+        </div>
       </div>
     );
   }
