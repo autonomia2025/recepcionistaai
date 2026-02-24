@@ -134,6 +134,11 @@ export function ChatView({ conversation }: ChatViewProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Detect dominant channel from messages
+  const detectedChannel = messages?.length
+    ? messages.filter(m => m.direction === 'inbound').slice(-1)[0]?.channel || messages[0]?.channel || 'whatsapp'
+    : 'whatsapp';
+
   const handleSend = async () => {
     if (!message.trim() || sendMessage.isPending) return;
 
@@ -144,6 +149,7 @@ export function ChatView({ conversation }: ChatViewProps) {
       await sendMessage.mutateAsync({
         conversationId: conversation.id,
         text,
+        channel: detectedChannel,
       });
     } catch (error) {
       console.error('Error sending message:', error);
@@ -417,6 +423,12 @@ export function ChatView({ conversation }: ChatViewProps) {
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="w-3 h-3" />
                 {contact.phone || contact.whatsapp_id}
+                <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5">
+                  {detectedChannel === 'instagram' ? '📸 Instagram' : 
+                   detectedChannel === 'email' || detectedChannel === 'gmail' ? '📧 Email' :
+                   detectedChannel === 'web' || detectedChannel === 'web_chat' ? '🌐 Web' :
+                   '💬 WhatsApp'}
+                </Badge>
               </p>
             </div>
           </div>

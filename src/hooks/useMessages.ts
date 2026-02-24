@@ -136,8 +136,31 @@ export function useSendMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ conversationId, text }: { conversationId: string; text: string }) => {
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+    mutationFn: async ({ conversationId, text, channel }: { conversationId: string; text: string; channel?: string }) => {
+      // Determine the correct send function based on the conversation channel
+      let sendFunction = 'send-whatsapp';
+      
+      if (channel) {
+        switch (channel) {
+          case 'instagram':
+            sendFunction = 'send-instagram';
+            break;
+          case 'email':
+          case 'gmail':
+            sendFunction = 'send-gmail';
+            break;
+          case 'web':
+          case 'web_chat':
+            // Web chat messages are stored directly, no outbound function needed
+            // Fall through to whatsapp as default for now
+            sendFunction = 'send-whatsapp';
+            break;
+          default:
+            sendFunction = 'send-whatsapp';
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke(sendFunction, {
         body: { conversation_id: conversationId, text },
       });
 

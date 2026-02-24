@@ -591,6 +591,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          archived: boolean | null
           created_at: string
           detected_intent: string | null
           did_schedule: boolean | null
@@ -617,6 +618,7 @@ export type Database = {
           workshop_id: string
         }
         Insert: {
+          archived?: boolean | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
@@ -643,6 +645,7 @@ export type Database = {
           workshop_id: string
         }
         Update: {
+          archived?: boolean | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
@@ -694,6 +697,7 @@ export type Database = {
           created_at: string
           id: string
           last_message_at: string | null
+          last_message_text: string | null
           sentiment: string | null
           status: Database["public"]["Enums"]["conversation_status"]
           workshop_id: string
@@ -706,6 +710,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_message_at?: string | null
+          last_message_text?: string | null
           sentiment?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           workshop_id: string
@@ -718,6 +723,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_message_at?: string | null
+          last_message_text?: string | null
           sentiment?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           workshop_id?: string
