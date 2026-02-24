@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Comercial Agendamiento - AutonomIA Suite</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a8e84;
+            /* Teal AutonomIA */
+            --accent: #6d28d9;
+            /* Purple for Scheduling/Calendar */
+            --background: #ffffff;
+            --surface: #f8fafb;
+            --foreground: #1c2024;
+            --muted: #606a74;
+            --border: #e2e0de;
+            --radius: 12px;
+            --whatsapp-bg: #e5ddd5;
+            --whatsapp-msg-in: #ffffff;
+            --whatsapp-msg-out: #dcf8c6;
+        }
+
+        /* --- RESET & PRINT --- */
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            .container {
+                width: 100% !important;
+                max-width: none !important;
+                padding: 0 !important;
+            }
+
+            .cover {
+                height: 100vh !important;
+            }
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* --- COVER --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(rgba(26, 142, 132, 0.8), rgba(109, 40, 217, 0.8)), url('scheduling-cover.png');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            padding: 40px;
+        }
+
+        .cover img.logo {
+            width: 250px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .cover h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            margin: 0;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .cover h2 {
+            font-family: 'Manrope', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            opacity: 0.9;
+            margin: 20px 0 60px;
+        }
+
+        .cover-footer {
+            margin-top: auto;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        /* --- SECTIONS --- */
+        .header-logo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        .header-logo img {
+            height: 40px;
+        }
+
+        .header-logo span {
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Space Grotesk';
+        }
+
+        .section {
+            margin-bottom: 50px;
+            page-break-inside: avoid;
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .step-badge {
+            background: var(--accent);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 25px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .card h4 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .narrative {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: var(--muted);
+            border-left: 3px solid var(--accent);
+            padding-left: 15px;
+            margin: 20px 0;
+        }
+
+        /* --- WHATSAPP MOCKUP --- */
+        .wa-chat {
+            background: var(--whatsapp-bg);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            margin: 30px auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 0.95rem;
+            page-break-inside: avoid;
+        }
+
+        .msg {
+            max-width: 85%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            position: relative;
+            clear: both;
+        }
+
+        .msg-in {
+            background: var(--whatsapp-msg-in);
+            float: left;
+            border-top-left-radius: 0;
+        }
+
+        .msg-out {
+            background: var(--whatsapp-msg-out);
+            float: right;
+            border-top-right-radius: 0;
+        }
+
+        .msg-time {
+            font-size: 0.7rem;
+            color: #999;
+            float: right;
+            margin-left: 10px;
+            margin-top: 5px;
+        }
+
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+
+        /* --- BACKEND MOCKUP --- */
+        .backend-mockup {
+            background: #111827;
+            border-radius: 12px;
+            padding: 20px;
+            color: #e5e7eb;
+            font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            margin: 30px 0;
+            page-break-inside: avoid;
+        }
+
+        .backend-title {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 10px;
+        }
+
+        .insight-pill {
+            display: inline-block;
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(139, 92, 246, 0.4);
+        }
+
+        .highlight-green {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .footer-note {
+            margin-top: 80px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            padding-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- PORTADA -->
+    <div class="cover">
+        <img src="../logo.png" class="logo" alt="AutonomIA">
+        <h1>Guión de Demo Perfecta</h1>
+        <h2>Foco: Agendamiento Inteligente 24/7</h2>
+        <div class="cover-footer">Documento de Ventas High-Ticket • 2026</div>
+    </div>
+
+    <div class="container">
+
+        <div class="header-logo">
+            <img src="../logo.png" alt="AutonomIA">
+            <span>MODELO DE AGENDAMIENTO</span>
+        </div>
+
+        <!-- INTRODUCCIÓN -->
+        <div class="section">
+            <h3>La Fricción de la Cita</h3>
+            <p>El agendamiento es el corazón de cualquier negocio de servicios. El <strong>40% de las citas</strong> se pierden porque el cliente quiere agendar fuera de horario o porque el recepcionista está ocupado en el teléfono. Aquí mostramos cómo AutonomIA elimina esa barrera.</p>
+
+            <div class="card">
+                <h4>🎯 El Setup Mental</h4>
+                <p>"Imagina que un cliente ve un anuncio tuyo en Instagram a las 11:30 PM de un domingo. Tiene el impulso de comprar/agendar ahora mismo. Si le dices 'escríbenos mañana', se va a olvidar. <strong>Mira cómo cerramos esa venta en caliente.</strong>"</p>
+            </div>
+        </div>
+
+        <!-- ACTO 1: LA CONVERSIÓN -->
+        <div class="section page-break">
+            <h3><span class="step-badge">ACTO 1</span> De Consulta a Cita en Segundos</h3>
+            <p class="narrative">"Muestra la capacidad de la IA para calificar y guiar al agendamiento sin intervención humana."</p>
+
+            <div class="wa-chat clearfix">
+                <div class="msg msg-in">
+                    Hola, vi que hacen detallado cerámico. ¿Tienen hora para esta semana?
+                    <div class="msg-time">23:31</div>
+                </div>
+                <div class="msg msg-out">
+                    ¡Hola! Sí, somos especialistas en detallado cerámico de alta gama ✨. Para darte la mejor atención, ¿qué vehículo tienes y qué nivel de protección buscas para la pintura?
+                    <div class="msg-time">23:32</div>
+                </div>
+                <div class="msg msg-in">
+                    Es un BMW M3 2023. Quiero lo mejor que tengan, ojalá con garantía.
+                    <div class="msg-time">23:33</div>
+                </div>
+                <div class="msg msg-out">
+                    ¡Excelente elección! Para un BMW M3 recomendamos nuestro tratamiento "Diamond Shield" de 5 años. \n\nTenemos disponibilidad para recibirlo este martes o miércoles. Puedes elegir el horario que más te acomode y confirmar tu reserva aquí: \n\n🔗 autono.mia/book/detailer-pro
+                    <div class="msg-time">23:33</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h4>🎤 El Pitch de Cierre (Acto 1)</h4>
+                <p>"¿Viste eso? La IA detectó que era un <strong>M3</strong> (cliente de alto valor), validó el servicio de mayor margen y entregó el link de agendamiento <strong>en tiempo real</strong>. El cliente no tuvo que esperar al lunes a las 10 AM para recibir una respuesta fría."</p>
+            </div>
+        </div>
+
+        <!-- ACTO 2: EL CRM INTELIGENTE -->
+        <div class="section page-break">
+            <div class="header-logo">
+                <img src="../logo.png" alt="AutonomIA">
+                <span>GESTIÓN DE AGENDA</span>
+            </div>
+            <h3><span class="step-badge">ACTO 2</span> El Orden que tu Negocio Necesita</h3>
+            <p class="narrative">"Muestra ahora el panel de control. El cliente ya no es un chat, es una cita confirmada con datos técnicos."</p>
+
+            <div class="backend-mockup">
+                <div class="backend-title">CITA AGENDADA: MARTES 10:00 AM</div>
+
+                <div style="margin-bottom: 20px;">
+                    <span class="insight-pill">Cliente: Felipe Rodó</span>
+                    <span class="insight-pill">Servicio: Cerámico Diamond (5 años)</span>
+                    <span class="insight-pill highlight-green">Estado: CONFIRMADA VIA LINK</span>
+                </div>
+
+                <div class="backend-title" style="margin-top: 20px;">NOTAS AUTOMÁTICAS PARA EL TÉCNICO</div>
+                <p style="font-size: 0.9rem; color: #d1d5db;">"Cliente muy interesado en protección de alta duración. Vehículo 2023. Se envió link de reserva y se confirmó el slot. Se debe preparar el kit de descontaminación previo."</p>
+            </div>
+
+            <div class="card">
+                <h4>🎤 El Pitch de Cierre (Acto 2)</h4>
+                <p>"Lo mejor de todo: <strong>Tu agenda se llena sola</strong> mientras tú te enfocas en operar el negocio. No más '¿a qué hora me dijo?', no más 'se me olvidó anotar al de la Hilux'. El sistema centraliza todo y te da la paz mental de saber que tu taller está lleno mañana."</p>
+            </div>
+        </div>
+
+        <!-- ACTO 3: EL ROI DEL AGENDAMIENTO -->
+        <div class="section">
+            <h3><span class="step-badge">ACTO 3</span> La Inversión que se Paga Sola</h3>
+            <p class="narrative">"Cerramos con la lógica financiera aplicada al tiempo y las citas perdidas."</p>
+
+            <div class="card" style="background: #fdf2f8; border-color: #db2777;">
+                <h4 style="color: #9d174d;">Cálculo de Supervivencia:</h4>
+                <ul style="margin: 0;">
+                    <li>"¿Cuánto te deja un servicio premium? Supongamos $300.000."</li>
+                    <li>"¿Cuántos chats de 'tienen hora' se quedan sin responder el fin de semana?"</li>
+                    <li><strong>"Si AutonomIA logra que UN cliente que hoy se te escapa concrete su cita, no solo pagaste el software del mes, sino que ganaste reputación de servicio 5 estrellas."</strong></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <p><strong>El Diferenciador:</strong> No vendes un calendario.<br> Vendes un <b>Recapturador de Clientes en Fuga</b> y <b>Libertad Administrativa</b>.</p>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
