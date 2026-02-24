@@ -423,6 +423,12 @@ export function ChatView({ conversation }: ChatViewProps) {
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="w-3 h-3" />
                 {contact.phone || contact.whatsapp_id}
+                <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5">
+                  {detectedChannel === 'instagram' ? '📸 Instagram' : 
+                   detectedChannel === 'email' || detectedChannel === 'gmail' ? '📧 Email' :
+                   detectedChannel === 'web' || detectedChannel === 'web_chat' ? '🌐 Web' :
+                   '💬 WhatsApp'}
+                </Badge>
               </p>
             </div>
           </div>
