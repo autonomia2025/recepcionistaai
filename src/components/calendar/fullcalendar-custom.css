@@ -1,0 +1,216 @@
+/* FullCalendar Custom Theme - matches app design system */
+
+.fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-button-bg-color: hsl(var(--primary));
+  --fc-button-border-color: hsl(var(--primary));
+  --fc-button-hover-bg-color: hsl(var(--primary) / 0.9);
+  --fc-button-hover-border-color: hsl(var(--primary) / 0.9);
+  --fc-button-active-bg-color: hsl(var(--primary) / 0.8);
+  --fc-button-active-border-color: hsl(var(--primary) / 0.8);
+  --fc-today-bg-color: hsl(var(--primary) / 0.08);
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-list-event-hover-bg-color: hsl(var(--accent));
+  --fc-page-bg-color: hsl(var(--background));
+  --fc-event-border-color: transparent;
+  font-family: inherit;
+}
+
+/* Header toolbar */
+.fc .fc-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+@media (max-width: 640px) {
+  .fc .fc-toolbar-title {
+    font-size: 1rem;
+  }
+  
+  .fc .fc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* Buttons */
+.fc .fc-button {
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+}
+
+.fc .fc-button:focus {
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary) / 0.3);
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+/* Day headers */
+.fc .fc-col-header-cell {
+  padding: 0.75rem 0;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-transform: capitalize;
+}
+
+.fc .fc-col-header-cell-cushion {
+  font-size: 0.875rem;
+}
+
+/* Day cells */
+.fc .fc-daygrid-day {
+  transition: background-color 0.15s ease;
+}
+
+.fc .fc-daygrid-day:hover {
+  background-color: hsl(var(--accent) / 0.5);
+}
+
+.fc .fc-daygrid-day-number {
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  color: hsl(var(--foreground));
+}
+
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 50%;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Events */
+.fc .fc-event {
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: grab;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.fc .fc-event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.fc .fc-event:active {
+  cursor: grabbing;
+}
+
+.fc .fc-event-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Event type colors */
+.fc-event-appointment {
+  background-color: #3B82F6 !important;
+  border-left: 3px solid #2563EB !important;
+}
+
+.fc-event-external {
+  background-color: #8B5CF6 !important;
+  border-left: 3px solid #7C3AED !important;
+}
+
+.fc-event-blocked {
+  background-color: #6B7280 !important;
+  border-left: 3px solid #4B5563 !important;
+}
+
+.fc-event-personal {
+  background-color: #22C55E !important;
+  border-left: 3px solid #16A34A !important;
+}
+
+/* Time grid */
+.fc .fc-timegrid-slot {
+  height: 3rem;
+}
+
+.fc .fc-timegrid-slot-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  border-color: hsl(var(--destructive));
+  border-width: 2px;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-color: hsl(var(--destructive));
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* Selection */
+.fc .fc-highlight {
+  background-color: hsl(var(--primary) / 0.15);
+}
+
+/* Scrollbar */
+.fc .fc-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+.fc .fc-scroller::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* All-day section */
+.fc .fc-daygrid-body-natural .fc-daygrid-day-events {
+  margin-bottom: 0.25rem;
+}
+
+/* More events popover */
+.fc .fc-more-popover {
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.fc .fc-more-popover .fc-popover-header {
+  background-color: hsl(var(--muted));
+  padding: 0.5rem 0.75rem;
+  font-weight: 500;
+}
+
+/* Loading state */
+.fc.fc-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}

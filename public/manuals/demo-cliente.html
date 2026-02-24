@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Extendida AutonomIA - Modelo Servicios</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #11789c;
+            /* Azul para servicios */
+            --accent: #1a8e84;
+            /* Teal */
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --foreground: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            .container {
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+
+            .cover {
+                height: 100vh !important;
+                page-break-after: always;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* --- COVER --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            text-align: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .cover img.logo {
+            width: 250px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .cover h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.8rem;
+            margin: 0;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .cover p {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            opacity: 0.9;
+            max-width: 700px;
+        }
+
+        /* --- SECTIONS --- */
+        .section {
+            background: var(--surface);
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+            margin-bottom: 50px;
+            border: 1px solid var(--border);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .section-header h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.4rem;
+            color: var(--primary);
+            margin: 0 0 15px 0;
+        }
+
+        .section-header p {
+            color: var(--muted);
+            font-size: 1.15rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* --- MOCKUP WINDOWS --- */
+        .mockup-window {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
+            margin: 30px 0;
+            background: white;
+        }
+
+        .mockup-header {
+            background: #f1f5f9;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot.r {
+            background: #ff5f56;
+        }
+
+        .dot.y {
+            background: #ffbd2e;
+        }
+
+        .dot.g {
+            background: #27c93f;
+        }
+
+        .mockup-title {
+            margin-left: 10px;
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+
+        /* --- TWO COLUMNS LAYOUT --- */
+        .split-layout {
+            display: flex;
+            gap: 30px;
+        }
+
+        .split-content {
+            flex: 1;
+        }
+
+        /* --- UI COMPONENTS --- */
+        .feature-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .feature-box h4 {
+            color: var(--primary);
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+        }
+
+        .feature-box p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        /* BOT SETTINGS MOCKUP */
+        .setting-row {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .setting-input {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--foreground);
+        }
+
+        /* MULTI-CHAT MOCKUP */
+        .chat-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .chat-in {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-top-left-radius: 0;
+        }
+
+        .chat-out {
+            background: var(--primary);
+            color: white;
+            margin-left: auto;
+            border-top-right-radius: 0;
+        }
+
+        .ai-reasoning {
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: -5px;
+            max-width: 80%;
+            margin-left: auto;
+        }
+
+        /* PIPELINE KANBAN */
+        .kanban-board {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            background: #f8fafc;
+            overflow-x: auto;
+        }
+
+        .kanban-col {
+            min-width: 250px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .kanban-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kanban-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .kanban-card-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .kanban-card-desc {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .kanban-count {
+            background: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        /* METRICS */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .metric-card {
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            background: #f8fafb;
+        }
+
+        .metric-val {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Space Grotesk';
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .metric-sub {
+            font-size: 0.75rem;
+            color: #10b981;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="cover">
+        <img src="../logo.png" class="logo" alt="AutonomIA">
+        <h1>Tu Recepcionista 24/7</h1>
+        <p>Una demostración técnica de cómo AutonomIA Suite recibe clientes, extrae sus datos y organiza tus
+            presupuestos sin que muevas un dedo.</p>
+    </div>
+
+    <div class="container">
+
+        <!-- SECCION 1: CONFIGURA EL CEREBRO -->
+        <div class="section">
+            <div class="section-header">
+                <h2>1. Configura a tu Experto (Bot Settings)</h2>
+                <p>Enséñale a la IA cómo vender. Configura tu catálogo, tono de voz y las típicas preguntas frecuentes
+                    para que responda como un experto de tu equipo.</p>
+            </div>
+
+            <div class="split-layout">
+                <div class="split-content">
+                    <div class="mockup-window" style="margin-top: 0;">
+                        <div class="mockup-header">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                            <span class="mockup-title">Settings / Configurar Bot</span>
+                        </div>
+                        <div style="padding: 20px;">
+                            <div class="setting-row">
+                                <span class="setting-label">Instrucciones del Negocio</span>
+                                <div class="setting-input">
+                                    Somos especialistas en servicio técnico y climatización. Si el cliente necesita un
+                                    diagnóstico complejo, indicar que el costo es de $35.000, los cuales se descuentan
+                                    si aprueban el presupuesto final.
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <span class="setting-label">Preguntas Frecuentes (FAQs)</span>
+                                <div class="setting-input">
+                                    Q: ¿Atienden a domicilio?<br>
+                                    A: Sí, en toda la región metropolitana.<br><br>
+                                    Q: ¿Dan garantía por los repuestos?<br>
+                                    A: Sí, 6 meses de garantía legal en repuestos originales.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="split-content">
+                    <div class="feature-box">
+                        <h4>Respuestas Precisas</h4>
+                        <p>El bot no inventa precios ni asume condiciones. Utiliza exclusivamente la información técnica
+                            que tú ingresas en su configuración.</p>
+                    </div>
+                    <div class="feature-box">
+                        <h4>Personalidad Adaptable</h4>
+                        <p>Dile a la IA si debe ser extremadamente formal en el trato o si debe usar un tono cercano y
+                            amigable para empatizar con el cliente.</p>
+                    </div>
+                    <div class="feature-box">
+                        <h4>Conexión Segura Meta API</h4>
+                        <p>Todo opera de manera oficial sin arriesgar tu número a baneos, logrando tiempos de respuesta
+                            menores a 5 segundos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 2: INBOX & CRM -->
+        <div class="section page-break">
+            <div class="section-header">
+                <h2>2. Inbox & CRM Invisible</h2>
+                <p>Mientras la IA negocia, extrae datos clave del cliente en tiempo real. Tú solo lees el resumen
+                    ordenado.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Panel / Inbox y Captura</span>
+                </div>
+                <div class="split-layout" style="gap: 0; align-items: stretch;">
+                    <div style="flex: 2; padding: 20px; border-right: 1px solid var(--border);">
+                        <div class="chat-bubble chat-in">Hola, mi equipo de aire acondicionado dejó de enfriar de un día
+                            para otro y gotea agua hacia adentro.</div>
+                        <div class="chat-bubble chat-out">¡Hola! Entiendo perfectamente el problema. Por los síntomas
+                            que describes, suele tratarse de falta de gas refrigerante o una bandeja de condensación
+                            obstruida. Nosotros somos especialistas en climatización. El diagnóstico a domicilio cuesta
+                            $35.000 (descontables si reparas). ¿Te gustaría que un técnico te visite?</div>
+                        <div class="ai-reasoning">🤖 AI Reasoning: Identifiqué falla descrita (no enfría, gotea). Evalué
+                            posibles causas. Apliqué la regla de negocio configurada (diagnóstico de $35.000
+                            descontables). Busqué generar interés para enviar al técnico.</div>
+                        <div class="chat-bubble chat-in">Me parece justo. Mi nombre es Carlos Paredes y estoy en
+                            Providencia. Necesito que vengan mañana.</div>
+                    </div>
+                    <div style="flex: 1; padding: 20px; background: #fafafa;">
+                        <span class="setting-label">CRM Ficha Cliente</span>
+                        <div
+                            style="margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; padding: 15px; background: white;">
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">NOMBRE CAPTURADO</span><br>
+                                <strong>Carlos Paredes</strong>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">URGENCIA / SCORE</span><br>
+                                <span
+                                    style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.8rem;">Alta
+                                    (Hot Lead)</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">REQUERIMIENTO PRINCIPAL</span><br>
+                                <strong>Aire Acondicionado. No enfría, gotea. Sector: Providencia.</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 3: CRM & COTIZACIONES -->
+        <div class="section page-break">
+            <div class="section-header">
+                <h2>3. CRM Inteligente y Cotizaciones</h2>
+                <p>Olvida el papel y lápiz. La IA agrupa a tus prospectos según su Temperatura (Score) e Intención de
+                    Compra, armando pre-cotizaciones técnicas listas para que tú las envíes.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Panel / Base de Clientes (CRM)</span>
+                </div>
+                <!-- CRM Table -->
+                <div style="padding: 20px; overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                        <thead>
+                            <tr
+                                style="border-bottom: 2px solid var(--border); color: var(--muted); text-transform: uppercase;">
+                                <th style="padding: 10px;">Cliente</th>
+                                <th style="padding: 10px;">Score</th>
+                                <th style="padding: 10px;">Intención</th>
+                                <th style="padding: 10px;">Recontacto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border); background: #f0fdf4;">
+                                <!-- Hover effect simulated on the hot lead -->
+                                <td style="padding: 15px;">
+                                    <strong>Carlos Paredes</strong><br>
+                                    <span style="color: var(--muted); font-size: 0.8rem;">+56 9 1234 5678</span>
+                                </td>
+                                <td style="padding: 15px;"><span
+                                        style="background: #ffedd5; color: #c2410c; padding: 4px 10px; border-radius: 12px; font-weight: bold;">🔥
+                                        95</span></td>
+                                <td style="padding: 15px;"><span style="color: var(--muted);">💰 Cotización</span></td>
+                                <td style="padding: 15px;">-</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 15px;">
+                                    <strong>María Silva</strong><br>
+                                    <span style="color: var(--muted); font-size: 0.8rem;">maria@empresa.com</span>
+                                </td>
+                                <td style="padding: 15px;"><span
+                                        style="background: #fef9c3; color: #ca8a04; padding: 4px 10px; border-radius: 12px; font-weight: bold;">⚡
+                                        65</span></td>
+                                <td style="padding: 15px;"><span style="color: var(--muted);">💬 Consulta</span></td>
+                                <td style="padding: 15px;"><span
+                                        style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem;">⏰
+                                        Pend.</span></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 15px;">
+                                    <strong>Empresa XYZ</strong><br>
+                                    <span style="color: var(--muted); font-size: 0.8rem;">+56 9 8765 4321</span>
+                                </td>
+                                <td style="padding: 15px;"><span
+                                        style="background: #f1f5f9; color: #64748b; padding: 4px 10px; border-radius: 12px; font-weight: bold;">💤
+                                        30</span></td>
+                                <td style="padding: 15px;"><span style="color: var(--muted);">🛠️ Soporte</span></td>
+                                <td style="padding: 15px;">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Ficha / Cotizacion Mockup -->
+            <div class="split-layout" style="margin-top: 40px; align-items: center;">
+                <div class="split-content">
+                    <div class="feature-box" style="margin-bottom: 0;">
+                        <h4>Cotizaciones Extraídas por IA</h4>
+                        <p>Al hacer click en un cliente caliente (Score > 80), verás cómo nuestra IA extrajo el problema
+                            estructural de la conversación. Documenta ubicación, unidades y especificaciones
+                            automáticamente para que tú solo tengas que ponerle valor y te aprueben el trabajo.</p>
+                    </div>
+                </div>
+                <div class="split-content" style="flex: 1.5;">
+                    <div class="mockup-window" style="margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                        <div class="mockup-header"
+                            style="background: var(--primary); color: white; border: none; padding: 15px;">
+                            <span class="mockup-title" style="color: white; font-size: 0.9rem; margin-left: 0;">Ficha
+                                Cliente: Carlos Paredes</span>
+                        </div>
+                        <div style="padding: 20px; background: white;">
+                            <h4 style="margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">📋 Cotización
+                                Solicitada (1 item)</h4>
+                            <div
+                                style="border-left: 4px solid var(--primary); padding: 15px; background: #f8fafc; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <div>
+                                        <h5 style="margin: 0; font-size: 1.05rem;">Diagnóstico Aire Acondicionado</h5>
+                                        <div style="margin-top: 8px;">
+                                            <span
+                                                style="border: 1px solid var(--border); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: white;">#
+                                                1 unidad(es)</span>
+                                            <span
+                                                style="background: #fef08a; color: #b45309; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin-left: 5px;">⏳
+                                                Pendiente de cotizar</span>
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <p
+                                            style="margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--primary);">
+                                            $35,000</p>
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.85rem; margin-bottom: 15px;">
+                                    <span style="color: var(--muted); display: block; margin-bottom: 5px;">📍
+                                        <strong>Ubicación:</strong> Providencia</span>
+                                </div>
+                                <div style="background: #e2e8f0; padding: 10px; border-radius: 8px;">
+                                    <p
+                                        style="margin: 0 0 5px 0; font-size: 0.8rem; font-weight: 700; color: var(--muted);">
+                                        Especificaciones Técnicas:</p>
+                                    <ul
+                                        style="margin: 0; padding-left: 15px; font-size: 0.8rem; color: var(--foreground);">
+                                        <li>Equipo dejó de enfriar súbitamente.</li>
+                                        <li>Gotea agua hacia el interior del inmueble.</li>
+                                    </ul>
+                                </div>
+                                <div
+                                    style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px;">
+                                    <span>Extraído: 23 de Febrero, 14:30 hrs</span>
+                                    <span style="font-weight: 700;">Confianza IA: 98%</span>
+                                </div>
+                            </div>
+
+                            <div
+                                style="margin-top: 15px; padding: 15px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 1.2rem;">💰</span>
+                                    <span style="font-weight: 600; font-size: 0.95rem; color: #065f46;">Valor Total
+                                        Estimado</span>
+                                </div>
+                                <span style="font-weight: 700; font-size: 1.2rem; color: #047857;">$35,000</span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 4: DASHBOARD / ROI -->
+        <div class="section">
+            <div class="section-header">
+                <h2>4. Mide el Ahorro de tu Negocio</h2>
+                <p>Las métricas clave. Descubre cuántas horas humanas de atención manual la IA "hizo desaparecer" este
+                    mes.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Dashboard / Métricas</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Tiempo Ahorrado</div>
+                        <div class="metric-val">34 <span style="font-size: 1rem; color: var(--muted);">hrs</span></div>
+                        <div class="metric-sub">Tiempo dedicado a servicio, no a WhatsApp</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Valor Generado (Estimado)</div>
+                        <div class="metric-val">$136,000</div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Ahorro en personal equivalente
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Nuevas Solicitudes Activas</div>
+                        <div class="metric-val">12</div>
+                        <div class="metric-sub">Clientes esperando su cotización o visita</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Mensajes Enviados por IA</div>
+                        <div class="metric-val">842</div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Cero esfuerzo humano</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Conversaciones Totales</div>
+                        <div class="metric-val">156</div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Este mes</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Tiempo Promedio Respuesta</div>
+                        <div class="metric-val">~3 <span style="font-size: 1rem; color: var(--muted);">seg</span></div>
+                        <div class="metric-sub">Superando a la competencia</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CIERRE -->
+        <div class="section"
+            style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; border: none;">
+            <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: white; font-size: 2.2rem; margin-bottom: 20px;">Vende servicios. No te pases el día
+                    respondiendo DUDAS.</h2>
+                <p style="font-size: 1.15rem; color: #94a3b8; margin-bottom: 30px;">Si la Inteligencia Artificial
+                    rescata a un solo cliente que, al no ser respondido a tiempo por tus competidores, decide contratar
+                    contigo sus servicios... el pago del software ya se pagó solo.</p>
+                <div style="font-family: 'Space Grotesk'; font-size: 1.4rem; color: #38bdf8; font-weight: 700;">
+                    Bienvenido a AutonomIA.</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 40px;">
+            © 2026 AutonomIA Suite. Exclusivo Modelo "Servicios". Todos los pantallazos son fieles a la interfaz real
+            del sistema.
+        </div>
+
+    </div>
+
+</body>
+
+</html>

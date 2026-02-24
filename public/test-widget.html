@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Chat Widget - AulaCDP</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    h1 {
+      margin: 0 0 20px;
+      color: #1f2937;
+    }
+    p {
+      color: #6b7280;
+      line-height: 1.6;
+    }
+    .note {
+      background: #fef3c7;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Test del Widget de Chat</h1>
+    <p>Esta página es para probar el widget de chat de AulaCDP.</p>
+    <p>Si el widget está funcionando correctamente, deberías ver un botón circular en la esquina inferior derecha.</p>
+    <div class="note">
+      <strong>Nota:</strong> El widget se carga desde la Edge Function web-chat-widget.
+    </div>
+  </div>
+  
+  <!-- Widget de Chat -->
+  <script src="https://hblwddfcfiblesjcosjt.supabase.co/functions/v1/web-chat-widget?id=7f2a1e1b-cb26-492d-a155-d3a4b8fbd316&primaryColor=%236366f1&title=AulaCDP&welcomeMessage=¡Hola! ¿En qué podemos ayudarte?"></script>
+</body>
+</html>

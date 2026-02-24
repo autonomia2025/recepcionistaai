@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Maestro AutonomIA - Modelo Servicios y Cotización</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #11789c;
+            --primary-light: #e7f2f7;
+            --primary-dark: #0a4d66;
+            --accent: #1a8e84;
+            --background: #ffffff;
+            --surface: #f8fafb;
+            --foreground: #1c2024;
+            --muted: #606a74;
+            --border: #e2e0de;
+            --radius: 16px;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            .container {
+                width: 100%;
+                max-width: none;
+                padding: 20px;
+            }
+
+            .cover {
+                height: 100vh;
+            }
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--foreground);
+            font-weight: 700;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* --- COVER --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom-left-radius: 60px;
+            border-bottom-right-radius: 60px;
+        }
+
+        .cover img {
+            width: 280px;
+            margin-bottom: 30px;
+            filter: brightness(0) invert(1);
+        }
+
+        .cover h1 {
+            font-size: 5rem;
+            margin: 0;
+            color: white;
+            letter-spacing: -0.04em;
+        }
+
+        .cover p {
+            font-size: 1.8rem;
+            opacity: 0.9;
+            max-width: 750px;
+        }
+
+        .section {
+            padding: 80px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section h2 {
+            font-size: 2.2rem;
+            color: var(--primary-dark);
+            margin-bottom: 30px;
+        }
+
+        .feature-card {
+            background: var(--surface);
+            padding: 30px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            margin-bottom: 25px;
+        }
+
+        .feature-card h3 {
+            margin-top: 0;
+            font-size: 1.4rem;
+        }
+
+        .highlight-box {
+            background: #f0fdf4;
+            border: 2px dashed var(--accent);
+            padding: 30px;
+            border-radius: 12px;
+            margin: 40px 0;
+        }
+
+        .pro-tip {
+            background: #fffbef;
+            border-left: 6px solid #f6ad55;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+
+        .pro-tip h4 {
+            margin-top: 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+
+        .footer {
+            background: var(--foreground);
+            color: white;
+            padding: 80px 40px;
+            text-align: center;
+            margin-top: 100px;
+            border-top-left-radius: 60px;
+            border-top-right-radius: 60px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="cover">
+        <img src="../logo.png" alt="AutonomIA">
+        <h1>Guía de Crecimiento</h1>
+        <p>Captura, Califica y Gestiona tus clientes con Inteligencia Artificial. <br> Convierte prospectos en ventas
+            reales de forma fluida.</p>
+    </div>
+
+    <div class="container">
+
+        <div class="section">
+            <h2>El Nuevo Estándar en Atención al Cliente</h2>
+            <p>Este sistema está diseñado para empresas donde cada mensaje es una oportunidad de negocio.
+                <strong>AutonomIA</strong> se encarga de recibir a todos los interesados, entender qué buscan
+                exactamente y calificarlos para que tú te enfoques solo en cerrar los mejores tratos.</p>
+        </div>
+
+        <!-- WHATSAPP -->
+        <div class="section">
+            <h2>1. Tu Canal de Ventas WhatsApp</h2>
+            <p>Toda la potencia comercial de AutonomIA ya está conectada a tu número a través de la API oficial. No
+                necesitas escanear códigos QR ni configuraciones técnicas complejas.</p>
+            <div class="feature-card">
+                <h3>Uso Directo</h3>
+                <ul>
+                    <li><strong>Conexión Lista:</strong> El equipo de AutonomIA ya activó tu línea para uso industrial.
+                    </li>
+                    <li><strong>Velocidad Profesional:</strong> La IA responderá en menos de 5 segundos, asegurando que
+                        el cliente no se vaya con la competencia por falta de atención.</li>
+                    <li><strong>Sin Interrupciones:</strong> Si tú mismo respondes desde el Inbox, el bot guardará
+                        silencio de forma automática.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- EL CRM AUTOMATICO -->
+        <div class="section page-break">
+            <h2>2. Tu Base de Clientes (CRM) se llena Sola</h2>
+            <p>Ya no tienes que anotar nombres o datos técnicos en papeles. Nuestra IA extrae la información importante
+                mientras conversa con el cliente.</p>
+            <div class="highlight-box">
+                <h4>✨ Datos que el bot detecta y guarda por ti:</h4>
+                <ul style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <li>👤 <strong>Nombre Completo:</strong> Detectado durante la charla.</li>
+                    <li>📱 <strong>Teléfono:</strong> Guardado automáticamente desde el contacto.</li>
+                    <li>📧 <strong>Correo:</strong> Extraído si el cliente lo facilita.</li>
+                    <li>�️ <strong>Detalles Técnicos:</strong> Marca, modelo de vehículo o servicio específico.</li>
+                    <li>� <strong>Intención:</strong> Qué solución exacta busca el cliente.</li>
+                </ul>
+            </div>
+            <p>Toda esta información estará lista en la <strong>Ficha del Cliente</strong> cuando abras el chat en tu
+                panel.</p>
+        </div>
+
+        <!-- CALIFICACION -->
+        <div class="section">
+            <h2>3. Calificando el Potencial del Cliente</h2>
+            <p>Optimiza tu tiempo hablando solo con quienes realmente van a comprar. AutonomIA te dice quién tiene
+                prioridad hoy.</p>
+            <div class="grid">
+                <div class="feature-card">
+                    <h3>Puntaje de Venta (Score)</h3>
+                    <p>La IA otorga un puntaje (0 a 100) a cada prospecto. Los clientes con más de 85 puntos son "Leads
+                        Calientes". ¡No los dejes esperar!</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Detección de Intención</h3>
+                    <p>Clasificamos cada conversación automáticamente: ¿Quiere una **Cotización**, tiene una
+                        **Consulta** o es un **Reclamo**?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOLICITUDES -->
+        <div class="section page-break">
+            <h2>4. Gestión de Oportunidades (Requests)</h2>
+            <p>Cada vez que un cliente demuestra un interés serio por un servicio, el sistema crea automáticamente una
+                <strong>Solicitud</strong> en tu panel.</p>
+            <div class="feature-card">
+                <h3>Gestiona el Éxito</h3>
+                <ul>
+                    <li><strong>Pedidos Nuevos:</strong> Todo lo capturado recientemente por la IA.</li>
+                    <li><strong>En Proceso:</strong> Lo que ya estás cotizando o gestionando con tu equipo.</li>
+                    <li><strong>Cierres:</strong> Marca como "Ganado" para registrar tus ingresos y mejorar el
+                        aprendizaje de la IA.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- INBOX AUDITORIA -->
+        <div class="section">
+            <h2>5. Inbox Inteligente: Control y Supervisión</h2>
+            <p>En el Inbox puedes auditar el desempeño de tu bot y asistirlo si es necesario.</p>
+            <div class="feature-card">
+                <h3>Nota de Razonamiento (AI Reasoning)</h3>
+                <p>¿Por qué el bot dijo eso? Verás una nota técnica: "El cliente consultó stock de repuestos, le informé
+                    disponiblidad y pedí confirmación". Es tu ventana a la mente de la IA.</p>
+            </div>
+            <div class="pro-tip">
+                <h4>⏯️ Pausa Instantánea</h4>
+                <p>Si quieres negociar tú mismo un contrato grande, dale a "Pausar Bot". Toma el mando del chat y vuelve
+                    a activarlo cuando la venta esté encaminada.</p>
+            </div>
+        </div>
+
+        <!-- ESTADISTICAS -->
+        <div class="section page-break">
+            <h2>6. Viendo tus Resultados Reales</h2>
+            <p>Tu Dashboard es el resumen de la eficiencia de tu negocio.</p>
+            <ul>
+                <li><strong>Eficiencia Comercial:</strong> ¿Qué porcentaje de consultas se convierten en ventas reales?
+                </li>
+                <li><strong>Retorno de Inversión:</strong> Cuántas horas de atención comercial te ha ahorrado el sistema
+                    este mes.</li>
+                <li><strong>Tendencias:</strong> Descubre qué servicios son los más solicitados para lanzar promociones
+                    estratégicas.</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <img src="../logo.png" alt="AutonomIA" width="200">
+            <h3>Crecimiento Inteligente para tu Empresa</h3>
+            <p>© 2026 AutonomIA Suite. <br> Atiende mejor. Vende más. Crece con Autonomía.</p>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Propuesta Comercial - AutonomIA Suite</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #11789c;
+            /* Azul corporativo Servicios */
+            --accent: #1a8e84;
+            /* Teal AutonomIA */
+            --background: #ffffff;
+            --surface: #f8fafb;
+            --foreground: #1c2024;
+            --muted: #606a74;
+            --border: #e2e0de;
+            --radius: 12px;
+        }
+
+        /* --- RESET & PRINT --- */
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            .container {
+                width: 100% !important;
+                max-width: none !important;
+                padding: 0 !important;
+            }
+
+            .cover {
+                height: 100vh !important;
+            }
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* --- COVER --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            padding: 40px;
+        }
+
+        .cover img.logo {
+            width: 250px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .cover h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            margin: 0;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .cover h2 {
+            font-family: 'Manrope', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 400;
+            opacity: 0.9;
+            margin: 20px 0 60px;
+        }
+
+        .cover-footer {
+            margin-top: auto;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        /* --- SECTIONS --- */
+        .header-logo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        .header-logo img {
+            height: 40px;
+        }
+
+        .header-logo span {
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Space Grotesk';
+        }
+
+        .section {
+            margin-bottom: 50px;
+            page-break-inside: avoid;
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            padding: 25px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .card h4 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .highlight-box {
+            background: #f0fdf4;
+            border-left: 5px solid var(--accent);
+            padding: 25px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+
+        /* --- PRICING TABLE --- */
+        .pricing-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .pricing-table th {
+            text-align: left;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            font-family: 'Space Grotesk';
+        }
+
+        .pricing-table td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .price-tag {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .old-price {
+            text-decoration: line-through;
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-right: 10px;
+        }
+
+        .footer-note {
+            margin-top: 80px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            padding-top: 30px;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- PORTADA -->
+    <div class="cover">
+        <img src="../logo.png" class="logo" alt="AutonomIA">
+        <h1>Propuesta Comercial<br>& Técnica</h1>
+        <h2>Implementación de Recepcionista Inteligente para WhatsApp</h2>
+        <div class="cover-footer">Documento Preparado para su Negocio • 2026</div>
+    </div>
+
+    <div class="container">
+
+        <div class="header-logo">
+            <img src="../logo.png" alt="AutonomIA">
+            <span>AUTONOMIA SUITE</span>
+        </div>
+
+        <!-- 1. RESUMEN EJECUTIVO -->
+        <div class="section">
+            <h3>1. Resumen Ejecutivo</h3>
+            <p><strong>AutonomIA Suite</strong> es un sistema de recepción inteligente diseñado para transformar el
+                WhatsApp de su negocio en un canal de captación y conversión automática de clientes.</p>
+            <p>El sistema responde instantáneamente cada mensaje entrante, identifica la intención del cliente, captura
+                sus datos automáticamente y permite a su equipo enfocarse exclusivamente en cerrar ventas, eliminando
+                pérdidas por demoras en la atención.</p>
+        </div>
+
+        <!-- 2. PROBLEMA -->
+        <div class="section">
+            <h3>2. Problema Actual Detectado</h3>
+            <p>En negocios que utilizan WhatsApp como canal principal, identificamos barreras críticas que frenan el
+                crecimiento:</p>
+            <div class="grid">
+                <div class="card">
+                    <h4>Pérdida de Oportunidades</h4>
+                    <p>Clientes que se van a la competencia por falta de respuesta inmediata (más de 10 min de espera).
+                    </p>
+                </div>
+                <div class="card">
+                    <h4>Carga Operativa</h4>
+                    <p>Saturación del equipo con consultas repetitivas o clientes no calificados.</p>
+                </div>
+                <div class="card">
+                    <h4>Fuga de Datos</h4>
+                    <p>Ausencia de un registro estructurado y seguimiento organizado de los prospectos.</p>
+                </div>
+                <div class="card">
+                    <h4>Dependencia Humana</h4>
+                    <p>Incapacidad de responder fuera del horario laboral o durante picos de trabajo.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. SOLUCION -->
+        <div class="section page-break">
+            <div class="header-logo">
+                <img src="../logo.png" alt="AutonomIA">
+                <span>SOLUCIÓN TÉCNICA</span>
+            </div>
+            <h3>3. Solución Propuesta</h3>
+            <p>Implementación de un ecosistema de recepción inteligente con IA integrado directamente en su WhatsApp
+                Business.</p>
+
+            <div class="card" style="margin-bottom: 20px;">
+                <h4>Atención Instantánea (IA)</h4>
+                <p>Respuesta automática en menos de 5 segundos a cada cliente, simulando un lenguaje natural y
+                    profesional.</p>
+            </div>
+
+            <div class="card" style="margin-bottom: 20px;">
+                <h4>CRM Automático</h4>
+                <p>Captura de Nombre, Teléfono, Necesidad técnica e Historial, clasificando al prospecto por su
+                    probabilidad de compra.</p>
+            </div>
+
+            <div class="card">
+                <h4>Operación 24/7</h4>
+                <p>El sistema no descansa. Ninguna venta se pierde, incluso si ocurre a las 3:00 AM.</p>
+            </div>
+        </div>
+
+        <!-- 4. ALCANCE -->
+        <div class="section">
+            <h3>4. Alcance de la Implementación</h3>
+            <ul>
+                <li><strong>Configuración Técnica:</strong> Integración con WhatsApp Business API Oficial y activación
+                    del motor dedicado de IA.</li>
+                <li><strong>Entrenamiento personalizado:</strong> Adaptación de la IA a su catálogo de servicios
+                    específico y protocolo comercial.</li>
+                <li><strong>Sistema de Captura:</strong> Activación de base de datos estructurada para la organización
+                    de prospectos.</li>
+                <li><strong>Garantía Operativa:</strong> Pruebas de precisión y validación antes de la puesta en marcha
+                    completa.</li>
+            </ul>
+        </div>
+
+        <!-- 6. INVERSION -->
+        <div class="section page-break">
+            <div class="header-logo">
+                <img src="../logo.png" alt="AutonomIA">
+                <span>INVERSIÓN Y CONDICIONES</span>
+            </div>
+            <h3>5. Inversión del Proyecto</h3>
+
+            <table class="pricing-table">
+                <tr>
+                    <th>Concepto</th>
+                    <th>Detalle</th>
+                    <th>Inversión</th>
+                </tr>
+                <tr>
+                    <td><strong>Implementación y Activación</strong></td>
+                    <td>Pago único. Setup, entrenamiento e integración.</td>
+                    <td>
+                        <span class="old-price">$418.000 CLP</span>
+                        <span class="price-tag">$209.000 CLP</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Licencia Operativa Mensual</strong></td>
+                    <td>Mantención, infraestructura IA y soporte técnico.</td>
+                    <td><span class="price-tag">$59.000 CLP</span> / mes</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <h4>Modalidad de Pago (Setup)</h4>
+                <ul>
+                    <li><strong>50% Inicial ($104.500):</strong> Previo al inicio de la configuración técnica y
+                        entrenamiento.</li>
+                    <li><strong>50% Final ($104.500):</strong> Una vez que el sistema esté operativo y validado en su
+                        WhatsApp.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 7. ROI -->
+        <div class="section">
+            <h3>6. Retorno sobre la Inversión (ROI)</h3>
+            <p>El sistema se paga solo. Dado el bajo costo operativo mensual, <strong>generar solo 1 cliente adicional
+                    al mes</strong> cubre completamente la licencia.</p>
+            <p>El objetivo real es recuperar el 100% de las ventas que hoy se pierden por falta de inmediatez.</p>
+        </div>
+
+        <!-- 8. TIEMPOS -->
+        <div class="section">
+            <h3>7. Plazos y Próximos Pasos</h3>
+            <p>Tiempo de activación: <strong>24 a 72 horas hábiles</strong> desde la confirmación del pago inicial.</p>
+            <ol>
+                <li>Firma y Pago del 50% inicial.</li>
+                <li>Recopilación de información de servicios para el entrenamiento.</li>
+                <li>Configuración técnica y pruebas.</li>
+                <li>Activación y pago del 50% final.</li>
+            </ol>
+        </div>
+
+        <div class="footer-note">
+            <p>© 2026 AutonomIA Suite • Validez de la propuesta: 15 días.</p>
+            <p><em>"Automatiza tu atención, recupera tu vida."</em></p>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
