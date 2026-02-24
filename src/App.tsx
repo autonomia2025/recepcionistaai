@@ -25,6 +25,8 @@ import BookingPage from "@/pages/BookingPage";
 import CancelAppointmentPage from "@/pages/CancelAppointmentPage";
 import LandingWizardPage from "@/pages/LandingWizardPage";
 import EmailSettingsPage from "@/pages/EmailSettingsPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import NotFound from "@/pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -57,6 +59,8 @@ const AppRoutes = () => {
       {/* Public cancel appointment route - direct from email */}
       <Route path="/cita/:appointmentId/:token" element={<CancelAppointmentPage />} />
       <Route path="/auth" element={user ? <Navigate to={defaultRoute} replace /> : <AuthPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/update-password" element={<UpdatePasswordPage />} />
       <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route path="/" element={<Navigate to={user ? defaultRoute : "/auth"} replace />} />
       {/* Landing Wizard - Full screen, outside AppLayout */}
