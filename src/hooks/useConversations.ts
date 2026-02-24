@@ -64,6 +64,7 @@ export function useConversations() {
           status,
           assigned_to_user_id,
           last_message_at,
+          last_message_text,
           created_at,
           ai_summary,
           sentiment,

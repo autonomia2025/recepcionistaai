@@ -5,6 +5,7 @@ import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
