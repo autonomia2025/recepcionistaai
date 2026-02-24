@@ -290,6 +290,11 @@ export default function AuthPage() {
                     </span>
                     <span className={cn("auth-submit-energy", loading && "is-active")} />
                   </Button>
+                  <div className="text-center mt-2">
+                    <a href="/reset-password" className="text-xs text-blue-600 hover:text-blue-700 hover:underline">
+                      ¿Olvidaste tu contraseña?
+                    </a>
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {authError
                       ? 'Acceso requiere habilitación previa del equipo AutonomIA'

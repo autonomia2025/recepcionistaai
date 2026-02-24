@@ -3,11 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
-    // Handle CORS
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
@@ -18,12 +17,48 @@ serve(async (req) => {
             throw new Error('contact_id is required');
         }
 
+        // --- Auth check ---
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+        const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+
+        // Verify caller identity
+        const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+            global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user }, error: userError } = await userClient.auth.getUser();
+        if (userError || !user) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        // 1. Fetch contact details to know which workshop they belong to
+        // Get caller profile for permission check
+        const { data: callerProfile } = await supabase
+            .from('profiles')
+            .select('role, workshop_id')
+            .eq('id', user.id)
+            .single();
+
+        if (!callerProfile) {
+            return new Response(JSON.stringify({ error: 'Profile not found' }), {
+                status: 403,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
+        // 1. Fetch contact details
         const { data: contact, error: contactError } = await supabase
             .from('contacts')
             .select('workshop_id, name')
@@ -34,21 +69,34 @@ serve(async (req) => {
             throw new Error('Contact not found');
         }
 
+        // Permission check: must be SUPERADMIN or same workshop
+        if (callerProfile.role !== 'SUPERADMIN' && callerProfile.workshop_id !== contact.workshop_id) {
+            return new Response(JSON.stringify({ error: 'Access denied: wrong workshop' }), {
+                status: 403,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
         // 2. Fetch conversation history
+        const { data: latestConv } = await supabase
+            .from('conversations')
+            .select('id')
+            .eq('contact_id', contact_id)
+            .order('last_message_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (!latestConv) {
+            return new Response(JSON.stringify({ success: false, message: 'No conversation found' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
         const { data: messages, error: messagesError } = await supabase
             .from('messages')
             .select('text, direction, created_at')
             .eq('workshop_id', contact.workshop_id)
-            .eq('conversation_id', (
-                // Get the latest conversation ID for this contact
-                await supabase
-                    .from('conversations')
-                    .select('id')
-                    .eq('contact_id', contact_id)
-                    .order('last_message_at', { ascending: false })
-                    .limit(1)
-                    .single()
-            ).data?.id)
+            .eq('conversation_id', latestConv.id)
             .order('created_at', { ascending: true });
 
         if (messagesError) throw messagesError;
@@ -62,11 +110,11 @@ serve(async (req) => {
             .map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Asistente'}: ${m.text}`)
             .join('\n');
 
-        // 3. Call OpenAI to extract quote items
-        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        // 3. Call AI via Lovable gateway
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${openaiApiKey}`,
+                'Authorization': `Bearer ${lovableApiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -87,7 +135,7 @@ Para cada ítem, identifica:
 - unit_price: Precio unitario si se mencionó (0 si no se sabe).
 - total_price: Precio total si se mencionó (0 si no se sabe).
 
-Responde ÚNICAMENTE con un array JSON de objetos con estos campos.`
+Responde ÚNICAMENTE con un JSON: { "items": [...] }`
                     },
                     {
                         role: 'user',
@@ -99,9 +147,8 @@ Responde ÚNICAMENTE con un array JSON de objetos con estos campos.`
             }),
         });
 
-        const aiData = await openaiResponse.json();
+        const aiData = await aiResponse.json();
         const result = JSON.parse(aiData.choices[0].message.content);
-        // Expecting something like { "items": [...] }
         const items = Array.isArray(result) ? result : (result.items || []);
 
         if (items.length === 0) {
@@ -110,7 +157,7 @@ Responde ÚNICAMENTE con un array JSON de objetos con estos campos.`
             });
         }
 
-        // 4. Delete existing pending quotation items for this contact to start fresh
+        // 4. Delete existing pending quotation items for this contact
         await supabase
             .from('quotation_items')
             .delete()
@@ -121,6 +168,7 @@ Responde ÚNICAMENTE con un array JSON de objetos con estos campos.`
         const itemsToInsert = items.map((item: any) => ({
             workshop_id: contact.workshop_id,
             contact_id: contact_id,
+            conversation_id: latestConv.id,
             product_name: item.product_name || 'Servicio/Producto',
             quantity: item.quantity || 1,
             unit: item.unit || 'unidad',
@@ -145,7 +193,8 @@ Responde ÚNICAMENTE con un array JSON de objetos con estos campos.`
 
     } catch (error) {
         console.error('Error generating manual quote:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return new Response(JSON.stringify({ error: message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
