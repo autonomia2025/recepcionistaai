@@ -134,6 +134,11 @@ export function ChatView({ conversation }: ChatViewProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Detect dominant channel from messages
+  const detectedChannel = messages?.length
+    ? messages.filter(m => m.direction === 'inbound').slice(-1)[0]?.channel || messages[0]?.channel || 'whatsapp'
+    : 'whatsapp';
+
   const handleSend = async () => {
     if (!message.trim() || sendMessage.isPending) return;
 
@@ -144,6 +149,7 @@ export function ChatView({ conversation }: ChatViewProps) {
       await sendMessage.mutateAsync({
         conversationId: conversation.id,
         text,
+        channel: detectedChannel,
       });
     } catch (error) {
       console.error('Error sending message:', error);
