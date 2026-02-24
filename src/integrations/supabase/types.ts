@@ -1382,6 +1382,7 @@ export type Database = {
           created_at: string
           direction: Database["public"]["Enums"]["message_direction"]
           id: string
+          metadata: Json | null
           text: string
           workshop_id: string
         }
@@ -1391,6 +1392,7 @@ export type Database = {
           created_at?: string
           direction: Database["public"]["Enums"]["message_direction"]
           id?: string
+          metadata?: Json | null
           text: string
           workshop_id: string
         }
@@ -1400,6 +1402,7 @@ export type Database = {
           created_at?: string
           direction?: Database["public"]["Enums"]["message_direction"]
           id?: string
+          metadata?: Json | null
           text?: string
           workshop_id?: string
         }
@@ -2481,6 +2484,7 @@ export type Database = {
           created_at: string
           direction: string
           id: string
+          metadata: Json
           text: string
           workshop_id: string
         }[]
