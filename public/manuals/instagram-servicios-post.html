@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Servicios Post - AutonomIA Suite</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a8e84;
+            --accent: #11789c;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gold: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            background: #111;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 0;
+        }
+
+        .instructions {
+            max-width: 800px;
+            background: white;
+            color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- SLIDE CONTAINER --- */
+        .slide {
+            width: 1080px;
+            height: 1920px;
+            background: var(--dark);
+            margin-bottom: 80px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 100px;
+            box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
+            transform: scale(0.4);
+            /* Reduced size for browser view */
+            transform-origin: top center;
+        }
+
+        @media print {
+            .slide {
+                margin: 0;
+                transform: none;
+                page-break-after: always;
+            }
+
+            .instructions {
+                display: none;
+            }
+
+            body {
+                padding: 0;
+                background: white;
+            }
+        }
+
+        /* --- BACKGROUNDS --- */
+        .bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 60px;
+            padding: 60px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* --- TYPOGRAPHY --- */
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 110px;
+            line-height: 1;
+            letter-spacing: -0.05em;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        p {
+            font-size: 44px;
+            line-height: 1.4;
+            opacity: 0.9;
+            text-align: center;
+        }
+
+        .highlight {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- COMPONENTS --- */
+        .badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 100px;
+            font-size: 28px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 40px;
+        }
+
+        .cta-btn {
+            background: white;
+            color: var(--dark);
+            padding: 40px 80px;
+            border-radius: 100px;
+            font-size: 48px;
+            font-weight: 800;
+            margin-top: 60px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        /* MOCKUP UI */
+        .mockup-ui {
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            border-radius: 40px;
+            color: #333;
+            overflow: hidden;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+            margin: 40px 0;
+        }
+
+        .mockup-header {
+            background: #f1f5f9;
+            padding: 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .mockup-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+
+        .mockup-content {
+            padding: 50px;
+        }
+
+        .quote-item {
+            border-left: 8px solid var(--primary);
+            background: #f8fafc;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .quote-item h3 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .quote-item p {
+            font-size: 28px;
+            text-align: left;
+            color: #64748b;
+        }
+
+        .quote-price {
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        /* DECORATIONS */
+        .floating-circles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            opacity: 0.2;
+            filter: blur(80px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="instructions">
+        <h2>📷 Post para Instagram: Rebranding "Servicios"</h2>
+        <p>Este post está enfocado 100% en el nuevo modelo de **Cotizaciones Automáticas**.</p>
+        <p>1. Ajusta el zoom para ver las láminas.</p>
+        <p>2. Presiona <b>Ctrl + P</b> e imprime a PDF.</p>
+    </div>
+
+    <!-- SLIDE 1: EL GANCHO -->
+    <div class="slide">
+        <div class="bg-overlay" style="background-image: url('ig-bg-1.png'); opacity: 0.8;"></div>
+        <div class="floating-circles">
+            <div class="circle" style="width: 800px; height: 800px; top: -200px; left: -200px;"></div>
+            <div class="circle"
+                style="width: 600px; height: 600px; bottom: 100px; right: -100px; background: var(--accent);"></div>
+        </div>
+        <div class="glass-panel">
+            <div class="badge">AutonomIA 2026</div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                <h1 style="font-size: 130px;">Vende <br><span class="gradient-text">Más Rápido</span></h1>
+                <p>Tu negocio no puede esperar. Hemos evolucionado para que tu respuesta sea instantánea.</p>
+            </div>
+            <div style="width: 100%; height: 600px; display: flex; justify-content: center; align-items: center;">
+                <img src="ig-bg-3.png"
+                    style="width: 80%; border-radius: 50px; box-shadow: 0 50px 100px rgba(0,0,0,0.7);" alt="AI Sales">
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: REBRANDING -->
+    <div class="slide">
+        <div class="floating-circles">
+            <div class="circle" style="width: 900px; height: 900px; top: 20%; left: -300px; opacity: 0.1;"></div>
+        </div>
+        <div class="glass-panel" style="justify-content: center; gap: 80px;">
+            <h1 style="font-size: 80px;">Adiós a los Bots Silenciosos.</h1>
+            <h1 style="font-size: 120px;" class="gradient-text">Hola, AutonomIA Suite.</h1>
+            <p style="font-size: 52px; font-weight: 300;">Ya no solo respondemos un "Hola". Ahora gestionamos tu venta
+                de principio a fin.</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: LA FUNCIÓN ESTRELLA -->
+    <div class="slide">
+        <div class="bg-overlay" style="background: var(--dark);"></div>
+        <div class="glass-panel">
+            <div class="badge">Nuevo Servicio</div>
+            <h1>Cotización <span class="highlight">Automatizada</span></h1>
+            <p>Nuestra IA ahora extrae productos, cantidades y tipos de servicio directamente del chat.</p>
+
+            <div class="mockup-ui">
+                <div class="mockup-header">
+                    <div class="mockup-dot" style="background: #ff5f56;"></div>
+                    <div class="mockup-dot" style="background: #ffbd2e;"></div>
+                    <div class="mockup-dot" style="background: #27c93f;"></div>
+                    <span style="font-weight: 700; opacity: 0.5;">Ficha de Cotización</span>
+                </div>
+                <div class="mockup-content">
+                    <div class="quote-item">
+                        <div>
+                            <h3>Servicio de Detallado</h3>
+                            <p>Full Cerámico - BMW M3</p>
+                        </div>
+                        <div class="quote-price">$350.000</div>
+                    </div>
+                    <div class="quote-item" style="border-left-color: #f59e0b;">
+                        <div>
+                            <h3>Mano de Obra</h3>
+                            <p>Especialista Senior</p>
+                        </div>
+                        <div class="quote-price">$85.000</div>
+                    </div>
+                    <div style="text-align: right; font-size: 32px; font-weight: 700; color: #64748b;">
+                        Total IA: <span style="color: black; font-size: 48px;">$435.000</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: EXTRACCIÓN -->
+    <div class="slide">
+        <div class="bg-overlay" style="background-image: url('scheduling-cover.png'); opacity: 0.3;"></div>
+        <div class="glass-panel">
+            <div class="badge">Poder de Datos</div>
+            <h1>Entonamos con <br>tu <span class="gradient-text">Workflow</span></h1>
+            <div style="margin: 60px 0; display: flex; flex-direction: column; gap: 40px; width: 100%;">
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 50px; border-radius: 40px; border: 2px solid rgba(255,255,255,0.1); width: 100%;">
+                    <p style="text-align: left; font-size: 40px;">✅ Detección de Productos</p>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 50px; border-radius: 40px; border: 2px solid rgba(255,255,255,0.1); width: 100%;">
+                    <p style="text-align: left; font-size: 40px;">✅ Cálculo de Precios</p>
+                </div>
+                <div
+                    style="background: rgba(255,255,255,0.05); padding: 50px; border-radius: 40px; border: 2px solid rgba(255,255,255,0.1); width: 100%;">
+                    <p style="text-align: left; font-size: 40px;">✅ Calificación de Leads</p>
+                </div>
+            </div>
+            <p>Tú solo revisas el resumen en tu panel. No más papel y lápiz.</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: EL IMPACTO -->
+    <div class="slide">
+        <div class="floating-circles">
+            <div class="circle" style="width: 1000px; height: 1000px; top: -500px; right: -500px; opacity: 0.3;"></div>
+        </div>
+        <div class="glass-panel" style="justify-content: center; gap: 100px;">
+            <div style="text-align: center;">
+                <h2 style="font-size: 160px;" class="gradient-text">3 Segundos.</h2>
+                <p>Es lo que tardamos en procesar una consulta compleja.</p>
+            </div>
+            <div style="text-align: center;">
+                <h2 style="font-size: 160px; color: var(--gold);">100%</h2>
+                <p>De tus clientes reciben respuesta oficial.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: CTA -->
+    <div class="slide">
+        <div class="bg-overlay" style="background-image: url('ig-bg-1.png'); opacity: 0.5;"></div>
+        <div class="glass-panel">
+            <div class="badge">Sé parte de la Suite</div>
+            <h1 style="font-size: 140px;">AutonomIA <br><span class="gradient-text">Suite</span></h1>
+            <p>Empieza a cotizar con Inteligencia Real. <br><br><b>Link en la Bio</b></p>
+
+            <div class="cta-btn">PROBAR DEMO</div>
+
+            <div
+                style="margin-top: 100px; font-family: 'Space Grotesk'; font-size: 32px; letter-spacing: 0.5em; opacity: 0.5;">
+                AUTONOMIA.AI
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
