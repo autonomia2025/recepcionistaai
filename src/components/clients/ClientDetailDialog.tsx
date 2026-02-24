@@ -286,39 +286,31 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
   const totalEstimatedValue = serviceRequests?.reduce((sum, sr) => sum + (sr.estimated_value || 0), 0) || 0;
   const totalQuotationValue = quotationItems?.reduce((sum, qi) => sum + (qi.total_price || 0), 0) || 0;
 
-  // Re-analyze conversations
+  // Re-analyze conversations to generate manual quote
   const handleReanalyze = async () => {
-    if (!conversations || conversations.length === 0) {
-      toast.error('No hay conversaciones para analizar');
-      return;
-    }
-
     setIsAnalyzing(true);
     try {
-      let analyzedCount = 0;
-
-      for (const conv of conversations) {
-        const { error } = await supabase.functions.invoke('analyze-conversation', {
-          body: {
-            conversation_id: conv.id,
-            contact_id: contact.id
-          }
-        });
-
-        if (!error) {
-          analyzedCount++;
+      const { data, error } = await supabase.functions.invoke('generate-manual-quote', {
+        body: {
+          contact_id: contact.id
         }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        // Refresh data
+        await refetchQuotationItems();
+        queryClient.invalidateQueries({ queryKey: ['client-conversations', contact.id] });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+
+        toast.success(`Cotización generada correctamente: ${data.items_count} ítems detectados.`);
+      } else {
+        toast.info(data?.message || 'No se pudieron extraer ítems de cotización de la conversación.');
       }
-
-      // Refresh data
-      await refetchQuotationItems();
-      queryClient.invalidateQueries({ queryKey: ['client-conversations', contact.id] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
-
-      toast.success(`Se analizaron ${analyzedCount} conversación(es). Datos de cotización extraídos.`);
     } catch (error) {
-      console.error('Error analyzing conversations:', error);
-      toast.error('Error al analizar las conversaciones');
+      console.error('Error generating manual quote:', error);
+      toast.error('Error al generar la cotización con IA');
     } finally {
       setIsAnalyzing(false);
     }
@@ -552,13 +544,35 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
 
         <Separator />
 
-        {/* Quotation Items (for chatbot_only mode) - Main section */}
-        {isChatbotOnly && quotationItems && quotationItems.length > 0 && (
-          <div>
-            <h4 className="font-medium mb-3 flex items-center gap-2">
+        {/* Quotation Items - Available for all modes now */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              📋 Cotización Solicitada ({quotationItems.length} {quotationItems.length === 1 ? 'item' : 'items'})
+              📋 Cotización Solicitada {quotationItems && quotationItems.length > 0 && `(${quotationItems.length})`}
             </h4>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReanalyze}
+              disabled={isAnalyzing}
+              className="h-8 text-xs"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1.5" />
+                  Generar Cotización (IA)
+                </>
+              )}
+            </Button>
+          </div>
+
+          {quotationItems && quotationItems.length > 0 ? (
             <div className="space-y-4">
               {quotationItems.map((item) => {
                 const statusInfo = QUOTATION_STATUS_LABELS[item.status] || QUOTATION_STATUS_LABELS.pending;
@@ -586,10 +600,10 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
                         </div>
                         {(item.unit_price || item.total_price) && (
                           <div className="text-right">
-                            {item.total_price && (
+                            {item.total_price && item.total_price > 0 && (
                               <p className="font-bold text-lg text-primary">{formatCurrency(item.total_price)}</p>
                             )}
-                            {item.unit_price && (
+                            {item.unit_price && item.unit_price > 0 && (
                               <p className="text-xs text-muted-foreground">{formatCurrency(item.unit_price)}/unidad</p>
                             )}
                           </div>
@@ -673,8 +687,15 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
                 </Card>
               )}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-center py-8 border-2 border-dashed rounded-xl border-muted bg-muted/5">
+              <ClipboardList className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No hay ítems de cotización detectados aún.</p>
+              <p className="text-xs text-muted-foreground/60 mb-4">Usa el botón de arriba para analizar la conversación.</p>
+            </div>
+          )}
+        </div>
+
 
         {/* Service Requests (for chatbot_only mode) */}
         {isChatbotOnly && serviceRequests && serviceRequests.length > 0 && (
