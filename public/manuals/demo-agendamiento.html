@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Extendida AutonomIA - Modelo Agendamiento</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6d28d9;
+            /* Morado para agendamiento (Calendar feel) */
+            --accent: #1a8e84;
+            /* Teal corporativo */
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --foreground: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--foreground);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: var(--background);
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            .container {
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+
+            .cover {
+                height: 100vh !important;
+                page-break-after: always;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* --- COVER --- */
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            text-align: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        .cover img.logo {
+            width: 250px;
+            margin-bottom: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .cover h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.8rem;
+            margin: 0;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .cover p {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            opacity: 0.9;
+            max-width: 700px;
+        }
+
+        /* --- SECTIONS --- */
+        .section {
+            background: var(--surface);
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+            margin-bottom: 50px;
+            border: 1px solid var(--border);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .section-header h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.4rem;
+            color: var(--primary);
+            margin: 0 0 15px 0;
+        }
+
+        .section-header p {
+            color: var(--muted);
+            font-size: 1.15rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* --- MOCKUP WINDOWS --- */
+        .mockup-window {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
+            margin: 30px 0;
+            background: white;
+        }
+
+        .mockup-header {
+            background: #f1f5f9;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot.r {
+            background: #ff5f56;
+        }
+
+        .dot.y {
+            background: #ffbd2e;
+        }
+
+        .dot.g {
+            background: #27c93f;
+        }
+
+        .mockup-title {
+            margin-left: 10px;
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+
+        /* --- TWO COLUMNS LAYOUT --- */
+        .split-layout {
+            display: flex;
+            gap: 30px;
+        }
+
+        .split-content {
+            flex: 1;
+        }
+
+        /* --- UI COMPONENTS --- */
+        .feature-box {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .feature-box h4 {
+            color: var(--primary);
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+        }
+
+        .feature-box p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--muted);
+        }
+
+        /* BOT SETTINGS MOCKUP */
+        .setting-row {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .setting-input {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--foreground);
+        }
+
+        /* MULTI-CHAT MOCKUP */
+        .chat-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .chat-in {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-top-left-radius: 0;
+        }
+
+        .chat-out {
+            background: var(--primary);
+            color: white;
+            margin-left: auto;
+            border-top-right-radius: 0;
+        }
+
+        .ai-reasoning {
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: -5px;
+            max-width: 80%;
+            margin-left: auto;
+        }
+
+        /* CALENDAR / APPOINTMENT MOCKUP */
+        .appointment-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .apt-time {
+            text-align: center;
+            min-width: 60px;
+            border-right: 1px solid var(--border);
+            padding-right: 15px;
+        }
+
+        .apt-time strong {
+            display: block;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .apt-time span {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .apt-info h5 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .apt-info p {
+            margin: 2px 0 0 0;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .apt-status {
+            margin-left: auto;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .status-confirmed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* METRICS */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .metric-card {
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            background: #f8fafb;
+        }
+
+        .metric-val {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Space Grotesk';
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .metric-sub {
+            font-size: 0.75rem;
+            color: #10b981;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="cover">
+        <img src="../logo.png" class="logo" alt="AutonomIA">
+        <h1>Tu Agenda Llena, Sin Esfuerzo</h1>
+        <p>Una demostración completa de cómo AutonomIA Suite califica a tus pacientes o clientes, sincroniza tu
+            disponibilidad y reduce el ausentismo de forma automática.</p>
+    </div>
+
+    <div class="container">
+
+        <!-- SECCION 1: CONFIGURA EL AGENDAMIENTO -->
+        <div class="section">
+            <div class="section-header">
+                <h2>1. Tu Agenda Personalizada (Smart Scheduling)</h2>
+                <p>Configura tus horarios, duración por servicio y reglas de negocio. La IA se convierte en tu
+                    recepcionista
+                    con acceso a tu disponibilidad real.</p>
+            </div>
+
+            <div class="split-layout">
+                <div class="split-content">
+                    <div class="mockup-window" style="margin-top: 0;">
+                        <div class="mockup-header">
+                            <div class="dot r"></div>
+                            <div class="dot y"></div>
+                            <div class="dot g"></div>
+                            <span class="mockup-title">Settings / Agenda y Disponibilidad</span>
+                        </div>
+                        <div style="padding: 20px;">
+                            <div class="setting-row">
+                                <span class="setting-label">Configuración de Horarios</span>
+                                <div class="setting-input">
+                                    Lunes a Viernes: 09:00 - 18:00 hrs.<br>
+                                    Bloquear: 13:00 - 14:00 (Almuerzo).<br>
+                                    Duración promedio: 45 min por cita.
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <span class="setting-label">Reglas de Calificación</span>
+                                <div class="setting-input">
+                                    Si es cliente nuevo para 'Tratamiento Estético', solicitar confirmación de
+                                    presupuesto previo.
+                                    Priorizar citas de 'Evaluación Dental' para los próximos 3 días.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="split-content">
+                    <div class="feature-box">
+                        <h4>Sincronización Total</h4>
+                        <p>Se conecta con la base de datos de tu taller, clínica o estudio para nunca agendar dos
+                            personas
+                            en el mismo slot.</p>
+                    </div>
+                    <div class="feature-box">
+                        <h4>Filtro de Calidad</h4>
+                        <p>Dile a la IA qué datos son obligatorios antes de dar una hora (ej: RUT, modelo de auto, o
+                            motivo de consulta médica).</p>
+                    </div>
+                    <div class="feature-box">
+                        <h4>Recordatorios Automáticos</h4>
+                        <p>El sistema envía WhatsApp de recordatorio 24h y 2h antes de la cita, con botón de
+                            confirmación o cancelación.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 2: INBOX & CONVERSIÓN -->
+        <div class="section page-break">
+            <div class="section-header">
+                <h2>2. Conversión Inteligente 24/7</h2>
+                <p>La IA no solo responde dudas, guía al usuario hacia el agendamiento mediante un flujo natural y
+                    persuasivo.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Panel / Inbox y Booking</span>
+                </div>
+                <div class="split-layout" style="gap: 0; align-items: stretch;">
+                    <div style="flex: 2; padding: 20px; border-right: 1px solid var(--border);">
+                        <div class="chat-bubble chat-in">Hola, ¿tienen hora disponible para una limpieza dental? Me
+                            duele un poco una muela también.</div>
+                        <div class="chat-bubble chat-out">¡Hola! Lamento que tengas esa molestia. Soy el asistente de
+                            Clínica Dental Salud. Sí, tenemos espacios esta semana. \n\nPara agendar la limpieza y que
+                            el doctor revise ese dolor, ¿te acomoda más venir por la mañana o por la tarde?</div>
+                        <div class="ai-reasoning">🤖 AI Reasoning: Detecté urgencia por dolor. Clasifiqué como
+                            "Evaluación + Limpieza". Utilicé tono empático. Ofrecí bloques horarios según disponibilidad
+                            vigente.</div>
+                        <div class="chat-bubble chat-in">Mañana martes por la tarde sería ideal.</div>
+                        <div class="chat-bubble chat-out">Perfecto. Tenemos disponible a las 16:30 hrs. Solo necesito tu
+                            nombre completo para confirmar y te enviaré un link para que termines de registrar tu ficha.
+                        </div>
+                    </div>
+                    <div style="flex: 1; padding: 20px; background: #fafafa;">
+                        <span class="setting-label">Estado del Lead</span>
+                        <div
+                            style="margin-top: 15px; border: 1px solid var(--border); border-radius: 8px; padding: 15px; background: white;">
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">ESTADO</span><br>
+                                <span
+                                    style="background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.8rem;">RESERVA
+                                    EN PROCESO</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">CITA TENTATIVA</span><br>
+                                <strong>Martes, 16:30 hrs</strong>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 0.7rem; color: var(--muted);">NOTA DE IA</span><br>
+                                <p style="font-size: 0.8rem; color: var(--muted);">Paciente con dolor agudo. Requiere
+                                    revisión prioritaria.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 3: GESTIÓN DE CITAS -->
+        <div class="section page-break">
+            <div class="section-header">
+                <h2>3. Tu Panel de Agenda Maestro</h2>
+                <p>Visualiza todas tus citas confirmadas y pendientes. Gestiona cambios y cancelaciones con un click
+                    mientras la IA mantiene al cliente informado.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Panel / Gestión de Agenda</span>
+                </div>
+                <div style="padding: 20px; background: #f1f5f9;">
+                    <div class="appointment-card">
+                        <div class="apt-time">
+                            <strong>09:00</strong>
+                            <span>Mañana</span>
+                        </div>
+                        <div class="apt-info">
+                            <h5>Felipe Rodó</h5>
+                            <p>Evaluación General • Dr. Arancibia</p>
+                        </div>
+                        <div class="apt-status status-confirmed">Confirmada</div>
+                    </div>
+                    <div class="appointment-card">
+                        <div class="apt-time">
+                            <strong>11:30</strong>
+                            <span>Mañana</span>
+                        </div>
+                        <div class="apt-info">
+                            <h5>María José Silva</h5>
+                            <p>Tratamiento Estético • Dra. Soto</p>
+                        </div>
+                        <div class="apt-status status-pending">Esperando Registro</div>
+                    </div>
+                    <div class="appointment-card">
+                        <div class="apt-time">
+                            <strong>16:30</strong>
+                            <span>Mañana</span>
+                        </div>
+                        <div class="apt-info">
+                            <h5>Carlos Paredes (IA Generated)</h5>
+                            <p>Urgencia / Limpieza • Libre</p>
+                        </div>
+                        <div class="apt-status status-confirmed">Confirmada por Bot</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCION 4: ROI & MÉTRICAS -->
+        <div class="section">
+            <div class="section-header">
+                <h2>4. Cero Citas Perdidas (Resultados)</h2>
+                <p>Mide el impacto real en tu facturación. Cuántas citas se generaron solas y cuánto se redujo el
+                    ausentismo gracias a los recordatorios inteligentes.</p>
+            </div>
+
+            <div class="mockup-window">
+                <div class="mockup-header">
+                    <div class="dot r"></div>
+                    <div class="dot y"></div>
+                    <div class="dot g"></div>
+                    <span class="mockup-title">Dashboard / Analytics Agendamiento</span>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Citas Generadas</div>
+                        <div class="metric-val">42</div>
+                        <div class="metric-sub">Agendadas 100% por la IA este mes</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Reducción de No-Shows</div>
+                        <div class="metric-val">-65%</div>
+                        <div style="font-size: 0.75rem; color: #10b981; margin-top: 5px;">Gracias a recordatorios x
+                            WhatsApp</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Citas Fuera de Horario</div>
+                        <div class="metric-val">18</div>
+                        <div class="metric-sub">Clientes rescatados post 19:00 hrs.</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Tasa de Confirmación</div>
+                        <div class="metric-val">94%</div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Respuesta rápida al primer
+                            contacto</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Tiempo Recepción Liberado</div>
+                        <div class="metric-val">22<span style="font-size: 1rem; color: var(--muted);">hrs</span></div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 5px;">Menos llamadas, más
+                            productividad</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">ROI Mensual Estimado</div>
+                        <div class="metric-val">8.4x</div>
+                        <div class="metric-sub">Retorno sobre inversión del sistema</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section"
+            style="background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%); color: white; border: none;">
+            <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: white; font-size: 2.2rem; margin-bottom: 20px;">Tu negocio nunca duerme. Tu agenda
+                    tampoco.</h2>
+                <p style="font-size: 1.15rem; color: #ddd6fe; margin-bottom: 30px;">Elimina el error humano, olvida los
+                    choques de horario y escala tu negocio de servicios con AutonomIA Suite. Tu recepcionista estrella,
+                    disponible cada segundo.</p>
+                <div style="font-family: 'Space Grotesk'; font-size: 1.4rem; color: #a78bfa; font-weight: 700;">
+                    Bienvenido al futuro del agendamiento.</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 40px;">
+            © 2026 AutonomIA Suite. Modelo "Agendamiento Inteligente". Los datos mostrados corresponden a la
+            funcionalidad estándar del sistema.
+        </div>
+    </div>
+</body>
+
+</html>
