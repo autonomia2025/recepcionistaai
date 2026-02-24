@@ -652,7 +652,7 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
                                 <span className="text-muted-foreground">•</span>
                                 <span>
                                   <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>{' '}
-                                  {value}
+                                  {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}
                                 </span>
                               </li>
                             ))}
