@@ -142,7 +142,6 @@ Responde ÚNICAMENTE con un JSON: { "items": [...] }`
                         content: `Historial de chat:\n${historyText}`
                     }
                 ],
-                temperature: 0,
                 response_format: { type: "json_object" }
             }),
         });
