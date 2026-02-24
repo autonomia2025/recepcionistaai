@@ -136,6 +136,7 @@ export default function ClientsPage() {
         .from('contacts')
         .select('*')
         .eq('workshop_id', profile.workshop_id)
+        .eq('archived', false)
         .order('lead_score', { ascending: false });
       
       if (error) throw error;
@@ -187,18 +188,18 @@ export default function ClientsPage() {
     enabled: !!profile?.workshop_id,
   });
 
-  // Delete contact mutation
+  // Archive contact mutation (soft-delete)
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
       const { error } = await supabase
         .from('contacts')
-        .delete()
+        .update({ archived: true })
         .eq('id', contactId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast({ title: 'Cliente eliminado correctamente' });
+      toast({ title: 'Cliente archivado correctamente' });
       setDeleteContactId(null);
     },
     onError: (error: Error) => {
@@ -568,9 +569,9 @@ export default function ClientsPage() {
       <AlertDialog open={!!deleteContactId} onOpenChange={() => setDeleteContactId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar cliente?</AlertDialogTitle>
+            <AlertDialogTitle>¿Archivar cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el cliente y toda su información asociada.
+              El cliente será archivado y dejará de aparecer en la lista. Sus conversaciones y datos se conservarán.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -579,7 +580,7 @@ export default function ClientsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteContactId && deleteContactMutation.mutate(deleteContactId)}
             >
-              Eliminar
+              Archivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

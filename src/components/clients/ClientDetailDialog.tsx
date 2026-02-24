@@ -270,7 +270,7 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
       if (error) throw error;
       return data as QuotationItem[];
     },
-    enabled: isChatbotOnly,
+    enabled: true,
   });
 
   const scoreInfo = getLeadScoreInfo(contact.lead_score);
@@ -353,7 +353,7 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
         </div>
 
         {/* Re-analyze Button (for chatbot_only mode) */}
-        {isChatbotOnly && conversations && conversations.length > 0 && (
+        {conversations && conversations.length > 0 && (
           <Button
             variant="outline"
             size="sm"
@@ -879,6 +879,7 @@ export function ClientDetailDialog({ contact, open, onOpenChange }: ClientDetail
         <SheetContent side="bottom" className="h-[90vh] px-3 pt-4">
           <SheetHeader className="pb-3">
             <SheetTitle className="text-lg">Ficha de Cliente</SheetTitle>
+            <p className="sr-only">Información detallada del cliente seleccionado</p>
           </SheetHeader>
           <ClientDetailContent contact={contact} />
         </SheetContent>
@@ -891,6 +892,7 @@ export function ClientDetailDialog({ contact, open, onOpenChange }: ClientDetail
       <DialogContent className="max-w-2xl max-h-[90vh] p-4 md:p-6">
         <DialogHeader>
           <DialogTitle>Ficha de Cliente</DialogTitle>
+          <DialogDescription className="sr-only">Información detallada del cliente seleccionado</DialogDescription>
         </DialogHeader>
         <ClientDetailContent contact={contact} />
       </DialogContent>

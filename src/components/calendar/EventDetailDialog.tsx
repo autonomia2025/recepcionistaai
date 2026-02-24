@@ -190,6 +190,7 @@ export function EventDetailDialog({ event, open, onOpenChange }: EventDetailDial
             <Calendar className="h-5 w-5 text-primary" />
             {event.title}
           </DialogTitle>
+          <DialogDescription className="sr-only">Detalles del evento de calendario</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">
