@@ -122,8 +122,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get admin email (use first admin if no specific email set)
+    // Get admin email: 1) explicit setting, 2) connected Gmail, 3) first admin profile
     let adminEmail = workshop.admin_notification_email;
+    if (!adminEmail) {
+      // Try connected Gmail email
+      const { data: gmailToken } = await supabase
+        .from('workshop_gmail_tokens')
+        .select('gmail_email')
+        .eq('workshop_id', workshop_id)
+        .single();
+      
+      adminEmail = gmailToken?.gmail_email;
+    }
     if (!adminEmail) {
       const { data: adminProfile } = await supabase
         .from('profiles')

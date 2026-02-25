@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useWorkshop } from '@/hooks/useWorkshopData';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +23,7 @@ export default function EmailSettingsPage() {
   const [notifyHotLead, setNotifyHotLead] = useState(false);
   const [notifyAppointment, setNotifyAppointment] = useState(false);
   const [notifyQuotation, setNotifyQuotation] = useState(false);
+  const [notificationEmail, setNotificationEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -33,6 +35,7 @@ export default function EmailSettingsPage() {
       setNotifyHotLead(workshop.email_notifications_hot_lead ?? false);
       setNotifyAppointment(workshop.email_notifications_appointment ?? false);
       setNotifyQuotation((workshop as { email_notifications_quotation?: boolean }).email_notifications_quotation ?? false);
+      setNotificationEmail((workshop as { admin_notification_email?: string }).admin_notification_email ?? workshop.gmail_email ?? '');
     }
   }, [workshop]);
 
@@ -47,7 +50,8 @@ export default function EmailSettingsPage() {
           email_notifications_handoff: notifyHandoff,
           email_notifications_hot_lead: notifyHotLead,
           email_notifications_appointment: notifyAppointment,
-          email_notifications_quotation: notifyQuotation
+          email_notifications_quotation: notifyQuotation,
+          admin_notification_email: notificationEmail || null
         })
         .eq('id', workshop.id);
 
@@ -109,6 +113,22 @@ export default function EmailSettingsPage() {
                   Conecta Gmail primero para activar las notificaciones por email
                 </div>
               )}
+
+              {/* Recipient email */}
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                <Label htmlFor="notificationEmail">📬 Email donde recibirás las alertas</Label>
+                <Input
+                  id="notificationEmail"
+                  type="email"
+                  value={notificationEmail}
+                  onChange={(e) => setNotificationEmail(e.target.value)}
+                  placeholder={workshop?.gmail_email || 'tu@email.com'}
+                  disabled={!gmailConnected}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si lo dejas vacío, se usará el Gmail conectado ({workshop?.gmail_email || '—'})
+                </p>
+              </div>
 
               <div className="space-y-4">
                 {/* Handoff - available for ALL workshops */}
