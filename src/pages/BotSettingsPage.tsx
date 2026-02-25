@@ -536,9 +536,9 @@ export default function BotSettingsPage() {
           </div>
         </div>
 
-        {/* Right column - Chat Simulator */}
+        {/* Right column - Chat Simulator (visible on all screens) */}
         <div className="xl:col-span-1">
-          <div className="sticky top-6">
+          <div className="xl:sticky xl:top-6">
             <ChatSimulator />
           </div>
         </div>

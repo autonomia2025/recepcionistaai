@@ -42,7 +42,7 @@ import {
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -71,6 +71,7 @@ interface Contact {
   service_requests_count?: number;
   total_estimated_value?: number;
   last_comuna?: string | null;
+  last_contact_at?: string | null;
 }
 
 function getLeadScoreInfo(score: number) {
@@ -91,6 +92,15 @@ function getIntentLabel(intent: string | null) {
     otro: { label: 'Otro', emoji: '📝' },
   };
   return intent ? labels[intent] || { label: intent, emoji: '📝' } : null;
+}
+
+function formatLastContact(dateStr: string | null | undefined) {
+  if (!dateStr) return null;
+  try {
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: es });
+  } catch {
+    return null;
+  }
 }
 
 function TableSkeleton() {
@@ -155,9 +165,33 @@ export default function ClientsPage() {
         filteredContacts = filteredContacts.filter(c => assignedContactIds.has(c.id));
       }
 
+      // Fetch last_message_at from conversations for each contact
+      const contactIds = filteredContacts.map(c => c.id);
+      if (contactIds.length > 0) {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('contact_id, last_message_at')
+          .eq('workshop_id', profile.workshop_id)
+          .in('contact_id', contactIds);
+
+        // Group by contact_id, take the max last_message_at
+        const lastContactMap: Record<string, string> = {};
+        conversations?.forEach(conv => {
+          if (conv.last_message_at) {
+            if (!lastContactMap[conv.contact_id] || conv.last_message_at > lastContactMap[conv.contact_id]) {
+              lastContactMap[conv.contact_id] = conv.last_message_at;
+            }
+          }
+        });
+
+        filteredContacts = filteredContacts.map(c => ({
+          ...c,
+          last_contact_at: lastContactMap[c.id] || null,
+        }));
+      }
+
       // For chatbot_only mode, fetch service request aggregates
       if (isChatbotOnly) {
-        const contactIds = filteredContacts.map(c => c.id);
         if (contactIds.length > 0) {
           const { data: serviceRequests } = await supabase
             .from('service_requests')
@@ -182,6 +216,16 @@ export default function ClientsPage() {
           }));
         }
       }
+
+      // Sort by last_contact_at DESC (most recent first), then by created_at DESC
+      filteredContacts.sort((a, b) => {
+        const aDate = a.last_contact_at || '';
+        const bDate = b.last_contact_at || '';
+        if (bDate && !aDate) return 1;
+        if (aDate && !bDate) return -1;
+        if (aDate && bDate) return bDate.localeCompare(aDate);
+        return b.created_at.localeCompare(a.created_at);
+      });
 
       return filteredContacts;
     },
@@ -391,7 +435,7 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Client List */}
       <Card className="card-premium overflow-hidden">
         <CardHeader className="py-4 px-4 md:px-6 border-b border-border/50">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -410,150 +454,228 @@ export default function ClientsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="table-premium">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-4 md:pl-6">Cliente</TableHead>
-                    <TableHead className="hidden sm:table-cell">Teléfono</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead className="hidden md:table-cell">Intención</TableHead>
-                    {!isChatbotOnly && (
-                      <TableHead className="hidden lg:table-cell">Agendó</TableHead>
-                    )}
-                    <TableHead className="hidden md:table-cell">Recontacto</TableHead>
-                    <TableHead className="hidden lg:table-cell">Fecha</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredContacts?.map((contact) => {
-                    const scoreInfo = getLeadScoreInfo(contact.lead_score);
-                    const intentInfo = getIntentLabel(contact.detected_intent);
-                    
-                    return (
-                      <TableRow 
-                        key={contact.id} 
-                        className="cursor-pointer"
-                        onClick={() => setSelectedContact(contact)}
-                      >
-                        <TableCell className="pl-4 md:pl-6">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              'w-9 h-9 rounded-full flex items-center justify-center text-base',
-                              contact.lead_score >= 80 ? 'bg-orange-50' : 
-                              contact.lead_score >= 50 ? 'bg-amber-50' : 'bg-gray-100'
+            <>
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-border/50">
+                {filteredContacts?.map((contact) => {
+                  const scoreInfo = getLeadScoreInfo(contact.lead_score);
+                  const lastContact = formatLastContact(contact.last_contact_at);
+                  
+                  return (
+                    <div 
+                      key={contact.id}
+                      className="p-4 active:bg-muted/50 cursor-pointer"
+                      onClick={() => setSelectedContact(contact)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          'w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0',
+                          contact.lead_score >= 80 ? 'bg-orange-50' : 
+                          contact.lead_score >= 50 ? 'bg-amber-50' : 'bg-gray-100'
+                        )}>
+                          {scoreInfo.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium text-sm truncate">{contact.name}</p>
+                            <span className={cn(
+                              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border flex-shrink-0',
+                              scoreInfo.className
                             )}>
-                              {scoreInfo.emoji}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{contact.name}</p>
-                              {contact.email && (
-                                <p className="text-xs text-muted-foreground truncate hidden md:block">
-                                  {contact.email}
-                                </p>
-                              )}
-                              <p className="text-xs text-muted-foreground sm:hidden">
-                                {contact.phone || '-'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Phone className="w-3.5 h-3.5" />
-                            <span className="text-sm">{contact.phone || '-'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
-                            scoreInfo.className
-                          )}>
-                            {contact.lead_score}
-                          </span>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {intentInfo ? (
-                            <span className="text-sm text-muted-foreground">
-                              {intentInfo.emoji} {intentInfo.label}
+                              {contact.lead_score}
                             </span>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            {contact.phone && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {contact.phone}
+                              </span>
+                            )}
+                          </div>
+                          {lastContact && (
+                            <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {lastContact}
+                            </p>
                           )}
-                        </TableCell>
-                        
-                        {!isChatbotOnly && (
-                          <TableCell className="hidden lg:table-cell">
-                            {contact.did_schedule === true ? (
-                              <div className="flex items-center gap-1.5 text-emerald-600">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span className="text-sm">Sí</span>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteContactId(contact.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="table-premium">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-4 md:pl-6">Cliente</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Último contacto</TableHead>
+                      <TableHead className="hidden lg:table-cell">Intención</TableHead>
+                      {!isChatbotOnly && (
+                        <TableHead className="hidden lg:table-cell">Agendó</TableHead>
+                      )}
+                      <TableHead className="hidden lg:table-cell">Recontacto</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredContacts?.map((contact) => {
+                      const scoreInfo = getLeadScoreInfo(contact.lead_score);
+                      const intentInfo = getIntentLabel(contact.detected_intent);
+                      const lastContact = formatLastContact(contact.last_contact_at);
+                      
+                      return (
+                        <TableRow 
+                          key={contact.id} 
+                          className="cursor-pointer"
+                          onClick={() => setSelectedContact(contact)}
+                        >
+                          <TableCell className="pl-4 md:pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                'w-9 h-9 rounded-full flex items-center justify-center text-base',
+                                contact.lead_score >= 80 ? 'bg-orange-50' : 
+                                contact.lead_score >= 50 ? 'bg-amber-50' : 'bg-gray-100'
+                              )}>
+                                {scoreInfo.emoji}
                               </div>
-                            ) : contact.did_schedule === false ? (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <XCircle className="w-4 h-4" />
-                                <span className="text-sm">No</span>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{contact.name}</p>
+                                {contact.email && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {contact.email}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Phone className="w-3.5 h-3.5" />
+                              <span className="text-sm">{contact.phone || '-'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn(
+                              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
+                              scoreInfo.className
+                            )}>
+                              {contact.lead_score}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {lastContact ? (
+                              <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" />
+                                {lastContact}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {intentInfo ? (
+                              <span className="text-sm text-muted-foreground">
+                                {intentInfo.emoji} {intentInfo.label}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          
+                          {!isChatbotOnly && (
+                            <TableCell className="hidden lg:table-cell">
+                              {contact.did_schedule === true ? (
+                                <div className="flex items-center gap-1.5 text-emerald-600">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span className="text-sm">Sí</span>
+                                </div>
+                              ) : contact.did_schedule === false ? (
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  <XCircle className="w-4 h-4" />
+                                  <span className="text-sm">No</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/50">-</span>
+                              )}
+                            </TableCell>
+                          )}
+                          
+                          <TableCell className="hidden lg:table-cell">
+                            {contact.should_recontact ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200/50">
+                                  ⏰ {contact.recontact_at 
+                                    ? (() => {
+                                        try {
+                                          const dateStr = contact.recontact_at;
+                                          const date = dateStr.includes('T') 
+                                            ? new Date(dateStr) 
+                                            : new Date(dateStr + 'T12:00:00');
+                                          return format(date, 'dd MMM', { locale: es });
+                                        } catch {
+                                          return 'Pend.';
+                                        }
+                                      })()
+                                    : 'Pend.'}
+                                </span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground/50">-</span>
                             )}
                           </TableCell>
-                        )}
-                        
-                        <TableCell className="hidden md:table-cell">
-                          {contact.should_recontact ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200/50">
-                                ⏰ {contact.recontact_at 
-                                  ? (() => {
-                                      try {
-                                        const dateStr = contact.recontact_at;
-                                        const date = dateStr.includes('T') 
-                                          ? new Date(dateStr) 
-                                          : new Date(dateStr + 'T12:00:00');
-                                        return format(date, 'dd MMM', { locale: es });
-                                      } catch {
-                                        return 'Pend.';
-                                      }
-                                    })()
-                                  : 'Pend.'}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                          {format(new Date(contact.created_at), 'dd MMM yy', { locale: es })}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteContactId(contact.id);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteContactId(contact.id);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
