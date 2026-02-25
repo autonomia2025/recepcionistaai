@@ -50,7 +50,8 @@ export default function RequestsPage() {
   const queryClient = useQueryClient();
   const { data: requests, isLoading } = useServiceRequests();
   
-  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>(isMobile ? 'table' : 'kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
