@@ -381,8 +381,8 @@ export default function ClientsPage() {
         <div className="section-header">
           <h2 className="section-title">Filtros</h2>
         </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 md:gap-3">
-        <div className="relative w-full sm:flex-1 sm:min-w-[180px] sm:max-w-md">
+        <div className="grid grid-cols-2 sm:flex sm:flex-row sm:flex-wrap gap-2 md:gap-3">
+        <div className="relative col-span-2 sm:flex-1 sm:min-w-[180px] sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
           <Input
             placeholder="Buscar cliente..."
@@ -393,7 +393,7 @@ export default function ClientsPage() {
         </div>
         
         <Select value={scoreFilter} onValueChange={setScoreFilter}>
-          <SelectTrigger className="w-full sm:w-[130px] bg-background border-border/60">
+          <SelectTrigger className="w-full sm:w-[130px] bg-background border-border/60 text-xs sm:text-sm">
             <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Score" />
           </SelectTrigger>
@@ -406,7 +406,7 @@ export default function ClientsPage() {
         </Select>
 
         <Select value={intentFilter} onValueChange={setIntentFilter}>
-          <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60">
+           <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
             <Target className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Intención" />
           </SelectTrigger>
@@ -423,7 +423,7 @@ export default function ClientsPage() {
 
         {!isChatbotOnly && (
           <Select value={scheduleFilter} onValueChange={setScheduleFilter}>
-            <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60">
+             <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
               <CalendarCheck className="w-4 h-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Agendamiento" />
             </SelectTrigger>
@@ -436,7 +436,7 @@ export default function ClientsPage() {
         )}
 
         <Select value={recontactFilter} onValueChange={setRecontactFilter}>
-          <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60">
+          <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
             <Clock className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Recontacto" />
           </SelectTrigger>
@@ -448,7 +448,7 @@ export default function ClientsPage() {
         </Select>
 
         <Select value={lastContactFilter} onValueChange={setLastContactFilter}>
-          <SelectTrigger className="w-full sm:w-[160px] bg-background border-border/60">
+          <SelectTrigger className="w-full sm:w-[160px] bg-background border-border/60 text-xs sm:text-sm">
             <MessageSquare className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Última conversación" />
           </SelectTrigger>
