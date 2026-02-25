@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Send, Phone, User, Brain, Clock, Target, Smile, RefreshCw, CalendarCheck, Mail, Car, Tag, MessageSquare, TrendingUp, AlertCircle, Bot, BotOff, Info, X } from 'lucide-react';
+import { Send, Phone, User, Brain, Clock, Target, Smile, RefreshCw, CalendarCheck, Mail, Car, Tag, MessageSquare, TrendingUp, AlertCircle, Bot, BotOff, Info, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,16 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useMessages, useSendMessage, Message } from '@/hooks/useMessages';
 import { Conversation } from '@/hooks/useConversations';
 import { supabase } from '@/integrations/supabase/client';
@@ -112,6 +122,8 @@ export function ChatView({ conversation }: ChatViewProps) {
   const [message, setMessage] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isTogglingBot, setIsTogglingBot] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { data: messages, isLoading } = useMessages(conversation.id);
   const sendMessage = useSendMessage();
@@ -219,6 +231,33 @@ export function ChatView({ conversation }: ChatViewProps) {
       toast.error('Error al cambiar estado del bot');
     } finally {
       setIsTogglingBot(false);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    setIsDeleting(true);
+    try {
+      // Delete messages first, then the conversation
+      const { error: msgError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversation.id);
+      if (msgError) throw msgError;
+
+      const { error: convError } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversation.id);
+      if (convError) throw convError;
+
+      toast.success('Conversación eliminada');
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast.error('Error al eliminar la conversación');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -470,6 +509,16 @@ export function ChatView({ conversation }: ChatViewProps) {
               </Badge>
             )}
 
+            {/* Delete Conversation */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDeleteDialog(true)}
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+
             {/* Mobile: Info Sheet Trigger */}
             <Sheet>
               <SheetTrigger asChild>
@@ -521,6 +570,16 @@ export function ChatView({ conversation }: ChatViewProps) {
           <Badge variant="outline" className={cn('text-xs', statusBadge.style)}>
             {statusBadge.label}
           </Badge>
+
+          {/* Mobile: Delete Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDeleteDialog(true)}
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
 
           {/* Mobile: Info Sheet Trigger */}
           <Sheet>
@@ -608,6 +667,27 @@ export function ChatView({ conversation }: ChatViewProps) {
           </div>
         </ScrollArea>
       </div>
+      {/* Delete Conversation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán todos los mensajes de esta conversación con <strong>{contact.name}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteConversation}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
