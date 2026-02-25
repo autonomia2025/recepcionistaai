@@ -1,90 +1,88 @@
 
 
-# Problemas Detectados para Usuarios Admin
+# Plan: Ordenar Clientes por Ultimo Contacto + Mobile-First
 
-Se encontraron **5 problemas concretos** que afectan la experiencia del admin. Aqui estan ordenados por impacto.
-
----
-
-## Problema 1: No se muestra el ultimo mensaje en la lista de conversaciones
-
-**Impacto:** Alto - El admin no ve una preview del ultimo mensaje en la lista del Inbox.
-
-**Causa:** La tabla `conversations` NO tiene columna `last_message_text`, pero el codigo (`ConversationList.tsx` linea 170 y `useConversations.ts`) espera ese campo. Siempre es `undefined`, asi que la lista solo muestra el resumen IA cuando existe, pero nunca el texto real del ultimo mensaje.
-
-**Solucion:**
-1. Agregar columna `last_message_text` a la tabla `conversations`
-2. Crear un trigger que actualice automaticamente este campo cada vez que se inserta un mensaje nuevo
-3. Backfill: actualizar registros existentes con el ultimo mensaje de cada conversacion
+## Dos cambios principales
 
 ---
 
-## Problema 2: Admin no puede eliminar contactos (falla silenciosamente)
+## 1. Ordenar clientes por ultimo mensaje (como Inbox)
 
-**Impacto:** Medio - El boton "Eliminar" en ClientsPage existe pero falla porque no hay politica RLS de DELETE en la tabla `contacts`.
+**Problema actual:** La query de clientes ordena por `lead_score DESC`. El admin no ve quien le escribio mas recientemente.
 
-**Causa:** La politica `Users can manage contacts in their workshop` usa comando `ALL`, que en teoria cubre DELETE. Sin embargo, hay relaciones de clave foranea en `conversations`, `appointments`, `messages`, `service_requests` y `quotation_items` que bloquean el DELETE por restricciones de integridad referencial (foreign key constraints).
+**Solucion:** Hacer un LEFT JOIN con `conversations` para obtener el `MAX(last_message_at)` por contacto, y ordenar por esa fecha descendente (mas reciente primero). Tambien mostrar "hace X minutos" en la UI.
 
-**Solucion:**
-1. Agregar `ON DELETE CASCADE` o manejar la eliminacion en cascada desde el frontend/edge function
-2. Alternativa mas segura: soft-delete con campo `archived` en contacts, y filtrar en las queries
+**Cambios en `ClientsPage.tsx`:**
+- Modificar la query para hacer una segunda consulta a `conversations` agrupada por `contact_id`, obteniendo el `MAX(last_message_at)` de cada contacto
+- Merge el resultado con los contactos y ordenar por `last_contact_at` DESC
+- Agregar campo visual "Ultimo contacto: hace 2h" en cada fila (visible en mobile y desktop)
+- La interfaz de contacto incluira `last_contact_at` como campo nuevo
 
----
-
-## Problema 3: Warning de accesibilidad en Dialogs (DialogContent sin Description)
-
-**Impacto:** Bajo (funcional) pero visible en consola - Genera warnings continuos que ensucian la consola de debug.
-
-**Causa:** Varios `DialogContent` y `SheetContent` no incluyen `DialogDescription` o `aria-describedby`. El warning exacto: "Missing Description or aria-describedby for DialogContent".
-
-**Solucion:**
-- Agregar `DialogDescription` (puede ser visualmente oculto con `sr-only`) a los dialogos que lo necesiten:
-  - `ClientDetailDialog`
-  - `EventDetailDialog`
-  - Otros dialogs que usen `DialogContent` sin description
+**No se necesita migracion SQL** - la data ya existe en `conversations.last_message_at`.
 
 ---
 
-## Problema 4: El boton "Cotizar" solo aparece en modo `chatbot_only`
+## 2. Mobile-First para todo el software
 
-**Impacto:** Medio - Admins con modo `with_scheduling` no tienen acceso a la funcion de cotizacion automatica desde el panel de clientes, aunque podrian beneficiarse de ella.
+**Principio:** No cambiar NADA en desktop (md+ breakpoints). Solo mejorar la experiencia en pantallas < 768px.
 
-**Causa:** En `ClientDetailDialog.tsx` linea 355, el boton de re-analizar/cotizar esta condicionado a `isChatbotOnly`. Los quotation items tampoco se cargan si no es chatbot_only (linea 272: `enabled: isChatbotOnly`).
+### 2a. ClientsPage - Vista mobile de cards en vez de tabla
 
-**Solucion:**
-- Hacer el boton de cotizacion disponible para todos los modos, no solo chatbot_only
-- Cargar quotation items independientemente del modo
+En mobile, reemplazar la tabla (que se corta) por una lista de cards compactas con la info clave:
+- Nombre + emoji de score
+- Telefono
+- Score badge
+- "Hace 2h" (ultimo contacto)
+- Boton de acciones
+
+La tabla desktop se mantiene identica.
+
+### 2b. DashboardPage
+- Ya usa `grid-cols-1 sm:grid-cols-2` - esta bien
+- No requiere cambios
+
+### 2c. CalendarPage
+- El FullCalendar ya es responsive
+- No requiere cambios significativos
+
+### 2d. TeamPage
+- Ya usa Cards que se apilan en mobile
+- No requiere cambios
+
+### 2e. BotSettingsPage
+- Formularios se apilan naturalmente
+- El ChatSimulator se esconde en mobile con `hidden lg:block` actualmente - hacer visible en mobile como tab o debajo del form
+
+### 2f. RequestsPage
+- El Kanban es horizontal - en mobile, forzar vista "lista" por defecto en vez de kanban
+- Las columnas kanban overflow horizontal ya existen
+
+### 2g. AutomationsPage / EmailSettingsPage
+- Formularios simples, ya responsive
+- No requiere cambios
+
+### 2h. Sidebar (AppSidebar)
+- Ya tiene soporte mobile con hamburger menu + overlay
+- El breakpoint es `1023px` - cambiar a `767px` para alinear con `md` de Tailwind y que tablets vean el sidebar fijo
+- **DECISION:** Mantener como esta (1023px) ya que en tablets el sidebar ocupa mucho espacio y es mejor como drawer
+
+### 2i. AppLayout header
+- Ya tiene boton hamburger `md:hidden`
+- Esta correcto
 
 ---
 
-## Problema 5: Envio de mensajes solo via WhatsApp
+## Resumen de archivos a modificar
 
-**Impacto:** Medio - El boton de enviar en el Inbox siempre invoca `send-whatsapp`, sin importar el canal original de la conversacion. Si el contacto llego por Instagram, email o web chat, la respuesta manual va por WhatsApp.
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/ClientsPage.tsx` | Query con last_contact_at + sort + mobile card view |
+| `src/pages/BotSettingsPage.tsx` | Mostrar ChatSimulator en mobile |
+| `src/pages/RequestsPage.tsx` | Default a vista lista en mobile |
 
-**Causa:** `useSendMessage` en `useMessages.ts` linea 140 siempre llama a `send-whatsapp`. No detecta el canal de la conversacion.
+## Orden de implementacion
 
-**Solucion:**
-- Detectar el canal de la conversacion (WhatsApp, Instagram, email, web)
-- Invocar la funcion de envio correspondiente (`send-whatsapp`, `send-instagram`, `send-gmail`)
-- Mostrar indicador visual del canal activo en el chat
-
----
-
-## Resumen de cambios propuestos
-
-| # | Problema | Archivos | Dificultad |
-|---|----------|----------|------------|
-| 1 | last_message_text faltante | migration SQL + trigger | Media |
-| 2 | Delete contactos falla | migration SQL (CASCADE o soft-delete) | Media |
-| 3 | Dialog aria warnings | ClientDetailDialog, EventDetailDialog | Baja |
-| 4 | Cotizar solo chatbot_only | ClientDetailDialog.tsx | Baja |
-| 5 | Envio solo por WhatsApp | useMessages.ts, ChatView.tsx | Alta |
-
-## Orden de implementacion recomendado
-
-1. **Problema 3** - Warnings de accesibilidad (rapido, limpia la consola)
-2. **Problema 1** - last_message_text (mejora UX inmediata en Inbox)
-3. **Problema 4** - Cotizar para todos los modos (cambio pequeno, alto valor)
-4. **Problema 2** - Delete contactos (requiere decision de arquitectura)
-5. **Problema 5** - Multi-canal (cambio complejo, requiere testing por canal)
+1. ClientsPage: query + sort + mobile cards
+2. BotSettingsPage: ChatSimulator visible en mobile
+3. RequestsPage: default list view en mobile
 
