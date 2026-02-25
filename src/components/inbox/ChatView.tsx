@@ -452,74 +452,57 @@ export function ChatView({ conversation }: ChatViewProps) {
       {/* Chat Section */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Compact Header - hidden on mobile (shown in InboxPage) */}
-        <div className="hidden md:flex px-4 py-3 border-b border-border/60 bg-card/70 backdrop-blur-sm items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
+        <div className="hidden md:flex px-3 py-2.5 border-b border-border/60 bg-card/70 backdrop-blur-sm items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <User className="w-4 h-4 text-primary" />
             </div>
-            <div>
-              <h3 className="font-semibold">{contact.name}</h3>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Phone className="w-3 h-3" />
-                {contact.phone || contact.whatsapp_id}
-                <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5">
-                  {detectedChannel === 'instagram' ? '📸 Instagram' : 
-                   detectedChannel === 'email' || detectedChannel === 'gmail' ? '📧 Email' :
-                   detectedChannel === 'web' || detectedChannel === 'web_chat' ? '🌐 Web' :
-                   '💬 WhatsApp'}
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm truncate">{contact.name}</h3>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                <Phone className="w-3 h-3 shrink-0" />
+                <span className="truncate">{contact.phone || contact.whatsapp_id}</span>
+                <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5 shrink-0">
+                  {detectedChannel === 'instagram' ? '📸' : 
+                   detectedChannel === 'email' || detectedChannel === 'gmail' ? '📧' :
+                   detectedChannel === 'web' || detectedChannel === 'web_chat' ? '🌐' :
+                   '💬'}
                 </Badge>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-3">
-            {/* Bot Toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button
               variant={isBotPaused ? "outline" : "default"}
-              size="sm"
+              size="icon"
               onClick={handleToggleBot}
               disabled={isTogglingBot}
               className={cn(
-                "h-8 text-xs gap-1.5 transition-colors",
+                "h-8 w-8 transition-colors",
                 isBotPaused
                   ? "border-orange-500/50 text-orange-600 hover:bg-orange-500/10"
                   : "bg-emerald-600 hover:bg-emerald-700"
               )}
+              title={isBotPaused ? 'Bot Pausado' : 'Bot Activo'}
             >
-              {isBotPaused ? (
-                <>
-                  <BotOff className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Bot Pausado</span>
-                </>
-              ) : (
-                <>
-                  <Bot className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Bot Activo</span>
-                </>
-              )}
+              {isBotPaused ? <BotOff className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
             </Button>
 
-            <Badge variant="outline" className={cn('text-xs hidden sm:flex', statusBadge.style)}>
+            <Badge variant="outline" className={cn('text-[10px] hidden lg:flex', statusBadge.style)}>
               {statusBadge.label}
             </Badge>
-            {contact.did_schedule && (
-              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20 hidden sm:flex">
-                <CalendarCheck className="w-3 h-3 mr-1" />
-                Agendado
-              </Badge>
-            )}
 
-            {/* Delete Conversation */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowDeleteDialog(true)}
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              title="Eliminar conversación"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
 
-            {/* Mobile: Info Sheet Trigger */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="lg:hidden h-8 w-8">
@@ -541,50 +524,39 @@ export function ChatView({ conversation }: ChatViewProps) {
         </div>
 
         {/* Mobile Header Controls */}
-        <div className="md:hidden px-3 py-2 border-b border-border/60 bg-card/70 backdrop-blur-sm flex items-center justify-between gap-2">
+        <div className="md:hidden px-3 py-2 border-b border-border/60 bg-card/70 backdrop-blur-sm flex items-center gap-2 shrink-0">
           <Button
             variant={isBotPaused ? "outline" : "default"}
             size="sm"
             onClick={handleToggleBot}
             disabled={isTogglingBot}
             className={cn(
-              "h-8 text-xs gap-1.5 transition-colors flex-1",
+              "h-8 text-xs gap-1 transition-colors flex-1 min-w-0",
               isBotPaused
                 ? "border-orange-500/50 text-orange-600 hover:bg-orange-500/10"
                 : "bg-emerald-600 hover:bg-emerald-700"
             )}
           >
-            {isBotPaused ? (
-              <>
-                <BotOff className="w-3.5 h-3.5" />
-                Bot Pausado
-              </>
-            ) : (
-              <>
-                <Bot className="w-3.5 h-3.5" />
-                Bot Activo
-              </>
-            )}
+            {isBotPaused ? <BotOff className="w-3.5 h-3.5 shrink-0" /> : <Bot className="w-3.5 h-3.5 shrink-0" />}
+            <span className="truncate">{isBotPaused ? 'Pausado' : 'Activo'}</span>
           </Button>
 
-          <Badge variant="outline" className={cn('text-xs', statusBadge.style)}>
+          <Badge variant="outline" className={cn('text-[10px] shrink-0', statusBadge.style)}>
             {statusBadge.label}
           </Badge>
 
-          {/* Mobile: Delete Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setShowDeleteDialog(true)}
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
 
-          {/* Mobile: Info Sheet Trigger */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8">
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
                 <Info className="w-4 h-4" />
               </Button>
             </SheetTrigger>
