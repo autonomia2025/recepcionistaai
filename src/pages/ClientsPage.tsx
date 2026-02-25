@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -132,6 +132,7 @@ export default function ClientsPage() {
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [lastContactFilter, setLastContactFilter] = useState<string>('all');
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -274,8 +275,21 @@ export default function ClientsPage() {
       if (scheduleFilter === 'scheduled') matchesSchedule = contact.did_schedule === true;
       else if (scheduleFilter === 'not_scheduled') matchesSchedule = contact.did_schedule === false || contact.did_schedule === null;
     }
+
+    let matchesLastContact = true;
+    if (lastContactFilter !== 'all' && contact.last_contact_at) {
+      const lastContactDate = new Date(contact.last_contact_at);
+      const now = new Date();
+      const diffHours = (now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60);
+      if (lastContactFilter === 'today') matchesLastContact = diffHours <= 24;
+      else if (lastContactFilter === 'week') matchesLastContact = diffHours <= 168;
+      else if (lastContactFilter === 'month') matchesLastContact = diffHours <= 720;
+      else if (lastContactFilter === 'older') matchesLastContact = diffHours > 720;
+    } else if (lastContactFilter === 'never') {
+      matchesLastContact = !contact.last_contact_at;
+    }
     
-    return matchesSearch && matchesScore && matchesIntent && matchesRecontact && matchesSchedule;
+    return matchesSearch && matchesScore && matchesIntent && matchesRecontact && matchesSchedule && matchesLastContact;
   });
 
   const stats = {
@@ -430,6 +444,21 @@ export default function ClientsPage() {
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="pending">⏰ Pendientes</SelectItem>
             <SelectItem value="none">Sin recontacto</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={lastContactFilter} onValueChange={setLastContactFilter}>
+          <SelectTrigger className="w-full sm:w-[160px] bg-background border-border/60">
+            <MessageSquare className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Última conversación" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="today">📅 Hoy</SelectItem>
+            <SelectItem value="week">📆 Esta semana</SelectItem>
+            <SelectItem value="month">🗓️ Este mes</SelectItem>
+            <SelectItem value="older">🕰️ Más antiguo</SelectItem>
+            <SelectItem value="never">🚫 Sin conversación</SelectItem>
           </SelectContent>
         </Select>
         </div>
