@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Ventas - AutonomIA Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --accent: #f59e0b;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --white: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: var(--white);
+            padding: 60px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 30px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            letter-spacing: -0.025em;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.75rem;
+            color: var(--primary-dark);
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            color: var(--text-main);
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        strong {
+            color: var(--primary-dark);
+        }
+
+        ul {
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        blockquote {
+            background-color: #eff6ff;
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin-bottom: 25px;
+            font-style: italic;
+            font-size: 1.1rem;
+            color: var(--primary-dark);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .script-box {
+            background-color: #f1f5f9;
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-print {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-print:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                width: 100%;
+                max-width: 100%;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">
+        🖨️ Imprimir a PDF
+    </button>
+
+    <div class="container">
+        <header>
+            <h1>AutonomIA Suite 🚀</h1>
+            <p class="subtitle">Manual de Ventas para High Performance Closers</p>
+            <p style="margin-top: 20px; color: var(--text-muted);">
+                Este manual es tu biblia comercial. Contiene las armas exactas para dominar el mercado de servicios en
+                Chile.
+            </p>
+        </header>
+
+        <section>
+            <h2>MÓDULO 1: PRODUCT KNOWLEDGE</h2>
+            <h3>¿Qué es AutonomIA Suite?</h3>
+            <p>Es una <strong>Recepcionista Virtual con Cerebro</strong> que vive dentro del WhatsApp de la empresa. No
+                es un software que el cliente debe "aprender"; es un miembro del equipo que ya sabe trabajar.</p>
+
+            <h3>La diferencia CRÍTICA: IA vs. Chatbot</h3>
+            <ul>
+                <li><strong>Chatbot de botones:</strong> Es un laberinto. "Presione 1 para ventas". Frustra al cliente.
+                    Si el cliente escribe algo que no está en el menú, el bot muere.</li>
+                <li><strong>AutonomIA Suite:</strong> Entiende lenguaje humano. Si un cliente escribe <em>"Hola, se me
+                        rompió el cárter, ¿tienen hora hoy?"</em>, la IA entiende la urgencia, el problema técnico y
+                    revisa la agenda en segundos.</li>
+            </ul>
+
+            <h3>Analogía para el cliente</h3>
+            <blockquote>
+                "Usted no está comprando un software. Está contratando a la mejor recepcionista del mundo: nunca duerme,
+                nunca llega tarde, contesta en 5 segundos, conoce todos sus precios de memoria y jamás se olvida de
+                pedirle el RUT al cliente."
+            </blockquote>
+        </section>
+
+        <section>
+            <h2>MÓDULO 2: ICP Y PSICOLOGÍA DEL CLIENTE</h2>
+            <h3>El Cliente Ideal (ICP)</h3>
+            <ul>
+                <li><strong>Rubros:</strong> Talleres mecánicos, Clínicas Estéticas/Dentales, Detailing, Servicios
+                    Técnicos.</li>
+                <li><strong>Facturación:</strong> Empresas que ya venden, no emprendimientos que están partiendo.</li>
+                <li><strong>El Problema:</strong> El dueño está "en el foso". O está arreglando un auto (taller) o está
+                    operando (clínica). No puede contestar WhatsApp y atender al mismo tiempo.</li>
+            </ul>
+
+            <h3>¿Qué le duele?</h3>
+            <ol>
+                <li><strong>Dinero quemado:</strong> Sabe que si contesta 2 horas tarde, el cliente ya le escribió a
+                    otros 3 competidores en Google.</li>
+                <li><strong>Esclavitud del celular:</strong> Su vida personal está invadida por chats de clientes a las
+                    11 PM.</li>
+                <li><strong>Desorden:</strong> No sabe cuántos leads entraron hoy ni cuántos se perdieron.</li>
+            </ol>
+        </section>
+
+        <section>
+            <h2>MÓDULO 3: PROSPECCIÓN (SEÑALES DE HAMBRE)</h2>
+            <p>Donde otros ven un local, tú ves una oportunidad de rescate.</p>
+            <ul>
+                <li><strong>Google Maps:</strong> Busca negocios con más de 20 reviews.</li>
+                <li><strong>Instagram Ads:</strong> Si gastan en publicidad pero tardan en responder WhatsApp, son
+                    prospectos de oro.</li>
+                <li><strong>Señal de Oro:</strong> Les escribes y tardan +20 min en responder. Estás viendo el problema
+                    en vivo.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>MÓDULO 4: SCRIPTS DE CONTACTO</h2>
+            <h3>WhatsApp Frío (Estilo Hormozi)</h3>
+            <div class="script-box">
+                "Hola [Nombre], vi que en [Negocio] hacen [Servicio]. Les escribí hace un rato y noté que tienen mucha
+                demanda porque tardaron un poquito en contestar. Tengo algo que ayuda a otros [Talleres/Clínicas] a
+                contestar en 5 segundos y agendar citas en automático. ¿Te molestaría si te mando un video de 30
+                segundos?"
+            </div>
+
+            <h3>Llamada Fría (Consultiva)</h3>
+            <div class="script-box">
+                <strong>Apertura:</strong> "Hola [Nombre], soy [Tu Nombre] de AutonomIA. Te llamo rápido porque vi tu
+                publicidad... Solo por curiosidad... ¿Cuántas ventas crees que pierdes al mes porque no alcanzan a
+                contestar los WhatsApp rápido?"
+            </div>
+        </section>
+
+        <section>
+            <h2>MÓDULO 5: GUION DE DEMO (EL SHOW DEL VALOR)</h2>
+            <ul>
+                <li><strong>El Problema (2 min):</strong> "Estás gastando en marketing para regalárselo a la
+                    competencia."</li>
+                <li><strong>La Solución (5 min):</strong> Envía un mensaje complejo a la IA y deja que el cliente vea
+                    cómo responde con lógica. Muestra el CRM.</li>
+                <li><strong>El Deseo (3 min):</strong> "Imagina despertar y tener 5 citas ya agendadas sin abrir el
+                    chat."</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>MÓDULO 6: EL CIERRE CONSULTIVO</h2>
+            <blockquote>
+                "Si cada cliente te deja $100.000 y pierdes 10 al mes, pierdes $1.000.000. La solución cuesta $159.000.
+                Con que salvemos a UN solo cliente, la IA se paga sola y te sobran $841.000. ¿Te hace sentido empezar?"
+            </blockquote>
+        </section>
+
+        <section>
+            <h2>MÓDULO 7: MANEJO DE OBJECIONES</h2>
+            <ul>
+                <li><strong>Muy caro:</strong> Comparar con el sueldo de una recepcionista ($600k+). La IA es 4x más
+                    barata y 10x más rápida.</li>
+                <li><strong>No confío en la IA:</strong> Menciona el modo de "Intervención Humana". Ella hace el trabajo
+                    pesado, tú mantienes el control.</li>
+                <li><strong>Lo voy a pensar:</strong> Cada hora que lo piensa, un cliente le escribe a la competencia.
+                </li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>MÓDULO 8: SEGUIMIENTO (FOLLOW UP)</h2>
+            <ul>
+                <li><strong>Día 1:</strong> Resumen de cómo recuperará el 60% de los leads.</li>
+                <li><strong>Día 3:</strong> Prueba social (Pantallazo de otro taller agendando solo).</li>
+                <li><strong>Día 7:</strong> Miedo a perder (Cupos de implementación limitados).</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>MÓDULO 9: PIPELINE Y METAS</h2>
+            <p><strong>Meta del éxito:</strong> 40 contactos día -> 10 demos semana -> 4 cierres mes.</p>
+            <p><strong>Mentalidad:</strong> El "No" es solo combustible. No vendes software, vendes "domingos tranquilos
+                sin clientes gritando en WhatsApp".</p>
+        </section>
+
+        <footer
+            style="margin-top: 60px; text-align: center; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); padding-top: 20px;">
+            &copy; 2026 AutonomIA Suite - Propiedad Confidencial
+        </footer>
+    </div>
+</body>
+
+</html>
