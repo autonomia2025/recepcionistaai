@@ -240,7 +240,7 @@ serve(async (req) => {
     // ===== RAG: Search for relevant knowledge using text search =====
     let ragContext = '';
     try {
-      const knowledgeMatches = await searchKnowledge(supabase, workshop_id, message_text);
+      const knowledgeMatches = await searchKnowledge(supabase, supabaseUrl, supabaseServiceKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
