@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academy: Elite Setter - AutonomIA Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030712;
+            --surface: #111827;
+            --primary: #6366f1;
+            --accent: #10b981;
+            --text-p: #9ca3af;
+            --text-h: #f9fafb;
+            --border: #1f2937;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            line-height: 1.6;
+            color: var(--text-p);
+            background-color: var(--bg);
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 80px;
+            border-radius: 32px;
+            border: 1px solid var(--border);
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        header {
+            text-align: left;
+            margin-bottom: 80px;
+            border-left: 6px solid var(--primary);
+            padding-left: 30px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--text-h);
+            line-height: 1;
+            letter-spacing: -0.04em;
+        }
+
+        h1 span {
+            color: var(--primary);
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            color: var(--text-h);
+            margin: 60px 0 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h2::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+            color: var(--text-h);
+            margin: 40px 0 15px;
+        }
+
+        p {
+            font-size: 1.15rem;
+            margin-bottom: 20px;
+        }
+
+        strong {
+            color: var(--text-h);
+            font-weight: 700;
+        }
+
+        .method-box {
+            background: rgba(31, 41, 55, 0.5);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 24px;
+            margin: 40px 0;
+        }
+
+        .script-card {
+            background: linear-gradient(145deg, #1e293b, #111827);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .script-card .label {
+            position: absolute;
+            top: -14px;
+            left: 30px;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .script-card p {
+            font-style: italic;
+            color: #e2e8f0;
+            font-size: 1.25rem;
+            line-height: 1.5;
+        }
+
+        .checklist {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+
+        .checklist li {
+            padding: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 1.1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .checklist li::before {
+            content: '✓';
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        .btn-print {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            background: var(--white);
+            color: var(--bg);
+            padding: 20px 40px;
+            border-radius: 100px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        footer {
+            margin-top: 80px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.5;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+                color: black;
+            }
+
+            .container {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                max-width: 100%;
+                width: 100%;
+                background: white;
+            }
+
+            h1,
+            h2,
+            h3,
+            strong {
+                color: black;
+            }
+
+            .script-card {
+                background: #f3f4f6;
+                color: black;
+                border: 1px solid #ccc;
+            }
+
+            .script-card p {
+                color: black;
+            }
+
+            .badge {
+                border: 1px solid black;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">📥 EXPORTAR PDF PARA SETTERS</button>
+
+    <div class="container">
+        <header>
+            <div class="badge">SETTER ACADEMY 2026</div>
+            <h1>The Elite <span>Setter</span> Manual</h1>
+            <p style="font-size: 1.4rem; margin-top: 20px;">Cómo agendar reuniones infalibles para AutonomIA Suite.</p>
+        </header>
+
+        <section>
+            <h2>🧠 Mentalidad: Vender la Cita, no el Software</h2>
+            <p>Tu única meta es que el dueño del negocio sienta que <strong>no puede permitirse perderse la demo de
+                    mañana.</strong> El setup dura menos de 72 horas, la oportunidad desaparece hoy.</p>
+
+            <div class="method-box">
+                <h3>La Ecuación del Valor para Setters</h3>
+                <p>Valor = (Curiosidad x Miedo a Perder) / (Baja Fricción)</p>
+                <ul>
+                    <li>No expliques funciones técnicas.</li>
+                    <li>Explica cómo rescatar el 50% de las ventas que está botando a la basura ahora mismo.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section>
+            <h2>🛡️ Guiones de Pattern Interrupt</h2>
+
+            <div class="script-card">
+                <span class="label">WHATSAPP FRÍO</span>
+                <p>"Hola [Nombre], vi que en [Negocio] ofrecen [Servicio]. Les escribí una duda técnica y noté que
+                    tardaron en responder. He ayudado a dueños a instalar una IA que contesta en 5 segundos y tiene el
+                    sistema listo en menos de 72 horas. ¿Te sirve que te muestre una demo mañana?"</p>
+            </div>
+
+            <div class="script-card">
+                <span class="label">OBJECIÓN: "¿ES CARO?"</span>
+                <p>"Si vendes 2 servicios más con la velocidad de la IA, el sistema ya se pagó solo. Pero lo importante
+                    es que veas cómo habla con TUS servicios antes de hablar de números. ¿Mañana a las 10:00?"</p>
+            </div>
+        </section>
+
+        <section>
+            <h2>🎯 Roadmap del Setter de Élite</h2>
+            <ul class="checklist">
+                <li>Detecta negocios con Ads activos (vierte dinero en un balde roto).</li>
+                <li>Verifica falla de respuesta (Escríbeles tú primero).</li>
+                <li>Vende el "Shock" de la inmediatez.</li>
+                <li>Setup rápido: Menos de 72 horas para estar funcionando.</li>
+                <li>Traspaso al Closer con toda la información del dolor detectado.</li>
+            </ul>
+        </section>
+
+        <footer>
+            PROPERTY OF AUTONOMIA SUITE. TOP SECRET COMMERCIAL TRAINING. PROHIBITED DISTRIBUTION.
+        </footer>
+    </div>
+</body>
+
+</html>
