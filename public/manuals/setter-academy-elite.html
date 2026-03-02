@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setter Academy: AutonomIA Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #3730a3;
+            --accent: #10b981;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text-main: #94a3b8;
+            --text-h: #f8fafc;
+            --gold: #fbbf24;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--card);
+            border-radius: 40px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.7);
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            padding: 100px 80px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 4rem;
+            color: white;
+            line-height: 0.9;
+            margin-bottom: 20px;
+            letter-spacing: -0.05em;
+        }
+
+        .hero p {
+            font-size: 1.4rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .content {
+            padding: 80px;
+        }
+
+        .module-badge {
+            background: rgba(251, 191, 36, 0.1);
+            color: var(--gold);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 40px;
+            display: inline-block;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
+            color: var(--text-h);
+            margin: 60px 0 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h2::before {
+            content: '';
+            width: 30px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            color: var(--text-h);
+            margin: 40px 0 20px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 24px;
+            margin-bottom: 40px;
+        }
+
+        .highlight {
+            color: var(--text-h);
+            font-weight: 700;
+        }
+
+        .tag {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .step-list {
+            list-style: none;
+            margin: 40px 0;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .step-num {
+            background: var(--primary);
+            color: white;
+            min-width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 900;
+            font-size: 1.5rem;
+        }
+
+        .script {
+            background: #0f172a;
+            padding: 30px;
+            border-radius: 20px;
+            font-style: italic;
+            border-left: 6px solid var(--accent);
+            margin: 20px 0;
+        }
+
+        .handoff-box {
+            background: linear-gradient(to right, #1e3a8a, #1e40af);
+            color: white;
+            padding: 40px;
+            border-radius: 24px;
+            margin-top: 40px;
+        }
+
+        .handoff-box h3 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .btn-print {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            background: var(--primary);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 100px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+
+        .btn-print:hover {
+            transform: translateY(-10px) scale(1.05);
+            background: #6366f1;
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                border-radius: 0;
+                box-shadow: none;
+                max-width: 100%;
+                border: none;
+                background: white;
+            }
+
+            .hero {
+                padding: 40px;
+            }
+
+            .hero h1 {
+                color: black;
+            }
+
+            .hero p {
+                color: #333;
+            }
+
+            .content {
+                padding: 40px;
+            }
+
+            h2,
+            h3,
+            .highlight {
+                color: black;
+            }
+
+            .info-card,
+            .script,
+            .handoff-box {
+                border: 1px solid #ccc;
+                background: #f9f9f9;
+                color: black;
+            }
+
+            .handoff-box h3 {
+                color: black;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">📥 DESCARGAR ACADEMIA DE SETTERS (PDF)</button>
+
+    <div class="container">
+        <header class="hero">
+            <h1>SETTER<br><span>ACADEMY</span></h1>
+            <p>AutonomIA Suite Elite Training Center</p>
+        </header>
+
+        <div class="content">
+            <div class="module-badge">Módulo 0: Conocimiento de Arma</div>
+            <h2>El Cerebro del Software</h2>
+            <p>Para agendar con autoridad, debes saber qué vendes. AutonomIA no es un bot, es una <span
+                    class="highlight">IA Conversacional de 72 horas de implementación.</span></p>
+
+            <div class="info-card">
+                <h3>Superpoderes del Sistema</h3>
+                <ul>
+                    <li><span class="highlight">RAG Logic:</span> La IA estudia el manual del taller/clínica y responde
+                        como un experto técnico.</li>
+                    <li><span class="highlight">Lead Scoring:</span> Detecta quién quiere comprar HOY y lo marca en el
+                        panel.</li>
+                    <li><span class="highlight">Auto-Extracción:</span> Captura Datos (Nombre, RUT, Auto) sin
+                        formularios.</li>
+                    <li><span class="highlight">Omnicanalidad:</span> WhatsApp es el corazón, el CRM es el cerebro.</li>
+                </ul>
+            </div>
+
+            <div class="module-badge">Módulo 1: El Proceso Maestro</div>
+            <h2>Paso a Paso del Setter Pro</h2>
+
+            <div class="step-list">
+                <div class="step-item">
+                    <div class="step-num">01</div>
+                    <div class="step-text">
+                        <h3>Investigación de Puntos de Dolor</h3>
+                        <p>Usa Facebook Ad Library. Si sale un taller con publicidad, escríbeles. Si tardan +10 min,
+                            están quemando dinero. Ahí es donde entras tú.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-num">02</div>
+                    <div class="step-text">
+                        <h3>El Pattern Interrupt</h3>
+                        <p>Tu meta es romper su inercia. No seas un vendedor más. Sé el que señala el incendio.</p>
+                        <div class="script">
+                            "Hola [Nombre], vi que en [Negocio] invierten en Ads pero tardan 15 min en responder. He
+                            rescatado el 50% de las ventas de otros talleres instalando una IA que responde en 5
+                            segundos. ¿Te envío el video?"
+                        </div>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-num">03</div>
+                    <div class="step-text">
+                        <h3>Calificación y Puente</h3>
+                        <p>Pregunta por las horas que pierde al día contestando "basura" (dudas repetitivas). Haz que
+                            sienta el costo de no tener la IA.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-badge">Módulo 2: El Puente de Oro</div>
+            <h2>Comunicación con los Closers (Felipe & Equipo)</h2>
+            <p>Tu misión termina cuando el Closer tiene toda la información para destruir las objeciones en la demo.</p>
+
+            <div class="handoff-box">
+                <h3>Protocolo de Traspaso (Checklist)</h3>
+                <p>Cada demo agendada debe reportarse con:</p>
+                <ul>
+                    <li>✅ <strong>El Dolor Master:</strong> (Ej: El dueño contesta mientras opera).</li>
+                    <li>✅ <strong>Volumen:</strong> (Ej: 50 leads al día, pierde el 60%).</li>
+                    <li>✅ <strong>Ambición:</strong> (Ej: Quiere contratar a alguien pero el desorden no lo deja).</li>
+                </ul>
+                <p style="margin-top:20px; font-weight: 800; font-size: 0.8rem;">RECUERDA: Confirma la asistencia del
+                    cliente 1 hora antes.</p>
+            </div>
+
+            <div class="module-badge">Módulo 3: Guerra de Objeciones</div>
+            <h2>Manejo de Barreras</h2>
+            <div class="info-card">
+                <span class="tag">OBJECIÓN: "SOLO BOTS DE BOTONES"</span>
+                <p>"Entiendo la mala experiencia, los botones frustran. Nuestra IA entiende lenguaje natural. Es como
+                    tenerte a ti clonado 24/7. Te lo muestro mañana."</p>
+
+                <span class="tag">OBJECIÓN: "MUY LARGO EL SETUP"</span>
+                <p>"Al contrario. Implementamos todo en menos de 72 horas. Para el lunes tu negocio ya está rescatando
+                    ventas."</p>
+            </div>
+        </div>
+
+        <footer style="padding: 40px; background: rgba(0,0,0,0.2); text-align: center;">
+            <p style="font-weight: 900; letter-spacing: 0.2em; font-size: 0.7rem;">AUTONOMIA SUITE ACADEMY © 2026 -
+                CONFIDENCIAL Y EXCLUSIVO</p>
+        </footer>
+    </div>
+</body>
+
+</html>
