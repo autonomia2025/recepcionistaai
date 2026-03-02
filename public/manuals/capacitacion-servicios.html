@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capacitación Ventas - Servicios AutonomIA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-dark: #6d28d9;
+            --secondary: #64748b;
+            --accent: #10b981;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-light: #f5f3ff;
+            --white: #ffffff;
+            --border: #ddd6fe;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: var(--white);
+            padding: 60px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 30px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            color: var(--primary-dark);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: var(--secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            color: var(--primary-dark);
+            margin-top: 45px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h3 {
+            font-size: 1.35rem;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+        }
+
+        p {
+            margin-bottom: 18px;
+            font-size: 1.05rem;
+        }
+
+        strong {
+            color: var(--primary-dark);
+            font-weight: 700;
+        }
+
+        ul,
+        ol {
+            margin-bottom: 25px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 12px;
+            font-size: 1.05rem;
+        }
+
+        blockquote {
+            background-color: #f3f4f6;
+            border-left: 6px solid var(--accent);
+            padding: 25px;
+            margin: 30px 0;
+            font-style: italic;
+            font-size: 1.15rem;
+            border-radius: 4px;
+        }
+
+        .script-box {
+            background-color: #f8fafc;
+            border: 2px solid var(--border);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .script-box::before {
+            content: "GUION";
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .btn-print {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            background: var(--primary-dark);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 15px rgba(109, 40, 217, 0.3);
+            transition: transform 0.2s;
+            z-index: 100;
+        }
+
+        .btn-print:hover {
+            transform: scale(1.05);
+        }
+
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: var(--secondary);
+            font-size: 0.9rem;
+            padding-top: 25px;
+            border-top: 1px solid var(--border);
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">🖨️ Descargar Manual PDF</button>
+
+    <div class="container">
+        <header>
+            <h1>AutonomIA Suite ⚡</h1>
+            <p class="subtitle">Especialista en Ventas de Servicios</p>
+            <p style="margin-top: 15px; font-weight: 600;">Manual de Capacitación para Closers (Solo Módulo Servicios)
+            </p>
+        </header>
+
+        <section>
+            <h2>🚀 Concepto: La IA que lo sabe todo</h2>
+            <p>En este módulo no vendemos agendas ni calendarios. Vendemos <strong>Inmediatez</strong> y
+                <strong>Calificación</strong>.</p>
+            <p>El problema del cliente es que recibe 100 mensajes y solo 10 son ventas. Él pierde tiempo con los otros
+                90. Nuestra IA contesta a los 100 en 5 segundos y le avisa al dueño quiénes son los 10 compradores.</p>
+
+            <h3>Diferencia con Chatbots tradicionales:</h3>
+            <ul>
+                <li><strong>Chatbots:</strong> Estáticos, aburridos, limitados.</li>
+                <li><strong>AutonomIA:</strong> Dinámica, entiende contexto y "lee" tu manual de servicios para
+                    responder cualquier duda técnica, de stock o de precio.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>💡 ROI: ¿Cuánto dinero se está escapando?</h2>
+            <blockquote>
+                "Si un lead te escribe y no le contestas en 5 minutos, la probabilidad de que te compre baja en un 80%.
+                Multiplica (Leads por mes) x (Venta promedio) x 0.8. <strong>Ese es el dinero que el cliente está
+                    quemando hoy sin la IA.</strong>"
+            </blockquote>
+        </section>
+
+        <section>
+            <h2>📱 Guiones de Ataque (Efectividad Total)</h2>
+            <div class="script-box">
+                <strong>WhatsApp Frío:</strong> "Hola [Nombre], vi que en [Negocio] ofrecen [Servicio]. Les escribí una
+                duda técnica y noté que tardaron en responder. Les tengo una IA que contesta todas las dudas de
+                servicios y precios en 5 segundos por ustedes. ¿Quieren ver cómo responde para su propio negocio?"
+            </div>
+
+            <div class="script-box">
+                <strong>Manejo de Objeción (Precio):</strong> "El setup cuesta $299k una vez. Una recepcionista te
+                cuesta $600k todos los meses + previsión. La IA se paga con una sola venta que logres rescatar de la
+                basura de WhatsApp."
+            </div>
+        </section>
+
+        <section>
+            <h2>🎯 Roadmap de Cierre</h2>
+            <ol>
+                <li><strong>Vende la "Prueba de Fuego":</strong> Envíale un mensaje al bot demo configurado con SUS
+                    servicios. Cuando vea que la IA conoce el precio de "Alineación y Balanceo" mejor que él mismo, la
+                    venta se cierra sola.</li>
+                <li><strong>Enfócate en los Datos:</strong> Muestra el CRM. Muestra cómo la IA capturó el RUT, el modelo
+                    de auto y el teléfono sin que nadie escribiera nada.</li>
+            </ol>
+        </section>
+
+        <footer>
+            &copy; 2026 AutonomIA Suite - Propiedad Confidencial Comercial
+        </footer>
+    </div>
+</body>
+
+</html>
