@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mega Academy: Setter Elite - AutonomIA Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020617;
+            --surface: #0f172a;
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --accent: #10b981;
+            --gold: #f59e0b;
+            --gold-light: #fbbf24;
+            --text-main: #94a3b8;
+            --text-h: #f8fafc;
+            --border: #1e293b;
+            --white: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.7;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Hero Styling */
+        .hero {
+            height: 80vh;
+            background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.15), transparent),
+                radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.1), transparent),
+                var(--bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 6rem;
+            font-weight: 900;
+            color: var(--white);
+            line-height: 0.85;
+            letter-spacing: -0.06em;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .hero h1 span {
+            display: block;
+            color: var(--gold);
+            font-size: 4rem;
+            letter-spacing: 0.1em;
+            font-weight: 300;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            max-width: 700px;
+            color: var(--text-main);
+            margin-bottom: 40px;
+        }
+
+        .badge {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-light);
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            margin-bottom: 30px;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1000px;
+            margin: -100px auto 100px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 40px;
+            padding: 80px;
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Section Styling */
+        section {
+            margin-bottom: 100px;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            color: var(--white);
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        h2::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, var(--border), transparent);
+        }
+
+        h3 {
+            font-size: 1.6rem;
+            color: var(--gold);
+            margin: 40px 0 20px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        p {
+            margin-bottom: 25px;
+            font-size: 1.2rem;
+        }
+
+        .highlight {
+            color: var(--white);
+            font-weight: 800;
+        }
+
+        /* Module Boxes */
+        .module-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .module-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .module-box:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+            transform: translateY(-5px);
+        }
+
+        /* Special UI Elements */
+        .script-box {
+            background: #020617;
+            border-left: 6px solid var(--primary);
+            padding: 40px;
+            border-radius: 20px;
+            margin: 40px 0;
+            position: relative;
+        }
+
+        .script-box::before {
+            content: 'SCRIPT MAESTRO';
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 900;
+        }
+
+        .script-box p {
+            font-style: italic;
+            color: var(--white);
+            font-size: 1.3rem;
+            margin-bottom: 0;
+        }
+
+        .handoff-protocol {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: var(--bg);
+            padding: 50px;
+            border-radius: 30px;
+            margin: 60px 0;
+        }
+
+        .handoff-protocol h3 {
+            color: var(--bg);
+            margin-top: 0;
+        }
+
+        .handoff-protocol ul {
+            list-style: none;
+        }
+
+        .handoff-protocol li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .handoff-protocol li::before {
+            content: '➜';
+            opacity: 0.5;
+        }
+
+        /* Timeline */
+        .timeline {
+            border-left: 2px solid var(--primary);
+            padding-left: 40px;
+            margin: 40px 0;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 50px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -51px;
+            top: 5px;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border: 4px solid var(--bg);
+            border-radius: 50%;
+        }
+
+        /* Button */
+        .btn-print {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            background: var(--gold);
+            color: var(--bg);
+            padding: 24px 48px;
+            border-radius: 100px;
+            font-weight: 900;
+            font-size: 1.2rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 40px 60px rgba(245, 158, 11, 0.3);
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-print:hover {
+            transform: translateY(-10px) scale(1.05);
+            background: var(--gold-light);
+        }
+
+        footer {
+            text-align: center;
+            padding: 100px 20px;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+            opacity: 0.5;
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+                color: black;
+                padding: 0;
+            }
+
+            .hero {
+                height: auto;
+                padding: 40px;
+                border-bottom: 2px solid black;
+            }
+
+            .hero h1 {
+                color: black;
+                font-size: 4rem;
+            }
+
+            .hero h1 span {
+                color: #555;
+                font-size: 2rem;
+            }
+
+            .container {
+                margin: 0;
+                max-width: 100%;
+                border: none;
+            }
+
+            .card {
+                background: white;
+                box-shadow: none;
+                border: none;
+                padding: 40px;
+            }
+
+            h2,
+            h3,
+            .highlight {
+                color: black;
+            }
+
+            .script-box,
+            .module-box {
+                background: white;
+                border: 1px solid #ccc;
+                color: black;
+            }
+
+            .script-box p {
+                color: black;
+            }
+
+            .handoff-protocol {
+                background: #eee;
+                border: 1px solid #000;
+                color: black;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">📥 GENERAR PDF CAPACITACIÓN ÉLITE</button>
+
+    <header class="hero">
+        <div class="badge">AutonomIA Suite Academy - V 2.0</div>
+        <h1>SETTER<span>MEGA ACADEMY</span></h1>
+        <p>Entrenamiento de clase mundial para la generación de citas de alto impacto en el mercado B2B SaaS de
+            Servicios.</p>
+    </header>
+
+    <div class="container">
+        <div class="card">
+
+            <section id="tecnologia">
+                <h2>01. La Tecnología Disruptiva</h2>
+                <p>Para agendar con autoridad, debes entender que AutonomIA Suite no es un "bot genérico". Es un <span
+                        class="highlight">Cerebro AI en la Nube</span> configurado en <span class="highlight">72
+                        HORAS</span>.</p>
+                <div class="module-grid">
+                    <div class="module-box">
+                        <h3>Lenguaje Natural</h3>
+                        <p>A diferencia de los menús de botones, nuestra IA entiende oraciones completas, modismos
+                            chilenos y corrige faltas de ortografía en tiempo real.</p>
+                    </div>
+                    <div class="module-box">
+                        <h3>Memoria RAG</h3>
+                        <p>La IA "lee" el manual del cliente (procedimientos, precios, stock) y responde solo con
+                            información oficial. No alucina ni inventa datos.</p>
+                    </div>
+                    <div class="module-box">
+                        <h3>Lead Scoring</h3>
+                        <p>Analiza la intención de compra. Si detecta urgencia, marca al lead como VIP en el panel del
+                            taller/negocio.</p>
+                    </div>
+                    <div class="module-box">
+                        <h3>Auto-Data</h3>
+                        <p>Extrae Nombre, RUT, Celular y Detalles del Auto sin que el cliente llene formularios
+                            aburridos.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="prospeccion">
+                <h2>02. Prospección de Guerrilla</h2>
+                <p>Tu objetivo es encontrar negocios que tienen <strong>Tráfico</strong> pero tienen una <strong>Fuga de
+                        Dinero</strong> en sus canales de atención.</p>
+
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <span class="highlight">Paso 1: FB Ad Library</span>
+                        <p>Busca negocios en [RUBRO] que estén gastando plata en anuncios hoy mismo.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <span class="highlight">Paso 2: El Cliente Misterioso</span>
+                        <p>Escríbeles un WhatsApp preguntando precios. Si tardan más de 10 minutos, son candidatos
+                            perfectos para AutonomIA.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <span class="highlight">Paso 3: El Diagnóstico</span>
+                        <p>Llama o escribe señalando el "incendio": el dinero que pierden cada vez que un lead se queda
+                            esperando.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="scripts">
+                <h2>03. Scripts de Alto Impacto</h2>
+
+                <div class="script-box">
+                    <p>"Hola Juan, vi tu publicidad en Facebook. Te escribí una duda ahora mismo y noté que tardaron 20
+                        min en responder. Eso significa que estás regalando al menos la mitad de tus ventas al negocio
+                        de al lado. He ayudado a dueños a rescatar todo ese dinero con una IA que atiende en 5 segundos.
+                        ¿Te envío un video?"</p>
+                </div>
+
+                <h3>Cómo agendar la Demo:</h3>
+                <p>Usa la técnica de <strong>Jordan Belfort</strong>: Entusiasmo, Escasez y Autoridad.</p>
+                <div class="script-box">
+                    <p>"Felipe y el equipo técnico tienen un espacio mañana para armar una demo con TUS propios
+                        servicios y mostrarte cómo la IA te ahorra 2 horas al día de respuesta basura. Solo toma 15
+                        minutos ver el futuro de tu taller. ¿10 AM o 3 PM?"</p>
+                </div>
+            </section>
+
+            <section id="handoff">
+                <h2>04. El Protocolo de Entrega</h2>
+                <p>Eres el proveedor de munición para el Closer. No agendes "reuniones", agenda "oportunidades de
+                    cierre".</p>
+
+                <div class="handoff-protocol">
+                    <h3>Checklist para el Grupo de Closers:</h3>
+                    <ul>
+                        <li>🔥 <strong>NOMBRE:</strong> Taller Mecánico X</li>
+                        <li>👤 <strong>DUEÑO:</strong> Juan Pérez</li>
+                        <li>💥 <strong>DOLOR:</strong> Gasta $1M en Ads y no tiene recepcionista (él contesta).</li>
+                        <li>🛠️ <strong>SERVICIOS:</strong> Mecánica rápida y frenos.</li>
+                        <li>⏰ <strong>TEST RESPUESTA:</strong> Falló (tardó 45 min).</li>
+                        <li>📅 <strong>CITA:</strong> Mañana 11:00 AM.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="objeciones">
+                <h2>05. Fortalezas ante Objeciones</h2>
+                <h3>"Es muy caro"</h3>
+                <p>R: "Caro es el costo de oportunidad. Si la IA rescata una sola venta de las 50 que pierdes hoy, el
+                    sistema es gratis. No hablamos de gasto, hablamos de protección de inversión."</p>
+
+                <h3>"El setup toma mucho"</h3>
+                <p>R: "En absoluto. Implementamos todo el cerebro personalizado en menos de 72 horas. Sin que tú hagas
+                    nada técnico."</p>
+
+                <h3>"No confío en la IA"</h3>
+                <p>R: "Es normal. Por eso agendo la demo. Para que veas a la IA hablando como TÚ y respondiendo TUS
+                    precios reales. Si no te vuela la cabeza, no seguimos."</p>
+            </section>
+
+            <section id="metas">
+                <h2>06. El Camino del Setter Elite</h2>
+                <p>Este es el volumen necesario para una facturación de talla mundial:</p>
+                <div class="module-grid" style="text-align:center;">
+                    <div class="module-box"><span class="highlight" style="font-size: 2rem;">50</span><br>Leads
+                        Investigados / Día</div>
+                    <div class="module-box"><span class="highlight" style="font-size: 2rem;">20</span><br>Llamadas /
+                        Seguimientos</div>
+                    <div class="module-box"><span class="highlight" style="font-size: 2rem;">12</span><br>Demos
+                        Agendadas / Semanales</div>
+                    <div class="module-box"><span class="highlight" style="font-size: 2rem;">+80%</span><br>Asistencia a
+                        la Demo</div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <footer>
+        AUTONOMIA SUITE 2026 | TOP SECRET TRAINING | CLASSIFIED CONTENT
+    </footer>
+
+    <script>
+        // Micro-animación en botones
+        document.querySelector('.btn-print').addEventListener('mouseover', function () {
+            this.style.boxShadow = '0 50px 80px rgba(245, 158, 11, 0.4)';
+        });
+    </script>
+</body>
+
+</html>
