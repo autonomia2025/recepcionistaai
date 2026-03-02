@@ -38,6 +38,30 @@ interface KnowledgeMatch {
   id: string;
   content: string;
   file_name: string;
+  similarity?: number;
+}
+
+// Generate embedding for query text via generate-embedding edge function
+async function getQueryEmbedding(supabaseUrl: string, serviceKey: string, text: string): Promise<number[] | null> {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-embedding`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      console.error('Embedding query failed:', response.status);
+      return null;
+    }
+    const result = await response.json();
+    return result.embedding || null;
+  } catch (e) {
+    console.error('Embedding query error:', e);
+    return null;
+  }
 }
 
 // Escape SQL wildcards in user input to prevent pattern injection
@@ -45,25 +69,47 @@ function escapeLikePattern(str: string): string {
   return str.replace(/[%_\\]/g, '\\$&');
 }
 
-// Simple text-based search for knowledge (no embeddings needed)
+// Vector similarity search with ILIKE fallback
 // deno-lint-ignore no-explicit-any
 async function searchKnowledge(
   supabase: any,
+  supabaseUrl: string,
+  serviceKey: string,
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
-  // Extract keywords from query (remove common words)
+  // 1. Try vector search first
+  try {
+    const embedding = await getQueryEmbedding(supabaseUrl, serviceKey, query);
+    if (embedding) {
+      const { data, error } = await supabase.rpc('match_bot_knowledge', {
+        query_embedding: `[${embedding.join(',')}]`,
+        p_workshop_id: workshopId,
+        match_threshold: 0.35,
+        match_count: 5,
+      });
+
+      if (!error && data && data.length > 0) {
+        console.log('Vector search returned', data.length, 'matches');
+        return data as KnowledgeMatch[];
+      }
+      console.log('Vector search returned 0 matches, falling back to keyword');
+    }
+  } catch (vecError) {
+    console.error('Vector search error, falling back:', vecError);
+  }
+
+  // 2. Fallback: keyword ILIKE search
   const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por'];
   const keywords = query
     .toLowerCase()
     .split(/\s+/)
     .filter(word => word.length > 2 && !stopWords.includes(word))
-    .slice(0, 5) // Take top 5 keywords
-    .map(escapeLikePattern); // Escape SQL wildcards to prevent pattern injection
+    .slice(0, 5)
+    .map(escapeLikePattern);
 
   if (keywords.length === 0) return [];
 
-  // Use ilike for text search with escaped keywords
   const { data, error } = await supabase
     .from('bot_knowledge')
     .select('id, content, file_name')
@@ -76,6 +122,7 @@ async function searchKnowledge(
     return [];
   }
 
+  console.log('Keyword fallback returned', (data || []).length, 'matches');
   return (data || []) as KnowledgeMatch[];
 }
 
@@ -193,7 +240,7 @@ serve(async (req) => {
     // ===== RAG: Search for relevant knowledge using text search =====
     let ragContext = '';
     try {
-      const knowledgeMatches = await searchKnowledge(supabase, workshop_id, message_text);
+      const knowledgeMatches = await searchKnowledge(supabase, supabaseUrl, supabaseServiceKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
