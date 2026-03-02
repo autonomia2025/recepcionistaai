@@ -26,12 +26,12 @@ interface Workshop {
 }
 
 interface AIReplyResult {
-  replies: string[]; // Array of messages to send
+  replies: string[];
   intent: 'agendar' | 'consulta' | 'humano' | 'saludo' | 'otro';
   confidence: number;
   should_handoff: boolean;
   should_send_booking_link: boolean;
-  reasoning?: string; // AI's internal logic for this reply
+  reasoning?: string;
 }
 
 interface KnowledgeMatch {
@@ -41,80 +41,97 @@ interface KnowledgeMatch {
   similarity?: number;
 }
 
-// Generate embedding for query text via generate-embedding edge function
-async function getQueryEmbedding(supabaseUrl: string, serviceKey: string, text: string): Promise<number[] | null> {
-  try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/generate-embedding`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
-    });
-    if (!response.ok) {
-      console.error('Embedding query failed:', response.status);
-      return null;
-    }
-    const result = await response.json();
-    return result.embedding || null;
-  } catch (e) {
-    console.error('Embedding query error:', e);
-    return null;
-  }
-}
-
 // Escape SQL wildcards in user input to prevent pattern injection
 function escapeLikePattern(str: string): string {
   return str.replace(/[%_\\]/g, '\\$&');
 }
 
-// Vector similarity search with ILIKE fallback
+// Use AI chat model to expand query into better search keywords
+async function expandQueryWithAI(
+  lovableApiKey: string,
+  query: string
+): Promise<string[]> {
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-lite',
+        messages: [
+          {
+            role: 'system',
+            content: `Eres un experto en expansión de consultas de búsqueda. Dado un mensaje de usuario, genera una lista de 5-10 palabras clave y sinónimos relevantes para buscar en una base de conocimiento.
+Responde SOLO con un JSON array de strings, sin explicaciones. Ejemplo: ["palabra1","palabra2","sinónimo1"]
+Incluye: sinónimos, variaciones, términos técnicos relacionados, y palabras clave del contexto.`
+          },
+          { role: 'user', content: query }
+        ],
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Query expansion failed:', response.status);
+      return [];
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content?.trim();
+    if (!content) return [];
+
+    let parsed = content;
+    if (parsed.startsWith('```')) {
+      parsed = parsed.replace(/```json?\n?/g, '').replace(/```\n?$/g, '').trim();
+    }
+    const keywords = JSON.parse(parsed);
+    if (Array.isArray(keywords)) {
+      console.log('AI expanded keywords:', keywords);
+      return keywords.map((k: string) => String(k).toLowerCase());
+    }
+    return [];
+  } catch (e) {
+    console.error('Query expansion error:', e);
+    return [];
+  }
+}
+
+// AI-enhanced keyword search: expand query with AI then use ILIKE
 // deno-lint-ignore no-explicit-any
 async function searchKnowledge(
   supabase: any,
-  supabaseUrl: string,
-  serviceKey: string,
+  lovableApiKey: string,
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
-  // 1. Try vector search first
-  try {
-    const embedding = await getQueryEmbedding(supabaseUrl, serviceKey, query);
-    if (embedding) {
-      const { data, error } = await supabase.rpc('match_bot_knowledge', {
-        query_embedding: `[${embedding.join(',')}]`,
-        p_workshop_id: workshopId,
-        match_threshold: 0.35,
-        match_count: 5,
-      });
+  // 1. Get AI-expanded keywords
+  const aiKeywords = await expandQueryWithAI(lovableApiKey, query);
 
-      if (!error && data && data.length > 0) {
-        console.log('Vector search returned', data.length, 'matches');
-        return data as KnowledgeMatch[];
-      }
-      console.log('Vector search returned 0 matches, falling back to keyword');
-    }
-  } catch (vecError) {
-    console.error('Vector search error, falling back:', vecError);
-  }
-
-  // 2. Fallback: keyword ILIKE search
-  const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por'];
-  const keywords = query
+  // 2. Also extract basic keywords from original query as fallback
+  const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por', 'me', 'mi', 'te', 'se', 'lo', 'le', 'su', 'nos', 'al'];
+  const basicKeywords = query
     .toLowerCase()
     .split(/\s+/)
     .filter(word => word.length > 2 && !stopWords.includes(word))
-    .slice(0, 5)
+    .slice(0, 5);
+
+  // 3. Merge and deduplicate
+  const allKeywords = [...new Set([...aiKeywords, ...basicKeywords])]
+    .filter(k => k.length > 2)
+    .slice(0, 12)
     .map(escapeLikePattern);
 
-  if (keywords.length === 0) return [];
+  if (allKeywords.length === 0) return [];
+
+  console.log('Searching knowledge with keywords:', allKeywords);
 
   const { data, error } = await supabase
     .from('bot_knowledge')
     .select('id, content, file_name')
     .eq('workshop_id', workshopId)
-    .or(keywords.map((k: string) => `content.ilike.%${k}%`).join(','))
+    .or(allKeywords.map((k: string) => `content.ilike.%${k}%`).join(','))
     .limit(5);
 
   if (error) {
@@ -122,7 +139,7 @@ async function searchKnowledge(
     return [];
   }
 
-  console.log('Keyword fallback returned', (data || []).length, 'matches');
+  console.log('AI-enhanced search returned', (data || []).length, 'matches');
   return (data || []) as KnowledgeMatch[];
 }
 
@@ -237,10 +254,10 @@ serve(async (req) => {
       system_prompt: botSettings?.system_prompt || null,
     };
 
-    // ===== RAG: Search for relevant knowledge using text search =====
+    // ===== RAG: AI-enhanced keyword search =====
     let ragContext = '';
     try {
-      const knowledgeMatches = await searchKnowledge(supabase, supabaseUrl, supabaseServiceKey, workshop_id, message_text);
+      const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
@@ -285,7 +302,7 @@ serve(async (req) => {
       .map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Negocio'}: ${m.text}`)
       .join('\n');
 
-    // Build booking URL - use configured URL from DB (set at publish time with correct domain)
+    // Build booking URL
     let fullBookingUrl: string | null = null;
     if (workshop.booking_url) {
       fullBookingUrl = workshop.booking_url;
@@ -317,7 +334,7 @@ serve(async (req) => {
       'formal': 'Mantén un tono muy formal y respetuoso en todo momento.',
     }[settings.tone || 'professional'] || 'Mantén un tono profesional.';
 
-    // Build context information that is always included
+    // Build context information
     const contextInfo = `
 INFORMACIÓN DEL NEGOCIO:
 - Nombre: ${workshop.name}
@@ -334,10 +351,9 @@ ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}` : ''}
 ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGENDAMIENTO: ${fullBookingUrl}` : ''}
 ${ragContext}`;
 
-    // Determine if this is a chatbot-only business (no scheduling)
     const isChatbotOnly = workshop.booking_mode === 'chatbot_only';
 
-    // Build system prompt - if custom prompt exists, append context; otherwise use default
+    // Build system prompt
     let systemPrompt: string;
 
     if (settings.system_prompt) {
@@ -411,7 +427,7 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
 
     console.log('Using system prompt length:', systemPrompt.length, 'custom:', !!settings.system_prompt, 'hasRAG:', !!ragContext);
 
-    // Call Lovable AI with correct model
+    // Call Lovable AI
     console.log('Calling Lovable AI gateway...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -441,7 +457,7 @@ Analiza el mensaje y responde con este JSON exacto:
 }
 
 REGLAS DE FORMATO:
-- "reasoning" debe explicar qué detectaste en el mensaje del cliente (ej: 'El cliente pregunta por precios de frenos, se activa intent cotizacion')
+- "reasoning" debe explicar qué detectaste en el mensaje del cliente
 - "replies" es un ARRAY (normalmente 1 mensaje, máximo 2-3 solo si es necesario)
 - Usa *negritas* para títulos y destacados
 - Usa • o - para listas/viñetas  
@@ -466,18 +482,14 @@ Criterios:${isChatbotOnly ? '' : `
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
         console.error('Rate limit exceeded');
-        return new Response(JSON.stringify({
-          error: 'Rate limit exceeded, please try again later'
-        }), {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded, please try again later' }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       if (aiResponse.status === 402) {
         console.error('Payment required');
-        return new Response(JSON.stringify({
-          error: 'AI credits exhausted'
-        }), {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted' }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -503,10 +515,8 @@ Criterios:${isChatbotOnly ? '' : `
       if (jsonContent.startsWith('```')) {
         jsonContent = jsonContent.replace(/```json?\n?/g, '').replace(/```\n?$/g, '').trim();
       }
-      // Handle both old format (reply) and new format (replies)
       const parsed = JSON.parse(jsonContent);
       if (parsed.reply && !parsed.replies) {
-        // Convert old format to new format
         parsed.replies = [parsed.reply];
       }
       result = parsed;
@@ -544,7 +554,7 @@ Criterios:${isChatbotOnly ? '' : `
     // Log error to health_logs for monitoring
     try {
       await supabase.from('health_logs').insert({
-        workshop_id: null, // Will be null if we couldn't identify the workshop
+        workshop_id: null,
         event_type: 'error',
         category: 'bot',
         message: `AI reply error: ${message}`,
