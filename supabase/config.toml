@@ -89,3 +89,9 @@ verify_jwt = false
 
 [functions.lead-capture]
 verify_jwt = false
+
+[functions.backfill-embeddings]
+verify_jwt = false
+
+[functions.generate-manual-quote]
+verify_jwt = false
