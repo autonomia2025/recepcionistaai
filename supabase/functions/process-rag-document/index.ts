@@ -247,8 +247,31 @@ function splitIntoChunks(text: string, chunkSize: number = 500, overlap: number 
   return chunks;
 }
 
-// Note: Embeddings are not generated - we use text-based search instead
-// The bot_knowledge table stores content that can be searched by text matching
+// Generate embedding for a text chunk via the generate-embedding edge function
+async function generateEmbedding(supabaseUrl: string, supabaseServiceKey: string, text: string): Promise<number[] | null> {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-embedding`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Embedding generation failed:', response.status, err);
+      return null;
+    }
+
+    const result = await response.json();
+    return result.embedding || null;
+  } catch (error) {
+    console.error('Embedding generation error:', error);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -307,7 +330,7 @@ serve(async (req) => {
         throw new Error('El documento no contiene suficiente texto para procesar');
       }
 
-      // Process each chunk - save without embeddings (use text search instead)
+      // Process each chunk - generate embeddings and save
       let successCount = 0;
 
       for (let i = 0; i < chunks.length; i++) {
@@ -316,23 +339,41 @@ serve(async (req) => {
         try {
           console.log(`Processing chunk ${i + 1}/${chunks.length}`);
 
-          // Save to bot_knowledge without embeddings - we use text search
+          // Generate embedding for this chunk
+          const embedding = await generateEmbedding(supabaseUrl, supabaseServiceKey, chunk);
+
+          if (!embedding) {
+            console.warn(`Chunk ${i}: embedding failed, saving without embedding`);
+          }
+
+          // Build the insert payload; format embedding as pgvector literal when present
+          const insertPayload: Record<string, unknown> = {
+            workshop_id,
+            document_id,
+            file_name,
+            content: chunk,
+            chunk_index: i,
+            metadata: { char_count: chunk.length, word_count: chunk.split(/\s+/).length },
+          };
+
+          if (embedding) {
+            // pgvector expects a string like "[0.1,0.2,...]"
+            insertPayload.embedding = `[${embedding.join(',')}]`;
+          }
+
           const { error: insertError } = await supabase
             .from('bot_knowledge')
-            .insert({
-              workshop_id,
-              document_id,
-              file_name,
-              content: chunk,
-              chunk_index: i,
-              embedding: null, // No embeddings - use text search
-              metadata: { char_count: chunk.length, word_count: chunk.split(/\s+/).length },
-            });
+            .insert(insertPayload);
 
           if (insertError) {
             console.error('Error inserting chunk:', insertError);
           } else {
             successCount++;
+          }
+
+          // Small delay to avoid rate limits on embedding API
+          if (i < chunks.length - 1) {
+            await new Promise(r => setTimeout(r, 200));
           }
         } catch (chunkError) {
           console.error(`Error processing chunk ${i}:`, chunkError);
