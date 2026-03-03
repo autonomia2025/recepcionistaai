@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Prospección Comercial - AutonomIA Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --bg: #f3f4f6;
+            --white: #ffffff;
+            --accent: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .page {
+            max-width: 800px;
+            margin: 40px auto;
+            background: var(--white);
+            padding: 60px 80px;
+            min-height: 1050px;
+            /* Approximate A4 proportion for viewing */
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            position: relative;
+            /* CRITICAL FOR PDF GENERATION: */
+            page-break-after: always;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary-dark);
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            color: var(--text-main);
+            margin: 30px 0 15px;
+        }
+
+        p {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        ul,
+        ol {
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .cover {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            height: 100%;
+            min-height: 900px;
+        }
+
+        .cover-subtitle {
+            font-size: 1.4rem;
+            color: var(--text-muted);
+            margin: 20px 0 40px;
+            font-weight: 500;
+        }
+
+        .cover-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 40px;
+            border-radius: 12px;
+            margin-top: 40px;
+            text-align: left;
+            width: 100%;
+        }
+
+        .highlight-box {
+            background: #f0fdf4;
+            border-left: 6px solid var(--accent);
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .highlight-box p {
+            margin-bottom: 0;
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #166534;
+        }
+
+        .script-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 30px 0;
+            font-style: italic;
+            font-size: 1.15rem;
+        }
+
+        .script-card strong {
+            color: var(--primary);
+            font-style: normal;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 40px;
+            right: 80px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .btn-print {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .kpi-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .kpi {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            width: 30%;
+            border: 1px solid #e2e8f0;
+        }
+
+        .kpi .num {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: block;
+        }
+
+        .kpi .label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+
+            body {
+                background: white;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+                padding: 40px;
+                min-height: auto;
+                height: 100vh;
+                page-break-after: always;
+            }
+
+            .cover {
+                height: 100vh;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir como PDF (8 Páginas)</button>
+
+    <!-- PÁGINA 1 -->
+    <div class="page cover">
+        <h3 style="color: var(--primary); text-transform: uppercase; letter-spacing: 2px;">Manual de Prospección
+            Comercial</h3>
+        <h1 style="font-size: 4rem; margin-top: 20px;">AutonomIA Suite</h1>
+        <p class="cover-subtitle">Sistema de IA para automatizar ventas por WhatsApp en empresas de servicios.</p>
+
+        <div class="cover-box">
+            <h3>Objetivo del manual</h3>
+            <p>Capacitar setters para generar demos calificadas.</p>
+
+            <h3 style="margin-top: 30px;">¿Qué es AutonomIA Suite?</h3>
+            <p>AutonomIA Suite es una plataforma de inteligencia artificial que responde automáticamente los mensajes de
+                WhatsApp de empresas de servicios, captura datos de clientes, califica leads y ayuda a cerrar más ventas
+                sin aumentar el equipo de atención.</p>
+        </div>
+        <div class="page-number">Página 1</div>
+    </div>
+
+    <!-- PÁGINA 2 -->
+    <div class="page">
+        <h2>Qué vendemos exactamente</h2>
+        <p>AutonomIA Suite es una recepcionista con IA que vive en el WhatsApp de una empresa.</p>
+
+        <h3>Funciones principales:</h3>
+        <ul>
+            <li><strong>Responde mensajes automáticamente</strong></li>
+            <li><strong>Contesta en menos de 5 segundos</strong></li>
+            <li><strong>Califica clientes potenciales</strong></li>
+            <li><strong>Guarda información en un CRM automático</strong></li>
+            <li><strong>Detecta clientes urgentes</strong></li>
+            <li><strong>Permite que un humano intervenga</strong> cuando sea necesario</li>
+        </ul>
+
+        <h3>Resultado para el negocio:</h3>
+        <ul>
+            <li>Más ventas</li>
+            <li>Menos tiempo respondiendo WhatsApp</li>
+            <li>Mejor organización de clientes</li>
+        </ul>
+        <div class="page-number">Página 2</div>
+    </div>
+
+    <!-- PÁGINA 3 -->
+    <div class="page">
+        <h2>El problema del cliente</h2>
+        <p>Las empresas tienen un dolor claro en el mercado actual relacionado con la atención digital.</p>
+
+        <h3>Problemas comunes:</h3>
+        <ul style="list-style-type: none; padding-left: 0;">
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee;">1️⃣ Empresas responden tarde WhatsApp</li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee;">2️⃣ Se pierden clientes por demora</li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee;">3️⃣ Muchas consultas son solo curiosos</li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee;">4️⃣ No tienen base de datos ordenada</li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee;">5️⃣ Los dueños pierden tiempo respondiendo</li>
+        </ul>
+
+        <div class="highlight-box" style="background: #fffbeb; border-color: #fbbf24;">
+            <p style="color: #b45309;"><strong>Dato clave:</strong> Muchas empresas pierden hasta el 50-60% de las
+                ventas por responder tarde.</p>
+        </div>
+
+        <div class="highlight-box">
+            <p><strong>Mensaje clave de venta:</strong> AutonomIA permite responder en menos de 5 segundos, 24/7.</p>
+        </div>
+        <div class="page-number">Página 3</div>
+    </div>
+
+    <!-- PÁGINA 4 -->
+    <div class="page">
+        <h2>Cliente ideal</h2>
+
+        <h3>Tipos de empresas a prospectar:</h3>
+        <p>Empresas de servicios con muchos mensajes.</p>
+
+        <h3>Ejemplos:</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">🚗 Talleres mecánicos</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">✨ Detailing automotriz</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">💆‍♀️ Clínicas estéticas</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">🦷 Clínicas dentales</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">🏠 Inmobiliarias</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">🔧 Empresas de reparación</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">⚙️ Empresas de instalación</div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 6px;">🛠️ Empresas de mantenimiento</div>
+        </div>
+
+        <h3 style="margin-top: 40px;">Características del cliente ideal:</h3>
+        <ul>
+            <li>Reciben muchos WhatsApp</li>
+            <li>Tardan en responder</li>
+            <li>Tienen ventas de ticket medio o alto</li>
+            <li>Usan WhatsApp como canal principal de ventas</li>
+        </ul>
+        <div class="page-number">Página 4</div>
+    </div>
+
+    <!-- PÁGINA 5 -->
+    <div class="page">
+        <h2>Script de contacto inicial</h2>
+        <p>Guion simple para primer contacto.</p>
+
+        <div class="script-card">
+            <p><strong>Hola, ¿hablo con la empresa [nombre]?</strong></p>
+            <br>
+            <p>Te llamo porque estamos trabajando con empresas de servicios que reciben muchos mensajes por WhatsApp y
+                pierden clientes por responder tarde.</p>
+            <br>
+            <p>Creamos una IA que responde automáticamente los mensajes, califica clientes y organiza los contactos.</p>
+            <br>
+            <p>La idea no es venderte nada ahora, solo mostrarte cómo funciona.</p>
+            <br>
+            <p><strong>¿Te hace sentido lo que te cuento?</strong></p>
+        </div>
+        <div class="page-number">Página 5</div>
+    </div>
+
+    <!-- PÁGINA 6 -->
+    <div class="page">
+        <h2>Calificación del cliente</h2>
+        <p>Antes de agendar demo se deben confirmar 3 cosas.</p>
+
+        <h3>Preguntas clave:</h3>
+        <div style="background: #eff6ff; padding: 25px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>1️⃣ ¿Cuántos mensajes reciben al día en WhatsApp?</strong></p>
+            <br>
+            <p><strong>2️⃣ ¿Quién responde actualmente los mensajes?</strong></p>
+            <br>
+            <p><strong>3️⃣ ¿Les pasa que algunos clientes se pierden porque no responden rápido?</strong></p>
+        </div>
+
+        <p>Si el cliente responde que sí a estas situaciones → <strong>cliente calificado.</strong></p>
+
+        <div class="highlight-box">
+            <p><strong>Objetivo del setter:</strong> Agendar una demo con el equipo.</p>
+        </div>
+        <div class="page-number">Página 6</div>
+    </div>
+
+    <!-- PÁGINA 7 -->
+    <div class="page">
+        <h2>Manejo de objeciones</h2>
+
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; margin-bottom: 30px;">
+            <h3 style="margin-top: 0; color: #dc2626;">Objeción 1: "Yo mismo respondo el WhatsApp"</h3>
+            <p><strong>Respuesta:</strong></p>
+            <p>"Perfecto, de hecho la mayoría de nuestros clientes también lo hacían.</p>
+            <p>El problema es que muchas veces los mensajes llegan cuando están ocupados o fuera del horario.</p>
+            <p>La IA responde inmediatamente y luego tú decides si continuar la conversación."</p>
+        </div>
+
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px;">
+            <h3 style="margin-top: 0; color: #dc2626;">Objeción 2: "No me interesa"</h3>
+            <p><strong>Respuesta:</strong></p>
+            <p>"Totalmente válido.</p>
+            <p>Solo por curiosidad, ¿cuántos mensajes reciben al día por WhatsApp?</p>
+            <p>Muchas empresas no se dan cuenta de cuántos clientes pierden hasta que ven cómo funciona el sistema."</p>
+        </div>
+        <div class="page-number">Página 7</div>
+    </div>
+
+    <!-- PÁGINA 8 -->
+    <div class="page">
+        <h2>Objetivo del setter</h2>
+
+        <h3 style="font-size: 1.6rem; color: #dc2626; text-transform: uppercase;">El setter no vende.</h3>
+
+        <h3>Su trabajo es:</h3>
+        <ul style="list-style-type: none; padding-left: 0;">
+            <li style="padding: 10px 0; font-size: 1.2rem;">✔ Encontrar empresas que necesiten el sistema</li>
+            <li style="padding: 10px 0; font-size: 1.2rem;">✔ Explicar brevemente qué hacemos</li>
+            <li style="padding: 10px 0; font-size: 1.2rem;">✔ Detectar interés</li>
+            <li style="padding: 10px 0; font-size: 1.2rem;">✔ Agendar una demo</li>
+        </ul>
+
+        <h3 style="margin-top: 50px;">Meta diaria sugerida:</h3>
+        <div class="kpi-box">
+            <div class="kpi">
+                <span class="num">50</span>
+                <span class="label">Contactos</span>
+            </div>
+            <div class="kpi">
+                <span class="num">10</span>
+                <span class="label">Conversaciones</span>
+            </div>
+            <div class="kpi">
+                <span class="num">3-5</span>
+                <span class="label">Demos agendadas</span>
+            </div>
+        </div>
+        <div class="page-number">Página 8</div>
+    </div>
+</body>
+
+</html>
