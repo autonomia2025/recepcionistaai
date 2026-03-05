@@ -122,7 +122,7 @@ export default function DashboardPage() {
         <div className="section-header">
           <h2 className="section-title">Métricas principales</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
           <MetricCard
             metricId="hours_saved"
             value={stats.hoursSaved}
