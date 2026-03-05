@@ -592,6 +592,7 @@ export type Database = {
       contacts: {
         Row: {
           archived: boolean | null
+          closed_at: string | null
           created_at: string
           detected_intent: string | null
           did_schedule: boolean | null
@@ -619,6 +620,7 @@ export type Database = {
         }
         Insert: {
           archived?: boolean | null
+          closed_at?: string | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
@@ -646,6 +648,7 @@ export type Database = {
         }
         Update: {
           archived?: boolean | null
+          closed_at?: string | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
