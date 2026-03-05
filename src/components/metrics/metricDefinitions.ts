@@ -10,7 +10,8 @@ import {
   Calculator,
   Zap,
   AlertTriangle,
-  ClipboardList
+  ClipboardList,
+  CircleCheckBig
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -155,6 +156,18 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
     icon: ClipboardList,
     colorClass: 'text-violet-600',
     bgClass: 'bg-violet-500/10',
+  },
+
+  closed_clients: {
+    id: 'closed_clients',
+    name: 'Clientes Cerrados',
+    description: 'Clientes que han sido marcados como cerrados/listos por el equipo. Representa conversiones exitosas o clientes atendidos completamente.',
+    dataSource: 'Tabla de contactos, filtrada por aquellos con fecha de cierre registrada.',
+    formula: 'Conteo de contactos con closed_at ≠ null',
+    unit: 'count',
+    icon: CircleCheckBig,
+    colorClass: 'text-emerald-600',
+    bgClass: 'bg-emerald-500/10',
   },
 
   // ==================== StatsPage Superadmin ====================

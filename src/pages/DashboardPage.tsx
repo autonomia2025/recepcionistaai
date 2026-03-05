@@ -31,13 +31,14 @@ export default function DashboardPage() {
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
       
-      const [conversations, contacts, appointments, messagesOut, messagesIn, activeRequests] = await Promise.all([
+      const [conversations, contacts, appointments, messagesOut, messagesIn, activeRequests, closedClients] = await Promise.all([
         supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'outbound'),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'inbound'),
         supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('status', 'in', '("done","lost")'),
+        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('closed_at', 'is', null),
       ]);
       
       const conversationCount = conversations.count || 0;
@@ -52,6 +53,7 @@ export default function DashboardPage() {
         messagesOut: messagesOut.count || 0,
         messagesIn: messagesIn.count || 0,
         activeRequests: activeRequests.count || 0,
+        closedClients: closedClients.count || 0,
         hoursSaved,
         valueGenerated,
       };
@@ -120,7 +122,7 @@ export default function DashboardPage() {
         <div className="section-header">
           <h2 className="section-title">Métricas principales</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
           <MetricCard
             metricId="hours_saved"
             value={stats.hoursSaved}
@@ -142,6 +144,12 @@ export default function DashboardPage() {
             metricId="clients"
             value={stats.contacts}
             workshopId={workshopId}
+          />
+          <MetricCard
+            metricId="closed_clients"
+            value={stats.closedClients}
+            workshopId={workshopId}
+            className="bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent"
           />
         </div>
       </div>

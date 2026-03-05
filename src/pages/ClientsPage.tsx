@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare } from 'lucide-react';
+import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -67,6 +67,7 @@ interface Contact {
   notes: string | null;
   tags: string[] | null;
   last_analyzed_at: string | null;
+  closed_at: string | null;
   // Aggregated data
   service_requests_count?: number;
   total_estimated_value?: number;
@@ -133,6 +134,8 @@ export default function ClientsPage() {
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [lastContactFilter, setLastContactFilter] = useState<string>('all');
+  const [closeContactId, setCloseContactId] = useState<string | null>(null);
+  const [closeStep, setCloseStep] = useState<1 | 2>(1);
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -244,8 +247,49 @@ export default function ClientsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: 'Cliente archivado correctamente' });
       setDeleteContactId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Close client mutation
+  const closeContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ closed_at: new Date().toISOString() })
+        .eq('id', contactId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: '✅ Cliente marcado como cerrado' });
+      setCloseContactId(null);
+      setCloseStep(1);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Reopen client mutation
+  const reopenContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ closed_at: null })
+        .eq('id', contactId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: 'Cliente reabierto' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -299,6 +343,7 @@ export default function ClientsPage() {
     cold: contacts?.filter(c => c.lead_score < 50).length || 0,
     pendingRecontact: contacts?.filter(c => c.should_recontact).length || 0,
     scheduled: contacts?.filter(c => c.did_schedule === true).length || 0,
+    closed: contacts?.filter(c => c.closed_at !== null).length || 0,
   };
 
   return (
@@ -313,7 +358,7 @@ export default function ClientsPage() {
         <div className="section-header">
           <h2 className="section-title">Resumen</h2>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
           <Card className="card-premium">
             <CardContent className="p-3 md:p-4 flex items-center gap-3">
               <div className="p-2 rounded-xl bg-primary/10">
@@ -370,6 +415,18 @@ export default function ClientsPage() {
               <div>
                 <p className="text-2xl font-bold text-amber-600">{stats.pendingRecontact}</p>
                 <p className="text-xs text-muted-foreground">Recontacto</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="card-premium border-emerald-200/50">
+            <CardContent className="p-3 md:p-4 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-50">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-emerald-600">{stats.closed}</p>
+                <p className="text-xs text-muted-foreground">Cerrados</p>
               </div>
             </CardContent>
           </Card>
@@ -506,7 +563,14 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{contact.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-sm truncate">{contact.name}</p>
+                              {contact.closed_at && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
+                                </span>
+                              )}
+                            </div>
                             <span className={cn(
                               'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border flex-shrink-0',
                               scoreInfo.className
@@ -535,7 +599,30 @@ export default function ClientsPage() {
                               <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuContent align="end" className="w-48">
+                            {contact.closed_at ? (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  reopenContactMutation.mutate(contact.id);
+                                }}
+                              >
+                                <Undo2 className="w-4 h-4 mr-2" />
+                                Reabrir cliente
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                className="text-emerald-600 focus:text-emerald-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCloseContactId(contact.id);
+                                  setCloseStep(1);
+                                }}
+                              >
+                                <CircleCheckBig className="w-4 h-4 mr-2" />
+                                Marcar como cerrado
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={(e) => {
@@ -593,7 +680,14 @@ export default function ClientsPage() {
                                 {scoreInfo.emoji}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">{contact.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-medium text-sm truncate">{contact.name}</p>
+                                  {contact.closed_at && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
+                                      <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
+                                    </span>
+                                  )}
+                                </div>
                                 {contact.email && (
                                   <p className="text-xs text-muted-foreground truncate">
                                     {contact.email}
@@ -684,7 +778,30 @@ export default function ClientsPage() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuContent align="end" className="w-48">
+                                {contact.closed_at ? (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      reopenContactMutation.mutate(contact.id);
+                                    }}
+                                  >
+                                    <Undo2 className="w-4 h-4 mr-2" />
+                                    Reabrir cliente
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="text-emerald-600 focus:text-emerald-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCloseContactId(contact.id);
+                                      setCloseStep(1);
+                                    }}
+                                  >
+                                    <CircleCheckBig className="w-4 h-4 mr-2" />
+                                    Marcar como cerrado
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
                                   onClick={(e) => {
@@ -733,6 +850,43 @@ export default function ClientsPage() {
             >
               Archivar
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close Client Double Confirmation Dialog */}
+      <AlertDialog open={!!closeContactId} onOpenChange={(open) => { if (!open) { setCloseContactId(null); setCloseStep(1); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {closeStep === 1 ? '¿Marcar como cliente cerrado?' : '⚠️ Confirmación final'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {closeStep === 1 
+                ? 'Este cliente será marcado como cerrado/listo. Esta acción quedará reflejada en las métricas del dashboard.' 
+                : '¿Estás completamente seguro? Esta acción marcará al cliente como cerrado de forma definitiva en las métricas.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {closeStep === 1 ? (
+              <AlertDialogAction
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCloseStep(2);
+                }}
+              >
+                Sí, continuar
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => closeContactId && closeContactMutation.mutate(closeContactId)}
+              >
+                ✅ Confirmar cierre
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
