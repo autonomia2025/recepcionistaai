@@ -680,7 +680,14 @@ export default function ClientsPage() {
                                 {scoreInfo.emoji}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">{contact.name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-medium text-sm truncate">{contact.name}</p>
+                                  {contact.closed_at && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
+                                      <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
+                                    </span>
+                                  )}
+                                </div>
                                 {contact.email && (
                                   <p className="text-xs text-muted-foreground truncate">
                                     {contact.email}
@@ -843,6 +850,43 @@ export default function ClientsPage() {
             >
               Archivar
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close Client Double Confirmation Dialog */}
+      <AlertDialog open={!!closeContactId} onOpenChange={(open) => { if (!open) { setCloseContactId(null); setCloseStep(1); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {closeStep === 1 ? '¿Marcar como cliente cerrado?' : '⚠️ Confirmación final'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {closeStep === 1 
+                ? 'Este cliente será marcado como cerrado/listo. Esta acción quedará reflejada en las métricas del dashboard.' 
+                : '¿Estás completamente seguro? Esta acción marcará al cliente como cerrado de forma definitiva en las métricas.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {closeStep === 1 ? (
+              <AlertDialogAction
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCloseStep(2);
+                }}
+              >
+                Sí, continuar
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => closeContactId && closeContactMutation.mutate(closeContactId)}
+              >
+                ✅ Confirmar cierre
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
