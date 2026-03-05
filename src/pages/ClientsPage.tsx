@@ -67,6 +67,7 @@ interface Contact {
   notes: string | null;
   tags: string[] | null;
   last_analyzed_at: string | null;
+  closed_at: string | null;
   // Aggregated data
   service_requests_count?: number;
   total_estimated_value?: number;
@@ -133,6 +134,8 @@ export default function ClientsPage() {
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [lastContactFilter, setLastContactFilter] = useState<string>('all');
+  const [closeContactId, setCloseContactId] = useState<string | null>(null);
+  const [closeStep, setCloseStep] = useState<1 | 2>(1);
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -244,8 +247,49 @@ export default function ClientsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({ title: 'Cliente archivado correctamente' });
       setDeleteContactId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Close client mutation
+  const closeContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ closed_at: new Date().toISOString() })
+        .eq('id', contactId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: '✅ Cliente marcado como cerrado' });
+      setCloseContactId(null);
+      setCloseStep(1);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Reopen client mutation
+  const reopenContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ closed_at: null })
+        .eq('id', contactId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({ title: 'Cliente reabierto' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -299,6 +343,7 @@ export default function ClientsPage() {
     cold: contacts?.filter(c => c.lead_score < 50).length || 0,
     pendingRecontact: contacts?.filter(c => c.should_recontact).length || 0,
     scheduled: contacts?.filter(c => c.did_schedule === true).length || 0,
+    closed: contacts?.filter(c => c.closed_at !== null).length || 0,
   };
 
   return (
