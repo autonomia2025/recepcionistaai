@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare } from 'lucide-react';
+import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -592,7 +592,30 @@ export default function ClientsPage() {
                               <MoreHorizontal className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuContent align="end" className="w-48">
+                            {contact.closed_at ? (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  reopenContactMutation.mutate(contact.id);
+                                }}
+                              >
+                                <Undo2 className="w-4 h-4 mr-2" />
+                                Reabrir cliente
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                className="text-emerald-600 focus:text-emerald-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCloseContactId(contact.id);
+                                  setCloseStep(1);
+                                }}
+                              >
+                                <CircleCheckBig className="w-4 h-4 mr-2" />
+                                Marcar como cerrado
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={(e) => {
@@ -741,7 +764,30 @@ export default function ClientsPage() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuContent align="end" className="w-48">
+                                {contact.closed_at ? (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      reopenContactMutation.mutate(contact.id);
+                                    }}
+                                  >
+                                    <Undo2 className="w-4 h-4 mr-2" />
+                                    Reabrir cliente
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="text-emerald-600 focus:text-emerald-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCloseContactId(contact.id);
+                                      setCloseStep(1);
+                                    }}
+                                  >
+                                    <CircleCheckBig className="w-4 h-4 mr-2" />
+                                    Marcar como cerrado
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
                                   onClick={(e) => {
