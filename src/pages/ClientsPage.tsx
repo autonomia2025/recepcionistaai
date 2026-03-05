@@ -563,7 +563,14 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{contact.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-sm truncate">{contact.name}</p>
+                              {contact.closed_at && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
+                                </span>
+                              )}
+                            </div>
                             <span className={cn(
                               'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border flex-shrink-0',
                               scoreInfo.className
