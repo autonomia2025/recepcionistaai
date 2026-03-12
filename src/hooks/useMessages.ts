@@ -23,7 +23,7 @@ export interface Message {
 export function useMessages(conversationId: string | null) {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAnalyzedMessageIdRef = useRef<string | null>(null);
 
   // Function to trigger AI analysis
