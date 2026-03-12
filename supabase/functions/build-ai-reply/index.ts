@@ -201,14 +201,15 @@ serve(async (req) => {
         .eq('id', authData.user.id)
         .single();
 
-      if (profileError || !profile?.workshop_id) {
+      if (profileError || !profile) {
         return new Response(JSON.stringify({ error: 'Profile not found' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      if (profile.workshop_id !== workshop_id && profile.role !== 'SUPERADMIN') {
+      // SUPERADMIN can simulate any workshop; others must match their own
+      if (profile.role !== 'SUPERADMIN' && profile.workshop_id !== workshop_id) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
