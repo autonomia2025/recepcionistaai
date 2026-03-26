@@ -324,6 +324,72 @@ async function fetchMetricData(
       };
     }
 
+    case 'closed_clients': {
+      let query = supabase
+        .from('contacts')
+        .select('name, phone, closed_at')
+        .not('closed_at', 'is', null);
+      
+      if (!isAdmin && workshopId) {
+        query = query.eq('workshop_id', workshopId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const currentPeriod = data?.filter(d => new Date(d.closed_at!) >= startDate) || [];
+      const previousPeriod = data?.filter(d => new Date(d.closed_at!) >= previousStartDate && new Date(d.closed_at!) < startDate) || [];
+
+      // Build breakdown with names
+      const breakdown: BreakdownDataPoint[] = currentPeriod.map(c => ({
+        date: c.closed_at!,
+        value: 1,
+        label: c.name || c.phone || 'Sin nombre',
+      }));
+
+      const change = previousPeriod.length > 0 
+        ? ((currentPeriod.length - previousPeriod.length) / previousPeriod.length) * 100 
+        : 0;
+
+      return {
+        currentValue: data?.length || 0,
+        breakdown,
+        comparison: {
+          previous: previousPeriod.length,
+          change,
+          trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
+        },
+        calculationExample: `${data?.length || 0} clientes cerrados en total`,
+      };
+    }
+
+    case 'active_requests': {
+      let query = supabase
+        .from('service_requests')
+        .select('created_at')
+        .not('status', 'in', '("done","lost")')
+        .gte('created_at', previousStartDate.toISOString());
+      
+      if (!isAdmin && workshopId) {
+        query = query.eq('workshop_id', workshopId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const current = data?.filter(d => new Date(d.created_at) >= startDate).length || 0;
+      const previous = data?.filter(d => new Date(d.created_at) < startDate).length || 0;
+      const breakdown = buildBreakdown(data || [], startDate, groupBy);
+      const change = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+
+      return {
+        currentValue: current,
+        breakdown,
+        comparison: { previous, change, trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral' },
+        calculationExample: `${current} solicitudes activas`,
+      };
+    }
+
     default:
       return emptyResult;
   }
