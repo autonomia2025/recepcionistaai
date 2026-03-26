@@ -20,16 +20,10 @@ interface Contact {
   email: string | null;
   lead_score: number;
   detected_intent: string | null;
-  intent_confidence: number | null;
-  should_recontact: boolean;
-  did_schedule: boolean | null;
   closed_at: string | null;
-  created_at: string;
   last_contact_at?: string | null;
-  tags: string[] | null;
-  notes: string | null;
-  // service request fields
   service_requests_count?: number;
+  [key: string]: unknown;
 }
 
 interface PipelineStage {
