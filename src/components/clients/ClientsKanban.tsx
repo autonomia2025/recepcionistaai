@@ -13,18 +13,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-interface Contact {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  lead_score: number;
-  detected_intent: string | null;
-  closed_at: string | null;
-  last_contact_at?: string | null;
-  service_requests_count?: number;
-  [key: string]: unknown;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Contact = any;
 
 interface PipelineStage {
   id: string;
