@@ -543,7 +543,19 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Client List */}
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <ClientsKanban
+          contacts={filteredContacts || []}
+          onSelectContact={setSelectedContact}
+          onCloseContact={(id) => { setCloseContactId(id); setCloseStep(1); }}
+          onReopenContact={(id) => reopenContactMutation.mutate(id)}
+          onDeleteContact={(id) => setDeleteContactId(id)}
+        />
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
       <Card className="card-premium overflow-hidden">
         <CardHeader className="py-4 px-4 md:px-6 border-b border-border/50">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -847,6 +859,7 @@ export default function ClientsPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Client Detail Dialog */}
       <ClientDetailDialog 
