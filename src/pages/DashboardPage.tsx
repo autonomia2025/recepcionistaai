@@ -88,8 +88,8 @@ export default function DashboardPage() {
     return (
       <div className="page-shell page-stack animate-in">
         <PageHeader title="Dashboard" description="Resumen de tu negocio" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-6">
-          {[...Array(5)].map((_, i) => <MetricSkeleton key={i} />)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+          {[...Array(4)].map((_, i) => <MetricSkeleton key={i} />)}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {[...Array(4)].map((_, i) => <MetricSkeleton key={i} />)}

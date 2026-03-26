@@ -41,7 +41,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2, LayoutGrid, List } from 'lucide-react';
+import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2, LayoutList, Kanban } from 'lucide-react';
+import { ClientsKanban } from '@/components/clients/ClientsKanban';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -136,7 +137,7 @@ export default function ClientsPage() {
   const [lastContactFilter, setLastContactFilter] = useState<string>('all');
   const [closeContactId, setCloseContactId] = useState<string | null>(null);
   const [closeStep, setCloseStep] = useState<1 | 2>(1);
-  const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -354,30 +355,22 @@ export default function ClientsPage() {
           title="Clientes" 
           description="Gestiona tu base de clientes y leads"
         />
-        <div className="flex items-center bg-background/50 border border-border/60 p-1 rounded-xl gap-1">
+        <div className="flex items-center gap-1 border rounded-lg p-1">
           <Button
-            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+            variant={viewMode === 'list' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setViewMode('table')}
-            className={cn(
-              "h-8 px-3 rounded-lg flex items-center gap-2 transition-all",
-              viewMode === 'table' ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
+            className="h-8 px-2"
+            onClick={() => setViewMode('list')}
           >
-            <List className="w-4 h-4" />
-            <span className="text-xs font-medium">Tabla</span>
+            <LayoutList className="w-4 h-4" />
           </Button>
           <Button
-            variant={viewMode === 'pipeline' ? 'secondary' : 'ghost'}
+            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => setViewMode('pipeline')}
-            className={cn(
-              "h-8 px-3 rounded-lg flex items-center gap-2 transition-all",
-              viewMode === 'pipeline' ? "bg-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
+            className="h-8 px-2"
+            onClick={() => setViewMode('kanban')}
           >
-            <LayoutGrid className="w-4 h-4" />
-            <span className="text-xs font-medium">Pipeline</span>
+            <Kanban className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -550,7 +543,19 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Client List */}
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <ClientsKanban
+          contacts={filteredContacts || []}
+          onSelectContact={setSelectedContact}
+          onCloseContact={(id) => { setCloseContactId(id); setCloseStep(1); }}
+          onReopenContact={(id) => reopenContactMutation.mutate(id)}
+          onDeleteContact={(id) => setDeleteContactId(id)}
+        />
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
       <Card className="card-premium overflow-hidden">
         <CardHeader className="py-4 px-4 md:px-6 border-b border-border/50">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -670,319 +675,191 @@ export default function ClientsPage() {
                 })}
               </div>
 
-              {/* Desktop Table/Pipeline View */}
-              <div className="hidden md:block">
-                {viewMode === 'table' ? (
-                  <div className="overflow-x-auto">
-                    <Table className="table-premium">
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="pl-4 md:pl-6">Cliente</TableHead>
-                          <TableHead>Teléfono</TableHead>
-                          <TableHead>Score</TableHead>
-                          <TableHead>Último contacto</TableHead>
-                          <TableHead className="hidden lg:table-cell">Intención</TableHead>
-                          {!isChatbotOnly && (
-                            <TableHead className="hidden lg:table-cell">Agendó</TableHead>
-                          )}
-                          <TableHead className="hidden lg:table-cell">Recontacto</TableHead>
-                          <TableHead className="w-[50px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredContacts?.map((contact) => {
-                          const scoreInfo = getLeadScoreInfo(contact.lead_score);
-                          const intentInfo = getIntentLabel(contact.detected_intent);
-                          const lastContact = formatLastContact(contact.last_contact_at);
-                          
-                          return (
-                            <TableRow 
-                              key={contact.id} 
-                              className="cursor-pointer"
-                              onClick={() => setSelectedContact(contact)}
-                            >
-                              <TableCell className="pl-4 md:pl-6">
-                                <div className="flex items-center gap-3">
-                                  <div className={cn(
-                                    'w-9 h-9 rounded-full flex items-center justify-center text-base',
-                                    contact.lead_score >= 80 ? 'bg-orange-50' : 
-                                    contact.lead_score >= 50 ? 'bg-amber-50' : 'bg-gray-100'
-                                  )}>
-                                    {scoreInfo.emoji}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="font-medium text-sm truncate">{contact.name}</p>
-                                      {contact.closed_at && (
-                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
-                                          <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
-                                        </span>
-                                      )}
-                                    </div>
-                                    {contact.email && (
-                                      <p className="text-xs text-muted-foreground truncate">
-                                        {contact.email}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                  <Phone className="w-3.5 h-3.5" />
-                                  <span className="text-sm">{contact.phone || '-'}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className={cn(
-                                  'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
-                                  scoreInfo.className
-                                )}>
-                                  {contact.lead_score}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                {lastContact ? (
-                                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    {lastContact}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground/50">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="hidden lg:table-cell">
-                                {intentInfo ? (
-                                  <span className="text-sm text-muted-foreground">
-                                    {intentInfo.emoji} {intentInfo.label}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground/50">-</span>
-                                )}
-                              </TableCell>
-                              
-                              {!isChatbotOnly && (
-                                <TableCell className="hidden lg:table-cell">
-                                  {contact.did_schedule === true ? (
-                                    <div className="flex items-center gap-1.5 text-emerald-600">
-                                      <CheckCircle2 className="w-4 h-4" />
-                                      <span className="text-sm">Sí</span>
-                                    </div>
-                                  ) : contact.did_schedule === false ? (
-                                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                                      <XCircle className="w-4 h-4" />
-                                      <span className="text-sm">No</span>
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground/50">-</span>
-                                  )}
-                                </TableCell>
-                              )}
-                              
-                              <TableCell className="hidden lg:table-cell">
-                                {contact.should_recontact ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200/50">
-                                      ⏰ {contact.recontact_at 
-                                        ? (() => {
-                                            try {
-                                              const dateStr = contact.recontact_at;
-                                              const date = dateStr.includes('T') 
-                                                ? new Date(dateStr) 
-                                                : new Date(dateStr + 'T12:00:00');
-                                              return format(date, 'dd MMM', { locale: es });
-                                            } catch {
-                                              return 'Pend.';
-                                            }
-                                          })()
-                                        : 'Pend.'}
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="table-premium">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-4 md:pl-6">Cliente</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Último contacto</TableHead>
+                      <TableHead className="hidden lg:table-cell">Intención</TableHead>
+                      {!isChatbotOnly && (
+                        <TableHead className="hidden lg:table-cell">Agendó</TableHead>
+                      )}
+                      <TableHead className="hidden lg:table-cell">Recontacto</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredContacts?.map((contact) => {
+                      const scoreInfo = getLeadScoreInfo(contact.lead_score);
+                      const intentInfo = getIntentLabel(contact.detected_intent);
+                      const lastContact = formatLastContact(contact.last_contact_at);
+                      
+                      return (
+                        <TableRow 
+                          key={contact.id} 
+                          className="cursor-pointer"
+                          onClick={() => setSelectedContact(contact)}
+                        >
+                          <TableCell className="pl-4 md:pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                'w-9 h-9 rounded-full flex items-center justify-center text-base',
+                                contact.lead_score >= 80 ? 'bg-orange-50' : 
+                                contact.lead_score >= 50 ? 'bg-amber-50' : 'bg-gray-100'
+                              )}>
+                                {scoreInfo.emoji}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-medium text-sm truncate">{contact.name}</p>
+                                  {contact.closed_at && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/50 flex-shrink-0">
+                                      <CheckCircle2 className="w-2.5 h-2.5" /> Cerrado
                                     </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground/50">-</span>
+                                  )}
+                                </div>
+                                {contact.email && (
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {contact.email}
+                                  </p>
                                 )}
-                              </TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                      <MoreHorizontal className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    {contact.closed_at ? (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          reopenContactMutation.mutate(contact.id);
-                                        }}
-                                      >
-                                        <Undo2 className="w-4 h-4 mr-2" />
-                                        Reabrir cliente
-                                      </DropdownMenuItem>
-                                    ) : (
-                                      <DropdownMenuItem
-                                        className="text-emerald-600 focus:text-emerald-600"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setCloseContactId(contact.id);
-                                          setCloseStep(1);
-                                        }}
-                                      >
-                                        <CircleCheckBig className="w-4 h-4 mr-2" />
-                                        Marcar como cerrado
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                      className="text-destructive focus:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteContactId(contact.id);
-                                      }}
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-muted/20 min-h-[500px]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-                      {[
-                        { 
-                          name: 'Nuevo', 
-                          contacts: filteredContacts?.filter(c => !c.detected_intent && !c.closed_at && !c.should_recontact) || [] 
-                        },
-                        { 
-                          name: 'En conversación', 
-                          contacts: filteredContacts?.filter(c => c.detected_intent && !c.closed_at && !c.should_recontact) || [] 
-                        },
-                        { 
-                          name: 'Recontacto', 
-                          contacts: filteredContacts?.filter(c => c.should_recontact && !c.closed_at) || [] 
-                        },
-                        { 
-                          name: 'Cerrado', 
-                          contacts: filteredContacts?.filter(c => c.closed_at) || [] 
-                        }
-                      ].map((column) => (
-                        <div key={column.name} className="flex flex-col gap-3 min-w-0">
-                          <div className="flex items-center justify-between px-1">
-                            <h3 className="font-semibold text-sm flex items-center gap-2">
-                              {column.name}
-                              <span className="bg-muted px-2 py-0.5 rounded-full text-[10px] text-muted-foreground font-bold">
-                                {column.contacts.length}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Phone className="w-3.5 h-3.5" />
+                              <span className="text-sm">{contact.phone || '-'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn(
+                              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border',
+                              scoreInfo.className
+                            )}>
+                              {contact.lead_score}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {lastContact ? (
+                              <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" />
+                                {lastContact}
                               </span>
-                            </h3>
-                          </div>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {intentInfo ? (
+                              <span className="text-sm text-muted-foreground">
+                                {intentInfo.emoji} {intentInfo.label}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
                           
-                          <div className="flex flex-col gap-2 max-h-[700px] overflow-y-auto pr-1 scrollbar-thin">
-                            {column.contacts.length === 0 ? (
-                              <div className="border border-dashed border-border/60 rounded-xl p-6 text-center">
-                                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-semibold">Vacío</p>
+                          {!isChatbotOnly && (
+                            <TableCell className="hidden lg:table-cell">
+                              {contact.did_schedule === true ? (
+                                <div className="flex items-center gap-1.5 text-emerald-600">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span className="text-sm">Sí</span>
+                                </div>
+                              ) : contact.did_schedule === false ? (
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  <XCircle className="w-4 h-4" />
+                                  <span className="text-sm">No</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/50">-</span>
+                              )}
+                            </TableCell>
+                          )}
+                          
+                          <TableCell className="hidden lg:table-cell">
+                            {contact.should_recontact ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200/50">
+                                  ⏰ {contact.recontact_at 
+                                    ? (() => {
+                                        try {
+                                          const dateStr = contact.recontact_at;
+                                          const date = dateStr.includes('T') 
+                                            ? new Date(dateStr) 
+                                            : new Date(dateStr + 'T12:00:00');
+                                          return format(date, 'dd MMM', { locale: es });
+                                        } catch {
+                                          return 'Pend.';
+                                        }
+                                      })()
+                                    : 'Pend.'}
+                                </span>
                               </div>
                             ) : (
-                              column.contacts.map((contact) => {
-                                const scoreInfo = getLeadScoreInfo(contact.lead_score);
-                                const lastContact = formatLastContact(contact.last_contact_at);
-                                
-                                return (
-                                  <div 
-                                    key={contact.id}
-                                    className="group bg-background border border-border/60 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-primary/20 transition-all cursor-pointer relative"
-                                    onClick={() => setSelectedContact(contact)}
-                                  >
-                                    <div className="flex items-start justify-between gap-2 mb-2">
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <p className="font-semibold text-sm truncate">{contact.name}</p>
-                                        <span className={cn(
-                                          'px-1.5 py-0.5 rounded-md text-[10px] font-bold border flex-shrink-0',
-                                          scoreInfo.className
-                                        )}>
-                                          {contact.lead_score}
-                                        </span>
-                                      </div>
-                                      
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <MoreHorizontal className="w-3 h-3" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48">
-                                          {contact.closed_at ? (
-                                            <DropdownMenuItem
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                reopenContactMutation.mutate(contact.id);
-                                              }}
-                                            >
-                                              <Undo2 className="w-4 h-4 mr-2" />
-                                              Reabrir cliente
-                                            </DropdownMenuItem>
-                                          ) : (
-                                            <DropdownMenuItem
-                                              className="text-emerald-600 focus:text-emerald-600"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setCloseContactId(contact.id);
-                                                setCloseStep(1);
-                                              }}
-                                            >
-                                              <CircleCheckBig className="w-4 h-4 mr-2" />
-                                              Marcar como cerrado
-                                            </DropdownMenuItem>
-                                          )}
-                                          <DropdownMenuItem
-                                            className="text-destructive focus:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setDeleteContactId(contact.id);
-                                            }}
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Eliminar
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                    
-                                    <div className="space-y-1.5">
-                                      {contact.phone && (
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80">
-                                          <Phone className="w-3 h-3" />
-                                          {contact.phone}
-                                        </div>
-                                      )}
-                                      {lastContact && (
-                                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
-                                          <Clock className="w-3 h-3" />
-                                          {lastContact}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
+                              <span className="text-muted-foreground/50">-</span>
                             )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                {contact.closed_at ? (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      reopenContactMutation.mutate(contact.id);
+                                    }}
+                                  >
+                                    <Undo2 className="w-4 h-4 mr-2" />
+                                    Reabrir cliente
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="text-emerald-600 focus:text-emerald-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCloseContactId(contact.id);
+                                      setCloseStep(1);
+                                    }}
+                                  >
+                                    <CircleCheckBig className="w-4 h-4 mr-2" />
+                                    Marcar como cerrado
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteContactId(contact.id);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </>
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Client Detail Dialog */}
       <ClientDetailDialog 

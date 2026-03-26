@@ -165,6 +165,17 @@ export function MetricDetailModal({
                   <div className="space-y-2">
                     <Skeleton className="h-24 w-full" />
                   </div>
+                ) : metricId === 'closed_clients' && breakdown?.breakdown && breakdown.breakdown.length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {breakdown.breakdown.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 bg-muted/30 rounded-lg">
+                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.date).toLocaleDateString('es-CL')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 ) : breakdown?.breakdown && breakdown.breakdown.length > 0 ? (
                   <div className="h-32">
                     <ResponsiveContainer width="100%" height="100%">
