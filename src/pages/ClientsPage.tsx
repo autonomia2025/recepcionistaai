@@ -137,6 +137,7 @@ export default function ClientsPage() {
   const [lastContactFilter, setLastContactFilter] = useState<string>('all');
   const [closeContactId, setCloseContactId] = useState<string | null>(null);
   const [closeStep, setCloseStep] = useState<1 | 2>(1);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
