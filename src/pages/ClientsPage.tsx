@@ -350,10 +350,30 @@ export default function ClientsPage() {
 
   return (
     <div className="page-shell page-stack animate-in">
-      <PageHeader 
-        title="Clientes" 
-        description="Gestiona tu base de clientes y leads"
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader 
+          title="Clientes" 
+          description="Gestiona tu base de clientes y leads"
+        />
+        <div className="flex items-center gap-1 border rounded-lg p-1">
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setViewMode('list')}
+          >
+            <LayoutList className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setViewMode('kanban')}
+          >
+            <Kanban className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* Stats Cards */}
       <div className="page-panel">
