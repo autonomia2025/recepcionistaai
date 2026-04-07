@@ -76,6 +76,7 @@ const STAGES: PipelineStage[] = [
 
 function classifyContact(contact: Contact): string {
   if (contact.closed_at) return 'cerrado';
+  if (contact.quote_sent) return 'cotizacion';
   if (contact.detected_intent === 'cotizacion' || (contact.service_requests_count && contact.service_requests_count > 0)) return 'cotizacion';
   if (contact.lead_score >= 80) return 'caliente';
   if (contact.lead_score >= 50 || contact.detected_intent) return 'interesado';
