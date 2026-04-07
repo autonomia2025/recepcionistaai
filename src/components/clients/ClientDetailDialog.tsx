@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import {
@@ -542,6 +543,9 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
             </CardContent>
           </Card>
         )}
+
+        {/* Cotización Enviada Checkbox */}
+        <QuoteSentCheckbox contactId={contact.id} initialValue={!!(contact as any).quote_sent} />
 
         <Separator />
 
