@@ -221,6 +221,11 @@ export function ClientsKanban({
                             {contact.detected_intent}
                           </span>
                         )}
+                        {contact.quote_sent && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
+                            📨 Cotización
+                          </span>
+                        )}
                       </div>
                       {lastContact && (
                         <p className="text-[10px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">
