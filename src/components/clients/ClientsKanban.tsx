@@ -76,6 +76,7 @@ const STAGES: PipelineStage[] = [
 
 function classifyContact(contact: Contact): string {
   if (contact.closed_at) return 'cerrado';
+  if (contact.quote_sent) return 'cotizacion';
   if (contact.detected_intent === 'cotizacion' || (contact.service_requests_count && contact.service_requests_count > 0)) return 'cotizacion';
   if (contact.lead_score >= 80) return 'caliente';
   if (contact.lead_score >= 50 || contact.detected_intent) return 'interesado';
@@ -218,6 +219,11 @@ export function ClientsKanban({
                         {contact.detected_intent && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                             {contact.detected_intent}
+                          </span>
+                        )}
+                        {contact.quote_sent && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
+                            📨 Cotización
                           </span>
                         )}
                       </div>

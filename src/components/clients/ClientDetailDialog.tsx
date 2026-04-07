@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import {
@@ -184,7 +185,60 @@ const QUOTATION_STATUS_LABELS: Record<string, { label: string; className: string
   rejected: { label: 'Rechazado', className: 'bg-red-500/10 text-red-600', icon: '❌' },
 };
 
+function QuoteSentCheckbox({ contactId, initialValue }: { contactId: string; initialValue: boolean }) {
+  const [checked, setChecked] = useState(initialValue);
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleToggle = useCallback(async (newVal: boolean) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .update({
+          quote_sent: newVal,
+          quote_sent_at: newVal ? new Date().toISOString() : null,
+        } as any)
+        .eq('id', contactId);
+
+      if (error) throw error;
+      setChecked(newVal);
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      toast.success(newVal ? 'Cotización marcada como enviada' : 'Cotización desmarcada');
+    } catch {
+      toast.error('Error al actualizar');
+    } finally {
+      setLoading(false);
+    }
+  }, [contactId, queryClient]);
+
+  return (
+    <Card className="border-blue-200 bg-blue-50/30">
+      <CardContent className="p-3 md:p-4 flex items-center gap-3">
+        <Checkbox
+          id={`quote-sent-${contactId}`}
+          checked={checked}
+          onCheckedChange={(val) => handleToggle(!!val)}
+          disabled={loading}
+          className="h-5 w-5"
+        />
+        <label
+          htmlFor={`quote-sent-${contactId}`}
+          className="text-sm font-medium cursor-pointer select-none flex items-center gap-2"
+        >
+          📨 Cotización enviada
+          {checked && (
+            <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-xs">
+              Enviada ✓
+            </Badge>
+          )}
+        </label>
+      </CardContent>
+    </Card>
+  );
+}
 function ClientDetailContent({ contact }: { contact: Contact }) {
+
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
   const queryClient = useQueryClient();
@@ -542,6 +596,9 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
             </CardContent>
           </Card>
         )}
+
+        {/* Cotización Enviada Checkbox */}
+        <QuoteSentCheckbox contactId={contact.id} initialValue={!!(contact as any).quote_sent} />
 
         <Separator />
 
