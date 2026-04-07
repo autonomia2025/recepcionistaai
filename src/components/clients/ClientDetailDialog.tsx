@@ -237,7 +237,7 @@ function QuoteSentCheckbox({ contactId, initialValue }: { contactId: string; ini
     </Card>
   );
 }
-
+function ClientDetailContent({ contact }: { contact: Contact }) {
 
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
