@@ -606,6 +606,8 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          quote_sent: boolean | null
+          quote_sent_at: string | null
           recontact_at: string | null
           recontact_reason: string | null
           schedule_confidence: number | null
@@ -634,6 +636,8 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          quote_sent?: boolean | null
+          quote_sent_at?: string | null
           recontact_at?: string | null
           recontact_reason?: string | null
           schedule_confidence?: number | null
@@ -662,6 +666,8 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          quote_sent?: boolean | null
+          quote_sent_at?: string | null
           recontact_at?: string | null
           recontact_reason?: string | null
           schedule_confidence?: number | null
