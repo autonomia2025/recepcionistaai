@@ -152,6 +152,15 @@ async function searchKnowledge(
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
+  // 0. Detect product codes in query (e.g. W186, NPM-GR, HHP4150, SOC200/41EC)
+  const productCodes = query.match(/\b[A-Z]{1,5}[-\/]?[A-Z0-9]{2,10}[-\/]?[A-Z0-9]{0,8}\b/gi) || [];
+  const cleanCodes = productCodes
+    .map(c => sanitizeKeyword(c))
+    .filter(c => c.length >= 2);
+  if (cleanCodes.length > 0) {
+    console.log('Product codes detected:', cleanCodes);
+  }
+
   // 1. Get AI-expanded keywords
   const aiKeywords = await expandQueryWithAI(lovableApiKey, query);
 
@@ -170,8 +179,8 @@ async function searchKnowledge(
     if (noAccent !== k) accentFree.push(noAccent);
   }
 
-  // 4. Merge, deduplicate, sanitize - only single words
-  const allKeywords = [...new Set([...aiKeywords, ...basicKeywords, ...accentFree])]
+  // 4. Merge, deduplicate, sanitize - product codes first for priority
+  const allKeywords = [...new Set([...cleanCodes, ...aiKeywords, ...basicKeywords, ...accentFree])]
     .map(k => sanitizeKeyword(k))
     .filter(k => k.length > 2 && !k.includes(' '))
     .slice(0, 20);
