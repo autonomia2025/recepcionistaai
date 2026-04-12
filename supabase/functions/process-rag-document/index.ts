@@ -227,23 +227,40 @@ async function extractText(buffer: Uint8Array, fileType: string, fileName: strin
   throw new Error(`Tipo de archivo no soportado: ${fileType || extension}`);
 }
 
-// Split text into chunks with overlap
-function splitIntoChunks(text: string, chunkSize: number = 500, overlap: number = 50): string[] {
-  const words = text.split(/\s+/).filter(w => w.trim());
-  const chunks: string[] = [];
+// Split text into chunks with overlap — semantic page-aware splitting for web content
+function splitIntoChunks(text: string, chunkSize: number = 400, overlap: number = 50): string[] {
+  // If text has page blocks (from web scraper), split by page first
+  const pageBlocks = text.split(/={3,}\s*PÁGINA:[^\n]*={3,}/);
 
-  let i = 0;
-  while (i < words.length) {
-    const chunkWords = words.slice(i, i + chunkSize);
-    const chunk = chunkWords.join(' ').trim();
-
-    if (chunk.length > 50) {
-      chunks.push(chunk);
+  if (pageBlocks.length > 1) {
+    const chunks: string[] = [];
+    for (const block of pageBlocks) {
+      const trimmed = block.trim();
+      if (trimmed.length < 50) continue;
+      const words = trimmed.split(/\s+/);
+      if (words.length <= chunkSize) {
+        chunks.push(trimmed);
+      } else {
+        let i = 0;
+        while (i < words.length) {
+          const chunk = words.slice(i, i + chunkSize).join(' ').trim();
+          if (chunk.length > 50) chunks.push(chunk);
+          i += chunkSize - overlap;
+        }
+      }
     }
-
-    i += chunkSize - overlap;
+    return chunks;
   }
 
+  // Generic text (PDFs, docs): normal word-based chunking
+  const words = text.split(/\s+/).filter(w => w.trim());
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < words.length) {
+    const chunk = words.slice(i, i + chunkSize).join(' ').trim();
+    if (chunk.length > 50) chunks.push(chunk);
+    i += chunkSize - overlap;
+  }
   return chunks;
 }
 
