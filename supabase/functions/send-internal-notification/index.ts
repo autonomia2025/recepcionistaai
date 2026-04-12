@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
         id, name, gmail_connected, admin_notification_email,
         email_notifications_handoff, email_notifications_hot_lead,
         email_notifications_appointment, email_notifications_quotation,
-        booking_mode, email_primary_color, email_logo_url
+        booking_mode, email_primary_color, email_logo_url,
+        zone_notification_emails
       `)
       .eq('id', workshop_id)
       .single();
