@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2, LayoutList, Kanban } from 'lucide-react';
+import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2, LayoutList, Kanban, MapPin } from 'lucide-react';
 import { ClientsKanban } from '@/components/clients/ClientsKanban';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -69,6 +69,7 @@ interface Contact {
   tags: string[] | null;
   last_analyzed_at: string | null;
   closed_at: string | null;
+  zone: string | null;
   // Aggregated data
   service_requests_count?: number;
   total_estimated_value?: number;
@@ -138,6 +139,7 @@ export default function ClientsPage() {
   const [closeContactId, setCloseContactId] = useState<string | null>(null);
   const [closeStep, setCloseStep] = useState<1 | 2>(1);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
@@ -334,8 +336,10 @@ export default function ClientsPage() {
     } else if (lastContactFilter === 'never') {
       matchesLastContact = !contact.last_contact_at;
     }
+
+    const matchesZone = zoneFilter === 'all' || contact.zone === zoneFilter;
     
-    return matchesSearch && matchesScore && matchesIntent && matchesRecontact && matchesSchedule && matchesLastContact;
+    return matchesSearch && matchesScore && matchesIntent && matchesRecontact && matchesSchedule && matchesLastContact && matchesZone;
   });
 
   const stats = {
@@ -538,6 +542,19 @@ export default function ClientsPage() {
             <SelectItem value="month">🗓️ Este mes</SelectItem>
             <SelectItem value="older">🕰️ Más antiguo</SelectItem>
             <SelectItem value="never">🚫 Sin conversación</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={zoneFilter} onValueChange={setZoneFilter}>
+          <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
+            <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Zona" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las zonas</SelectItem>
+            <SelectItem value="santiago">📍 Santiago</SelectItem>
+            <SelectItem value="talca">📍 Talca</SelectItem>
+            <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
           </SelectContent>
         </Select>
         </div>

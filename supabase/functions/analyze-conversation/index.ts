@@ -160,7 +160,8 @@ Responde SOLO con este JSON (sin markdown ni texto adicional):
     "email": "email@ejemplo.com o null si no se menciona",
     "vehicle_brand": "Toyota o null",
     "vehicle_model": "Corolla o null",
-    "vehicle_year": 2020
+    "vehicle_year": 2020,
+    "zone": "talca|puerto_montt|santiago o null"
   }
 }
 
@@ -188,6 +189,12 @@ Busca en la conversación si el cliente menciona EXPLÍCITAMENTE:
    - "Tengo un Toyota Corolla 2020"
    - "Es un Hyundai Accent año 2018"
    - "Mi auto es un Kia Sportage"
+
+5. ZONA: Detecta la zona del cliente. Las zonas válidas son: talca, puerto_montt, santiago
+   - Si menciona Talca, Maule, Curicó, Linares → zone = "talca"
+   - Si menciona Puerto Montt, Osorno, Llanquihue, Los Lagos → zone = "puerto_montt"
+   - Si menciona Santiago, Providencia, Las Condes, Maipú, La Florida, o cualquier comuna de la RM → zone = "santiago"
+   - Si no menciona ubicación → zone = null
 
 REGLAS:
 - Solo incluir datos que el cliente mencione EXPLÍCITAMENTE
@@ -338,7 +345,7 @@ Estructura de cada item:
     // Get current contact data to avoid overwriting with nulls
     const { data: currentContact } = await supabase
       .from('contacts')
-      .select('name, phone, email, vehicle_brand, vehicle_model, vehicle_year')
+      .select('name, phone, email, vehicle_brand, vehicle_model, vehicle_year, zone')
       .eq('id', contact_id)
       .single();
 
@@ -410,6 +417,11 @@ Estructura de cada item:
       if (!isNaN(year) && year >= 1990 && year <= new Date().getFullYear() + 1) {
         contactUpdate.vehicle_year = year;
       }
+    }
+
+    // Update zone if extracted and not already set
+    if (extracted.zone && ['talca', 'puerto_montt', 'santiago'].includes(extracted.zone) && !currentContact?.zone) {
+      contactUpdate.zone = extracted.zone;
     }
 
     // Calculate recontact date using DAYS (not hours) for more sensible dates

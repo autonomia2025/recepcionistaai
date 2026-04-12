@@ -619,6 +619,7 @@ export type Database = {
           web_session_id: string | null
           whatsapp_id: string | null
           workshop_id: string
+          zone: string | null
         }
         Insert: {
           archived?: boolean | null
@@ -649,6 +650,7 @@ export type Database = {
           web_session_id?: string | null
           whatsapp_id?: string | null
           workshop_id: string
+          zone?: string | null
         }
         Update: {
           archived?: boolean | null
@@ -679,6 +681,7 @@ export type Database = {
           web_session_id?: string | null
           whatsapp_id?: string | null
           workshop_id?: string
+          zone?: string | null
         }
         Relationships: [
           {

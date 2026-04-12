@@ -1,4 +1,4 @@
-import { Search, User, BotOff, MessageSquare } from 'lucide-react';
+import { Search, User, BotOff, MessageSquare, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,15 @@ function getSentimentEmoji(sentiment: string | null) {
     negative: '😟',
   };
   return sentiment ? sentiments[sentiment] || '' : '';
+}
+
+function getZoneLabel(zone: string | null) {
+  const zones: Record<string, { label: string; emoji: string }> = {
+    talca: { label: 'Talca', emoji: '📍' },
+    puerto_montt: { label: 'Pto. Montt', emoji: '📍' },
+    santiago: { label: 'Santiago', emoji: '📍' },
+  };
+  return zone ? zones[zone] || null : null;
 }
 
 function getStatusBadge(status: string) {
@@ -101,6 +110,7 @@ export function ConversationList({
               const intentLabel = getIntentLabel(conv.contacts.detected_intent);
               const sentimentEmoji = getSentimentEmoji(conv.sentiment);
               const statusBadge = getStatusBadge(conv.status);
+              const zoneInfo = getZoneLabel((conv.contacts as any).zone);
               const isNew = conv.status === 'new';
               const isSelected = selectedId === conv.id;
               
@@ -162,6 +172,11 @@ export function ConversationList({
                           <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-orange-200/50">
                             <BotOff className="w-2.5 h-2.5" />
                             Pausado
+                          </span>
+                        )}
+                        {zoneInfo && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200/50">
+                            {zoneInfo.emoji} {zoneInfo.label}
                           </span>
                         )}
                       </div>
