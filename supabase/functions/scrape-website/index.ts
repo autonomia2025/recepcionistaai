@@ -6,6 +6,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Strip HTML to clean text, removing scripts/styles/nav/footer noise
+function htmlToCleanText(html: string): string {
+  // Remove script, style, svg, noscript tags and their content
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, ' [HEADER] ');
+
+  // Convert common elements to readable text
+  text = text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(/<h[1-6][^>]*>/gi, '\n### ')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<td[^>]*>/gi, ' | ')
+    .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, '[$1] ')
+    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, '(imagen: $1) ');
+
+  // Remove remaining HTML tags
+  text = text.replace(/<[^>]+>/g, ' ');
+
+  // Decode HTML entities
+  text = text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec)));
+
+  // Clean whitespace
+  text = text
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .replace(/^\s+/gm, '')
+    .trim();
+
+  return text;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -68,8 +118,9 @@ serve(async (req) => {
       // 2. Fetch the website HTML
       const fetchResponse = await fetch(formattedUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; RecepcionistaAI/1.0)',
-          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
         },
         redirect: 'follow',
       });
@@ -81,11 +132,19 @@ serve(async (req) => {
       const html = await fetchResponse.text();
       console.log('Fetched HTML length:', html.length);
 
-      // Limit HTML size to avoid token limits
-      const maxHtmlLength = 100000;
-      const truncatedHtml = html.length > maxHtmlLength ? html.substring(0, maxHtmlLength) : html;
+      // 3. Strip HTML to clean text first (much more efficient for AI)
+      const cleanText = htmlToCleanText(html);
+      console.log('Clean text length:', cleanText.length);
 
-      // 3. Use Gemini to extract structured content
+      if (cleanText.length < 100) {
+        throw new Error('El sitio web no tiene suficiente contenido de texto. Puede ser una página con contenido dinámico (JavaScript).');
+      }
+
+      // Truncate clean text to fit in context window
+      const maxTextLength = 60000;
+      const truncatedText = cleanText.length > maxTextLength ? cleanText.substring(0, maxTextLength) : cleanText;
+
+      // 4. Use Gemini to structure and organize the extracted content
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -97,22 +156,31 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: `Eres un experto en extraer información de sitios web. Tu tarea es analizar el HTML de un sitio web y extraer TODA la información relevante del negocio en formato texto limpio y bien estructurado.
+              content: `Eres un experto en extraer y organizar información de sitios web para un chatbot de atención al cliente.
 
-Debes extraer:
-- Nombre del negocio
-- Descripción general
-- Productos y/o servicios (con nombre, precio si está disponible, descripción)
-- Categorías de productos
-- Información de contacto (teléfono, email, dirección, horarios)
-- Políticas (envío, devoluciones, garantías)
-- Cualquier otra información relevante para atención al cliente
+Tu tarea es analizar el texto extraído de un sitio web y reorganizarlo de forma COMPLETA y DETALLADA.
 
-Formatea la salida como texto plano bien estructurado con secciones claras. NO uses HTML ni markdown. Solo texto plano con saltos de línea.`
+EXTRAE TODO lo siguiente que encuentres:
+1. NOMBRE DEL NEGOCIO y descripción general
+2. TODOS los productos y servicios mencionados - incluye nombre, modelo, descripción, precio, especificaciones técnicas
+3. CATEGORÍAS de productos o servicios
+4. INFORMACIÓN DE CONTACTO: teléfono, email, dirección, horarios, redes sociales
+5. POLÍTICAS: envío, devoluciones, garantías, formas de pago
+6. INFORMACIÓN SOBRE LA EMPRESA: historia, misión, valores, equipo
+7. PREGUNTAS FRECUENTES si las hay
+8. Cualquier dato relevante para atención al cliente
+
+REGLAS:
+- Sé EXHAUSTIVO. Incluye TODOS los productos/servicios que veas, con todos sus detalles.
+- Usa texto plano bien formateado con secciones claras.
+- NO omitas información. Más contenido es mejor.
+- Si hay precios, inclúyelos.
+- Si hay especificaciones técnicas, inclúyelas.
+- Organiza por categorías cuando sea posible.`
             },
             {
               role: 'user',
-              content: `Extrae toda la información relevante del siguiente sitio web (${formattedUrl}):\n\n${truncatedHtml}`
+              content: `Extrae y organiza TODA la información del sitio web ${formattedUrl}. Sé exhaustivo:\n\n${truncatedText}`
             }
           ],
           max_tokens: 16000,
@@ -127,14 +195,25 @@ Formatea la salida como texto plano bien estructurado con secciones claras. NO u
 
       const aiResult = await aiResponse.json();
       const extractedContent = aiResult.choices?.[0]?.message?.content || '';
+      const finishReason = aiResult.choices?.[0]?.finish_reason;
+
+      console.log('Extracted content length:', extractedContent.length, 'finishReason:', finishReason);
 
       if (!extractedContent || extractedContent.trim().length < 50) {
         throw new Error('No se pudo extraer contenido útil del sitio web');
       }
 
-      console.log('Extracted content length:', extractedContent.length);
+      if (finishReason === 'length') {
+        console.warn('AI output was truncated due to token limits');
+      }
 
-      // 4. Process as RAG document (send plain text directly)
+      // Update file_size with actual content size
+      await supabase
+        .from('bot_documents')
+        .update({ file_size: extractedContent.length })
+        .eq('id', documentId);
+
+      // 5. Process as RAG document (send plain text directly)
       const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-rag-document`, {
         method: 'POST',
         headers: {
@@ -159,6 +238,7 @@ Formatea la salida como texto plano bien estructurado con secciones claras. NO u
         success: true,
         document_id: documentId,
         domain,
+        content_length: extractedContent.length,
         chunks_created: processResult.chunks_created,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
