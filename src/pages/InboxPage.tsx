@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ConversationList } from '@/components/inbox/ConversationList';
 import { ChatView } from '@/components/inbox/ChatView';
 import { useConversations, Conversation } from '@/hooks/useConversations';
+import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare, ArrowLeft, Inbox, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
