@@ -36,6 +36,7 @@ export interface Conversation {
     vehicle_year: number | null;
     tags: string[] | null;
     notes: string | null;
+    zone: string | null;
     created_at: string;
   };
   assigned_to: {
@@ -90,6 +91,7 @@ export function useConversations() {
             vehicle_year,
             tags,
             notes,
+            zone,
             created_at
           ),
           assigned_to:profiles!conversations_assigned_to_user_id_fkey(
