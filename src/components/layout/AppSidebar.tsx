@@ -87,14 +87,7 @@ export const AppSidebar = () => {
       });
     }
 
-    // Add Solicitudes only for chatbot_only mode
-    if (workshopMode?.booking_mode === 'chatbot_only') {
-      baseItems.push({
-        to: '/requests',
-        icon: ClipboardList,
-        label: 'Solicitudes'
-      });
-    }
+    // Solicitudes removed
 
     baseItems.push({
       to: '/team',

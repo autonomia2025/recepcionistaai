@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { MetricCard } from '@/components/metrics';
 import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
@@ -25,7 +24,6 @@ function MetricSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
-  const { data: workshopMode } = useWorkshopMode();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats', profile?.workshop_id],
@@ -60,7 +58,6 @@ export default function DashboardPage() {
     enabled: !!profile?.workshop_id,
   });
 
-  const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
   const workshopId = profile?.workshop_id;
 
   const conversionRate = stats?.conversations 
