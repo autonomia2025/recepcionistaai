@@ -619,18 +619,20 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
           </Card>
         )}
 
-        {/* Zone */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Zona
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ZoneSelector contactId={contact.id} initialValue={contact.zone || null} />
-          </CardContent>
-        </Card>
+        {/* Zone - only for SOC Ingenieria */}
+        {isSOC && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Zona
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ZoneSelector contactId={contact.id} initialValue={contact.zone || null} />
+            </CardContent>
+          </Card>
+        )}
 
 
         {!isChatbotOnly && (contact.vehicle_brand || contact.vehicle_model) && (
