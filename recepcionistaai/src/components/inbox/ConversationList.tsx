@@ -110,6 +110,7 @@ export function ConversationList({
               const intentLabel = getIntentLabel(conv.contacts.detected_intent);
               const sentimentEmoji = getSentimentEmoji(conv.sentiment);
               const statusBadge = getStatusBadge(conv.status);
+              const zoneInfo = getZoneLabel((conv.contacts as any).zone);
               const isNew = conv.status === 'new';
               const isSelected = selectedId === conv.id;
               
