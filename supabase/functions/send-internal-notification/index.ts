@@ -122,8 +122,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get admin email: 1) explicit setting, 2) connected Gmail, 3) first admin profile
+    // Get admin email: 1) zone-specific (SOC Ingenieria), 2) explicit setting, 3) connected Gmail, 4) first admin profile
     let adminEmail = workshop.admin_notification_email;
+
+    // For SOC Ingenieria hot_lead notifications, route to zone-specific email
+    const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
+    if (workshop_id === SOC_WORKSHOP_ID && notification_type === 'hot_lead' && extra_data?.zone) {
+      const zoneEmails = (workshop as any).zone_notification_emails as Record<string, string> | null;
+      const zoneEmail = zoneEmails?.[extra_data.zone as string];
+      if (zoneEmail) {
+        adminEmail = zoneEmail;
+        console.log(`Routing hot_lead to zone email: ${extra_data.zone} -> ${zoneEmail}`);
+      }
+    }
+
     if (!adminEmail) {
       // Try connected Gmail email
       const { data: gmailToken } = await supabase
