@@ -49,10 +49,8 @@ function htmlToCleanText(html: string): string {
   return text;
 }
 
-// Extract internal links from HTML
 function extractInternalLinks(html: string, baseUrl: URL): string[] {
   const links: string[] = [];
-  const seen = new Set<string>();
   const regex = /<a[^>]*href="([^"#]*)"[^>]*>/gi;
   let match;
 
@@ -62,46 +60,32 @@ function extractInternalLinks(html: string, baseUrl: URL): string[] {
 
     try {
       const fullUrl = new URL(href, baseUrl.origin);
-      // Only same domain
       if (fullUrl.hostname !== baseUrl.hostname) continue;
-      // Skip assets
       if (/\.(jpg|jpeg|png|gif|svg|css|js|pdf|zip|mp4|mp3|woff|woff2|ttf|ico)$/i.test(fullUrl.pathname)) continue;
-      // Skip anchors, login, cart, account pages
-      if (/\/(cart|checkout|mi-cuenta|my-account|login|wp-admin|wp-login|feed|xmlrpc)/i.test(fullUrl.pathname)) continue;
+      if (/\/(cart|checkout|mi-cuenta|my-account|login|wp-admin|wp-login|feed|xmlrpc|wp-json|wp-content|wp-includes)/i.test(fullUrl.pathname)) continue;
 
-      const clean = fullUrl.origin + fullUrl.pathname;
-      if (!seen.has(clean) && clean !== baseUrl.origin + baseUrl.pathname) {
-        seen.add(clean);
-        links.push(clean);
-      }
-    } catch { /* skip invalid */ }
+      const clean = fullUrl.origin + fullUrl.pathname.replace(/\/$/, '');
+      links.push(clean);
+    } catch { /* skip */ }
   }
 
   return links;
 }
 
-// Prioritize product/service/category pages
-function prioritizeLinks(links: string[]): string[] {
-  const scored = links.map(link => {
-    let score = 0;
-    const lower = link.toLowerCase();
-    // High priority: product categories, services, about
-    if (/\/(categor|product|servic|tienda|shop|store|nosotros|about|quienes-somos)/i.test(lower)) score += 10;
-    // Medium: specific product pages
-    if (/\/(producto|item|equipo)/i.test(lower)) score += 7;
-    // Medium: info pages
-    if (/\/(contacto|contact|horario|precio|faq|pregunta)/i.test(lower)) score += 6;
-    // Lower priority: blog, news
-    if (/\/(blog|noticias|news|tag|page\/\d)/i.test(lower)) score -= 5;
-    return { link, score };
-  });
+function isHighPriorityUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return /\/(categor|product|servic|tienda|shop|store|nosotros|about|quienes|contacto|equipo|producto|item|precio|faq|arriendo|venta|marca)/i.test(lower);
+}
 
-  scored.sort((a, b) => b.score - a.score);
-  return scored.map(s => s.link);
+function isLowPriorityUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return /\/(blog|noticias|news|tag\/|author\/|comment|attachment|page\/\d|#|replyto|\?replyto)/i.test(lower);
 }
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const resp = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -109,12 +93,72 @@ async function fetchPage(url: string): Promise<string | null> {
         'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
       },
       redirect: 'follow',
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!resp.ok) return null;
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) return null;
     return await resp.text();
   } catch {
     return null;
   }
+}
+
+// BFS crawl: discover links from each page we visit
+async function crawlSite(startUrl: string, baseUrl: URL, maxPages: number): Promise<{ url: string; text: string }[]> {
+  const visited = new Set<string>();
+  const results: { url: string; text: string }[] = [];
+  
+  // Normalize start URL
+  const startNormalized = baseUrl.origin + baseUrl.pathname.replace(/\/$/, '');
+  const queue: string[] = [startUrl];
+  visited.add(startNormalized);
+
+  while (queue.length > 0 && results.length < maxPages) {
+    // Take a batch from queue
+    const batchSize = Math.min(10, maxPages - results.length, queue.length);
+    const batch = queue.splice(0, batchSize);
+
+    const fetched = await Promise.all(batch.map(async (pageUrl) => {
+      const html = await fetchPage(pageUrl);
+      if (!html) return null;
+      
+      // Extract new links from this page
+      const newLinks = extractInternalLinks(html, baseUrl);
+      
+      const clean = htmlToCleanText(html);
+      if (clean.length < 150) return { html: null, links: newLinks, url: pageUrl, text: '' };
+      
+      return { html, links: newLinks, url: pageUrl, text: clean };
+    }));
+
+    for (const r of fetched) {
+      if (!r) continue;
+      
+      // Add discovered links to queue
+      for (const link of r.links) {
+        const normalized = link.replace(/\/$/, '');
+        if (!visited.has(normalized) && !isLowPriorityUrl(normalized)) {
+          visited.add(normalized);
+          // High priority pages go to front of queue
+          if (isHighPriorityUrl(normalized)) {
+            queue.unshift(normalized);
+          } else {
+            queue.push(normalized);
+          }
+        }
+      }
+
+      if (r.text && r.text.length >= 150) {
+        results.push({ url: r.url, text: r.text });
+      }
+    }
+
+    console.log(`Crawled batch: ${results.length} pages collected, ${queue.length} in queue`);
+  }
+
+  return results;
 }
 
 serve(async (req) => {
@@ -151,7 +195,7 @@ serve(async (req) => {
 
     const baseUrl = new URL(formattedUrl);
     const domain = baseUrl.hostname;
-    console.log('Scraping URL (multi-page):', formattedUrl);
+    console.log('Scraping URL (full crawl):', formattedUrl);
 
     // 1. Create bot_documents record
     const { data: doc, error: docError } = await supabase
@@ -174,43 +218,17 @@ serve(async (req) => {
     const documentId = doc.id;
 
     try {
-      // 2. Fetch main page
-      const mainHtml = await fetchPage(formattedUrl);
-      if (!mainHtml) throw new Error('No se pudo acceder al sitio');
+      // 2. Full BFS crawl - up to 200 pages
+      const maxPages = 200;
+      const allPageTexts = await crawlSite(formattedUrl, baseUrl, maxPages);
 
-      console.log('Main page HTML length:', mainHtml.length);
+      console.log(`Full crawl complete: ${allPageTexts.length} pages with content`);
 
-      // 3. Extract and prioritize internal links
-      const allLinks = extractInternalLinks(mainHtml, baseUrl);
-      const prioritized = prioritizeLinks(allLinks);
-      const maxSubpages = 15; // Crawl up to 15 subpages
-      const subpageUrls = prioritized.slice(0, maxSubpages);
-
-      console.log(`Found ${allLinks.length} internal links, crawling top ${subpageUrls.length}`);
-
-      // 4. Fetch subpages in parallel (batches of 5)
-      const allPageTexts: { url: string; text: string }[] = [];
-      const mainClean = htmlToCleanText(mainHtml);
-      allPageTexts.push({ url: formattedUrl, text: mainClean });
-
-      for (let i = 0; i < subpageUrls.length; i += 5) {
-        const batch = subpageUrls.slice(i, i + 5);
-        const results = await Promise.all(batch.map(async (pageUrl) => {
-          const html = await fetchPage(pageUrl);
-          if (!html) return null;
-          const clean = htmlToCleanText(html);
-          // Only include if page has meaningful content
-          if (clean.length < 200) return null;
-          return { url: pageUrl, text: clean };
-        }));
-        for (const r of results) {
-          if (r) allPageTexts.push(r);
-        }
+      if (allPageTexts.length === 0) {
+        throw new Error('No se pudo extraer contenido del sitio web.');
       }
 
-      console.log(`Successfully scraped ${allPageTexts.length} pages`);
-
-      // 5. Combine all page texts with page markers
+      // 3. Combine all page texts
       let combinedText = '';
       for (const page of allPageTexts) {
         combinedText += `\n\n===== PÁGINA: ${page.url} =====\n\n`;
@@ -219,29 +237,50 @@ serve(async (req) => {
 
       console.log('Combined text length:', combinedText.length);
 
-      if (combinedText.length < 200) {
-        throw new Error('El sitio web no tiene suficiente contenido de texto.');
+      // 4. For very large sites, process in chunks with multiple AI calls
+      const maxChunkSize = 120000;
+      const textChunks: string[] = [];
+      
+      if (combinedText.length <= maxChunkSize) {
+        textChunks.push(combinedText);
+      } else {
+        // Split by page boundaries to avoid cutting mid-content
+        let currentChunk = '';
+        for (const page of allPageTexts) {
+          const pageBlock = `\n\n===== PÁGINA: ${page.url} =====\n\n${page.text}`;
+          if (currentChunk.length + pageBlock.length > maxChunkSize && currentChunk.length > 0) {
+            textChunks.push(currentChunk);
+            currentChunk = pageBlock;
+          } else {
+            currentChunk += pageBlock;
+          }
+        }
+        if (currentChunk.length > 0) textChunks.push(currentChunk);
       }
 
-      // Truncate to fit context window (larger now for multi-page)
-      const maxTextLength = 120000;
-      const truncatedText = combinedText.length > maxTextLength
-        ? combinedText.substring(0, maxTextLength)
-        : combinedText;
+      console.log(`Processing ${textChunks.length} text chunk(s) with AI`);
 
-      // 6. Use AI to structure content - use gemini-2.5-pro for bigger context
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${lovableApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            {
-              role: 'system',
-              content: `Eres un experto en extraer información COMPLETA de sitios web para un chatbot de atención al cliente.
+      // 5. Process each chunk with AI
+      const allExtracted: string[] = [];
+
+      for (let i = 0; i < textChunks.length; i++) {
+        const chunk = textChunks[i];
+        const isFirst = i === 0;
+        
+        console.log(`Processing AI chunk ${i + 1}/${textChunks.length} (${chunk.length} chars)`);
+
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'system',
+                content: `Eres un experto en extraer información COMPLETA de sitios web para un chatbot de atención al cliente.
 
 Se te entrega el texto de MÚLTIPLES PÁGINAS de un mismo sitio web. Tu tarea es crear un documento EXHAUSTIVO con toda la información.
 
@@ -253,7 +292,7 @@ Para CADA producto encontrado incluye:
 - Marca
 - Descripción detallada
 - Especificaciones técnicas (presión, caudal, potencia, dimensiones, peso, etc.)
-- Precio (si existe)
+- Precio (si existe, sino "Cotizar")
 - Categoría a la que pertenece
 - Usos recomendados
 - Accesorios incluidos o compatibles
@@ -265,75 +304,74 @@ Para CADA producto encontrado incluye:
 - Para qué tipo de equipos/situaciones
 
 ## CATEGORÍAS
-Lista completa de categorías y subcategorías de productos/servicios
+Lista completa de categorías y subcategorías
 
 ## INFORMACIÓN DE LA EMPRESA
 - Nombre, descripción, historia, trayectoria
 - Misión, visión, valores
-- Diferenciadores (¿por qué elegirlos?)
+- Diferenciadores
 
 ## CONTACTO
-- Teléfonos (todos)
-- Emails (todos)
-- Direcciones de cada sucursal con horarios
+- Teléfonos, emails, direcciones con horarios
 - Redes sociales
 
 ## POLÍTICAS
-- Formas de pago
-- Envío y despacho
-- Garantías
-- Devoluciones
+- Formas de pago, envío, garantías, devoluciones
 
 ## MARCAS
-Lista de todas las marcas que distribuyen/venden
+Todas las marcas que distribuyen/venden
 
 ## PREGUNTAS FRECUENTES
-Cualquier FAQ encontrada
 
-REGLAS CRÍTICAS:
-- NO omitas NINGÚN producto. Si hay 50 productos, lista los 50.
-- Incluye TODOS los detalles técnicos disponibles.
-- Si un producto aparece sin precio, indica "Precio: Cotizar".
-- Organiza por categoría para fácil búsqueda.
-- El chatbot usará EXACTAMENTE este texto para responder, así que debe ser completo.
-- Escribe en español.`
-            },
-            {
-              role: 'user',
-              content: `Extrae TODA la información de las siguientes ${allPageTexts.length} páginas del sitio web ${domain}. Sé EXHAUSTIVO, no omitas ningún producto ni servicio:\n\n${truncatedText}`
-            }
-          ],
-          max_tokens: 32000,
-        }),
-      });
+REGLAS:
+- NO omitas NINGÚN producto. Lista TODOS con TODOS sus detalles.
+- Si hay especificaciones técnicas, inclúyelas TODAS.
+- Si un producto no tiene precio, indica "Precio: Cotizar".
+- Organiza por categoría.
+- Escribe en español.
+${!isFirst ? '\nEsta es una CONTINUACIÓN del mismo sitio web. Agrega solo la información NUEVA que no se haya cubierto antes.' : ''}`
+              },
+              {
+                role: 'user',
+                content: `${isFirst ? `Extrae TODA la información del sitio web ${domain}` : `CONTINUACIÓN - extrae información adicional del sitio ${domain}`}. Sé EXHAUSTIVO:\n\n${chunk}`
+              }
+            ],
+            max_tokens: 32000,
+          }),
+        });
 
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text();
-        console.error('AI extraction error:', aiResponse.status, errText);
-        throw new Error('Error al procesar el contenido con IA');
+        if (!aiResponse.ok) {
+          const errText = await aiResponse.text();
+          console.error(`AI extraction error chunk ${i + 1}:`, aiResponse.status, errText);
+          if (i === 0) throw new Error('Error al procesar el contenido con IA');
+          continue; // Skip non-critical chunks
+        }
+
+        const aiResult = await aiResponse.json();
+        const content = aiResult.choices?.[0]?.message?.content || '';
+        if (content.trim().length > 50) {
+          allExtracted.push(content);
+        }
+
+        const finishReason = aiResult.choices?.[0]?.finish_reason;
+        console.log(`Chunk ${i + 1} extracted: ${content.length} chars, finishReason: ${finishReason}`);
       }
 
-      const aiResult = await aiResponse.json();
-      const extractedContent = aiResult.choices?.[0]?.message?.content || '';
-      const finishReason = aiResult.choices?.[0]?.finish_reason;
+      const finalContent = allExtracted.join('\n\n---\n\n');
 
-      console.log('Extracted content length:', extractedContent.length, 'finishReason:', finishReason);
-
-      if (!extractedContent || extractedContent.trim().length < 50) {
+      if (!finalContent || finalContent.trim().length < 50) {
         throw new Error('No se pudo extraer contenido útil del sitio web');
       }
 
-      if (finishReason === 'length') {
-        console.warn('AI output was truncated due to token limits');
-      }
+      console.log('Final content length:', finalContent.length);
 
       // Update file_size
       await supabase
         .from('bot_documents')
-        .update({ file_size: extractedContent.length })
+        .update({ file_size: finalContent.length })
         .eq('id', documentId);
 
-      // 7. Process as RAG document
+      // 6. Process as RAG document
       const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-rag-document`, {
         method: 'POST',
         headers: {
@@ -344,7 +382,7 @@ REGLAS CRÍTICAS:
           document_id: documentId,
           workshop_id,
           file_name: `🌐 ${domain}`,
-          plain_text: extractedContent,
+          plain_text: finalContent,
         }),
       });
 
@@ -359,7 +397,7 @@ REGLAS CRÍTICAS:
         document_id: documentId,
         domain,
         pages_scraped: allPageTexts.length,
-        content_length: extractedContent.length,
+        content_length: finalContent.length,
         chunks_created: processResult.chunks_created,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
