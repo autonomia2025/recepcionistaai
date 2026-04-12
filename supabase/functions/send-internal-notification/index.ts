@@ -292,7 +292,7 @@ function generateEmailContent(
     hot_lead: {
       emoji: '🔥',
       title: 'Lead caliente detectado',
-      description: `${contactName} muestra alta intención de compra o urgencia. ${extraData?.intent ? `Intención: ${extraData.intent}` : ''}`,
+      description: `${contactName} muestra alta intención de compra o urgencia. ${extraData?.intent ? `Intención: ${extraData.intent}` : ''} ${extraData?.zone ? `📍 Zona: ${String(extraData.zone).replace('_', ' ')}` : ''}`,
       ctaText: 'Ver lead',
       ctaUrl: conversationId ? `${appUrl}/inbox?conversation=${conversationId}` : `${appUrl}/clients`,
       urgencyColor: '#ef4444'
