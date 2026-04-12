@@ -544,6 +544,19 @@ export default function ClientsPage() {
             <SelectItem value="never">🚫 Sin conversación</SelectItem>
           </SelectContent>
         </Select>
+
+        <Select value={zoneFilter} onValueChange={setZoneFilter}>
+          <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
+            <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Zona" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las zonas</SelectItem>
+            <SelectItem value="santiago">📍 Santiago</SelectItem>
+            <SelectItem value="talca">📍 Talca</SelectItem>
+            <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+          </SelectContent>
+        </Select>
         </div>
       </div>
 
