@@ -291,9 +291,10 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
 }
 
 function ClientDetailContent({ contact }: { contact: Contact }) {
-
+  const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
+  const isSOC = profile?.workshop_id === '610fb257-a649-4115-b944-21f31e7952db';
   const queryClient = useQueryClient();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
