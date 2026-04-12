@@ -172,32 +172,16 @@ export default function DashboardPage() {
             value={stats.messagesIn}
             workshopId={workshopId}
           />
-          {isChatbotOnly ? (
-            <MetricCard
-              metricId="avg_response_time"
-              value="~3 min"
-              workshopId={workshopId}
-            />
-          ) : (
-            <MetricCard
-              metricId="appointments"
-              value={stats.appointments}
-              workshopId={workshopId}
-            />
-          )}
-          {isChatbotOnly ? (
-            <MetricCard
-              metricId="active_requests"
-              value={stats.activeRequests}
-              workshopId={workshopId}
-            />
-          ) : (
-            <MetricCard
-              metricId="conversion_rate"
-              value={conversionRate}
-              workshopId={workshopId}
-            />
-          )}
+          <MetricCard
+            metricId="appointments"
+            value={stats.appointments}
+            workshopId={workshopId}
+          />
+          <MetricCard
+            metricId="conversion_rate"
+            value={conversionRate}
+            workshopId={workshopId}
+          />
         </div>
       </div>
     </div>
