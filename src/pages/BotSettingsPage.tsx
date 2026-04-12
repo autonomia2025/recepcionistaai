@@ -22,6 +22,7 @@ import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
+import { WebImporter } from '@/components/bot/WebImporter';
 
 interface Service {
   name: string;
@@ -332,6 +333,10 @@ export default function BotSettingsPage() {
                     onUploadComplete={() => refetchDocs()}
                     documentCount={documents.length}
                     maxDocuments={10}
+                  />
+                  <WebImporter
+                    workshopId={profile.workshop_id}
+                    onImportComplete={() => refetchDocs()}
                   />
                   <DocumentList
                     documents={documents}

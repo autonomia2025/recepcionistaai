@@ -89,3 +89,6 @@ verify_jwt = false
 
 [functions.lead-capture]
 verify_jwt = false
+
+[functions.scrape-website]
+verify_jwt = false
