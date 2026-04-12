@@ -238,6 +238,57 @@ function QuoteSentCheckbox({ contactId, initialValue }: { contactId: string; ini
     </Card>
   );
 }
+
+const ZONE_OPTIONS = [
+  { value: 'santiago', label: '📍 Santiago' },
+  { value: 'talca', label: '📍 Talca' },
+  { value: 'puerto_montt', label: '📍 Puerto Montt' },
+];
+
+function ZoneSelector({ contactId, initialValue }: { contactId: string; initialValue: string | null }) {
+  const [zone, setZone] = useState<string | null>(initialValue);
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleChange = useCallback(async (newZone: string) => {
+    const value = newZone === 'none' ? null : newZone;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ zone: value } as any)
+        .eq('id', contactId);
+      if (error) throw error;
+      setZone(value);
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success(value ? `Zona actualizada a ${ZONE_OPTIONS.find(z => z.value === value)?.label}` : 'Zona removida');
+    } catch {
+      toast.error('Error al actualizar zona');
+    } finally {
+      setLoading(false);
+    }
+  }, [contactId, queryClient]);
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {ZONE_OPTIONS.map(opt => (
+        <Button
+          key={opt.value}
+          variant={zone === opt.value ? 'default' : 'outline'}
+          size="sm"
+          disabled={loading}
+          onClick={() => handleChange(zone === opt.value ? 'none' : opt.value)}
+          className="text-xs"
+        >
+          {opt.label}
+        </Button>
+      ))}
+      {!zone && <span className="text-xs text-muted-foreground self-center">Sin asignar</span>}
+    </div>
+  );
+}
+
 function ClientDetailContent({ contact }: { contact: Contact }) {
 
   const { data: workshopMode } = useWorkshopMode();
