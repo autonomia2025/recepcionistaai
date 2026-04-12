@@ -33,7 +33,7 @@ export function WebImporter({ workshopId, onImportComplete }: WebImporterProps) 
       if (data?.success) {
         toast({
           title: '¡Sitio importado!',
-          description: `Se extrajeron ${data.chunks_created} fragmentos de ${data.domain}`,
+          description: `Se analizaron ${data.pages_scraped || 1} páginas y se crearon ${data.chunks_created} fragmentos de ${data.domain}`,
         });
         setUrl('');
         onImportComplete();

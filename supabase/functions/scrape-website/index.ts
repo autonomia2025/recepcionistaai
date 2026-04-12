@@ -6,19 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Strip HTML to clean text, removing scripts/styles/nav/footer noise
 function htmlToCleanText(html: string): string {
-  // Remove script, style, svg, noscript tags and their content
   let text = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<svg[\s\S]*?<\/svg>/gi, '')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
     .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/gi, ' [HEADER] ');
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '');
 
-  // Convert common elements to readable text
   text = text
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
@@ -32,10 +28,8 @@ function htmlToCleanText(html: string): string {
     .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, '[$1] ')
     .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, '(imagen: $1) ');
 
-  // Remove remaining HTML tags
   text = text.replace(/<[^>]+>/g, ' ');
 
-  // Decode HTML entities
   text = text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -46,7 +40,6 @@ function htmlToCleanText(html: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec)));
 
-  // Clean whitespace
   text = text
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n\s*\n/g, '\n\n')
@@ -54,6 +47,74 @@ function htmlToCleanText(html: string): string {
     .trim();
 
   return text;
+}
+
+// Extract internal links from HTML
+function extractInternalLinks(html: string, baseUrl: URL): string[] {
+  const links: string[] = [];
+  const seen = new Set<string>();
+  const regex = /<a[^>]*href="([^"#]*)"[^>]*>/gi;
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    let href = match[1].trim();
+    if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;
+
+    try {
+      const fullUrl = new URL(href, baseUrl.origin);
+      // Only same domain
+      if (fullUrl.hostname !== baseUrl.hostname) continue;
+      // Skip assets
+      if (/\.(jpg|jpeg|png|gif|svg|css|js|pdf|zip|mp4|mp3|woff|woff2|ttf|ico)$/i.test(fullUrl.pathname)) continue;
+      // Skip anchors, login, cart, account pages
+      if (/\/(cart|checkout|mi-cuenta|my-account|login|wp-admin|wp-login|feed|xmlrpc)/i.test(fullUrl.pathname)) continue;
+
+      const clean = fullUrl.origin + fullUrl.pathname;
+      if (!seen.has(clean) && clean !== baseUrl.origin + baseUrl.pathname) {
+        seen.add(clean);
+        links.push(clean);
+      }
+    } catch { /* skip invalid */ }
+  }
+
+  return links;
+}
+
+// Prioritize product/service/category pages
+function prioritizeLinks(links: string[]): string[] {
+  const scored = links.map(link => {
+    let score = 0;
+    const lower = link.toLowerCase();
+    // High priority: product categories, services, about
+    if (/\/(categor|product|servic|tienda|shop|store|nosotros|about|quienes-somos)/i.test(lower)) score += 10;
+    // Medium: specific product pages
+    if (/\/(producto|item|equipo)/i.test(lower)) score += 7;
+    // Medium: info pages
+    if (/\/(contacto|contact|horario|precio|faq|pregunta)/i.test(lower)) score += 6;
+    // Lower priority: blog, news
+    if (/\/(blog|noticias|news|tag|page\/\d)/i.test(lower)) score -= 5;
+    return { link, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.link);
+}
+
+async function fetchPage(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+    });
+    if (!resp.ok) return null;
+    return await resp.text();
+  } catch {
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -76,23 +137,21 @@ serve(async (req) => {
       });
     }
 
-    // Validate URL
     let formattedUrl = url.trim();
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    try {
-      new URL(formattedUrl);
-    } catch {
+    try { new URL(formattedUrl); } catch {
       return new Response(JSON.stringify({ error: 'URL no válida' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const domain = new URL(formattedUrl).hostname;
-    console.log('Scraping URL:', formattedUrl);
+    const baseUrl = new URL(formattedUrl);
+    const domain = baseUrl.hostname;
+    console.log('Scraping URL (multi-page):', formattedUrl);
 
     // 1. Create bot_documents record
     const { data: doc, error: docError } = await supabase
@@ -115,36 +174,62 @@ serve(async (req) => {
     const documentId = doc.id;
 
     try {
-      // 2. Fetch the website HTML
-      const fetchResponse = await fetch(formattedUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
-        },
-        redirect: 'follow',
-      });
+      // 2. Fetch main page
+      const mainHtml = await fetchPage(formattedUrl);
+      if (!mainHtml) throw new Error('No se pudo acceder al sitio');
 
-      if (!fetchResponse.ok) {
-        throw new Error(`No se pudo acceder al sitio (HTTP ${fetchResponse.status})`);
+      console.log('Main page HTML length:', mainHtml.length);
+
+      // 3. Extract and prioritize internal links
+      const allLinks = extractInternalLinks(mainHtml, baseUrl);
+      const prioritized = prioritizeLinks(allLinks);
+      const maxSubpages = 15; // Crawl up to 15 subpages
+      const subpageUrls = prioritized.slice(0, maxSubpages);
+
+      console.log(`Found ${allLinks.length} internal links, crawling top ${subpageUrls.length}`);
+
+      // 4. Fetch subpages in parallel (batches of 5)
+      const allPageTexts: { url: string; text: string }[] = [];
+      const mainClean = htmlToCleanText(mainHtml);
+      allPageTexts.push({ url: formattedUrl, text: mainClean });
+
+      for (let i = 0; i < subpageUrls.length; i += 5) {
+        const batch = subpageUrls.slice(i, i + 5);
+        const results = await Promise.all(batch.map(async (pageUrl) => {
+          const html = await fetchPage(pageUrl);
+          if (!html) return null;
+          const clean = htmlToCleanText(html);
+          // Only include if page has meaningful content
+          if (clean.length < 200) return null;
+          return { url: pageUrl, text: clean };
+        }));
+        for (const r of results) {
+          if (r) allPageTexts.push(r);
+        }
       }
 
-      const html = await fetchResponse.text();
-      console.log('Fetched HTML length:', html.length);
+      console.log(`Successfully scraped ${allPageTexts.length} pages`);
 
-      // 3. Strip HTML to clean text first (much more efficient for AI)
-      const cleanText = htmlToCleanText(html);
-      console.log('Clean text length:', cleanText.length);
-
-      if (cleanText.length < 100) {
-        throw new Error('El sitio web no tiene suficiente contenido de texto. Puede ser una página con contenido dinámico (JavaScript).');
+      // 5. Combine all page texts with page markers
+      let combinedText = '';
+      for (const page of allPageTexts) {
+        combinedText += `\n\n===== PÁGINA: ${page.url} =====\n\n`;
+        combinedText += page.text;
       }
 
-      // Truncate clean text to fit in context window
-      const maxTextLength = 60000;
-      const truncatedText = cleanText.length > maxTextLength ? cleanText.substring(0, maxTextLength) : cleanText;
+      console.log('Combined text length:', combinedText.length);
 
-      // 4. Use Gemini to structure and organize the extracted content
+      if (combinedText.length < 200) {
+        throw new Error('El sitio web no tiene suficiente contenido de texto.');
+      }
+
+      // Truncate to fit context window (larger now for multi-page)
+      const maxTextLength = 120000;
+      const truncatedText = combinedText.length > maxTextLength
+        ? combinedText.substring(0, maxTextLength)
+        : combinedText;
+
+      // 6. Use AI to structure content - use gemini-2.5-pro for bigger context
       const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -156,34 +241,69 @@ serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: `Eres un experto en extraer y organizar información de sitios web para un chatbot de atención al cliente.
+              content: `Eres un experto en extraer información COMPLETA de sitios web para un chatbot de atención al cliente.
 
-Tu tarea es analizar el texto extraído de un sitio web y reorganizarlo de forma COMPLETA y DETALLADA.
+Se te entrega el texto de MÚLTIPLES PÁGINAS de un mismo sitio web. Tu tarea es crear un documento EXHAUSTIVO con toda la información.
 
-EXTRAE TODO lo siguiente que encuentres:
-1. NOMBRE DEL NEGOCIO y descripción general
-2. TODOS los productos y servicios mencionados - incluye nombre, modelo, descripción, precio, especificaciones técnicas
-3. CATEGORÍAS de productos o servicios
-4. INFORMACIÓN DE CONTACTO: teléfono, email, dirección, horarios, redes sociales
-5. POLÍTICAS: envío, devoluciones, garantías, formas de pago
-6. INFORMACIÓN SOBRE LA EMPRESA: historia, misión, valores, equipo
-7. PREGUNTAS FRECUENTES si las hay
-8. Cualquier dato relevante para atención al cliente
+EXTRAE ABSOLUTAMENTE TODO:
 
-REGLAS:
-- Sé EXHAUSTIVO. Incluye TODOS los productos/servicios que veas, con todos sus detalles.
-- Usa texto plano bien formateado con secciones claras.
-- NO omitas información. Más contenido es mejor.
-- Si hay precios, inclúyelos.
-- Si hay especificaciones técnicas, inclúyelas.
-- Organiza por categorías cuando sea posible.`
+## PRODUCTOS
+Para CADA producto encontrado incluye:
+- Nombre completo y modelo
+- Marca
+- Descripción detallada
+- Especificaciones técnicas (presión, caudal, potencia, dimensiones, peso, etc.)
+- Precio (si existe)
+- Categoría a la que pertenece
+- Usos recomendados
+- Accesorios incluidos o compatibles
+
+## SERVICIOS
+- Nombre del servicio
+- Descripción detallada
+- Qué incluye
+- Para qué tipo de equipos/situaciones
+
+## CATEGORÍAS
+Lista completa de categorías y subcategorías de productos/servicios
+
+## INFORMACIÓN DE LA EMPRESA
+- Nombre, descripción, historia, trayectoria
+- Misión, visión, valores
+- Diferenciadores (¿por qué elegirlos?)
+
+## CONTACTO
+- Teléfonos (todos)
+- Emails (todos)
+- Direcciones de cada sucursal con horarios
+- Redes sociales
+
+## POLÍTICAS
+- Formas de pago
+- Envío y despacho
+- Garantías
+- Devoluciones
+
+## MARCAS
+Lista de todas las marcas que distribuyen/venden
+
+## PREGUNTAS FRECUENTES
+Cualquier FAQ encontrada
+
+REGLAS CRÍTICAS:
+- NO omitas NINGÚN producto. Si hay 50 productos, lista los 50.
+- Incluye TODOS los detalles técnicos disponibles.
+- Si un producto aparece sin precio, indica "Precio: Cotizar".
+- Organiza por categoría para fácil búsqueda.
+- El chatbot usará EXACTAMENTE este texto para responder, así que debe ser completo.
+- Escribe en español.`
             },
             {
               role: 'user',
-              content: `Extrae y organiza TODA la información del sitio web ${formattedUrl}. Sé exhaustivo:\n\n${truncatedText}`
+              content: `Extrae TODA la información de las siguientes ${allPageTexts.length} páginas del sitio web ${domain}. Sé EXHAUSTIVO, no omitas ningún producto ni servicio:\n\n${truncatedText}`
             }
           ],
-          max_tokens: 16000,
+          max_tokens: 32000,
         }),
       });
 
@@ -207,13 +327,13 @@ REGLAS:
         console.warn('AI output was truncated due to token limits');
       }
 
-      // Update file_size with actual content size
+      // Update file_size
       await supabase
         .from('bot_documents')
         .update({ file_size: extractedContent.length })
         .eq('id', documentId);
 
-      // 5. Process as RAG document (send plain text directly)
+      // 7. Process as RAG document
       const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-rag-document`, {
         method: 'POST',
         headers: {
@@ -238,6 +358,7 @@ REGLAS:
         success: true,
         document_id: documentId,
         domain,
+        pages_scraped: allPageTexts.length,
         content_length: extractedContent.length,
         chunks_created: processResult.chunks_created,
       }), {
