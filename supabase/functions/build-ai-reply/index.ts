@@ -428,7 +428,7 @@ INFORMACIÓN DEL NEGOCIO:
 - Dirección: ${workshop.address || 'Consultar'}
 - Ciudad: ${workshop.city || 'Chile'}
 - Teléfono: ${workshop.phone || 'Consultar'}
-- Zonas de operación: Talca, Puerto Montt, Santiago
+${workshop.id === '610fb257-a649-4115-b944-21f31e7952db' ? '- Zonas de operación: Talca, Puerto Montt, Santiago' : ''}
 ${settings.business_description ? `- Descripción: ${settings.business_description}` : ''}
 
 SERVICIOS DISPONIBLES:
@@ -438,10 +438,10 @@ ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}` : ''}
 
 ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGENDAMIENTO: ${fullBookingUrl}` : ''}
 
-ZONA DEL CLIENTE (IMPORTANTE):
+${workshop.id === '610fb257-a649-4115-b944-21f31e7952db' ? `ZONA DEL CLIENTE (IMPORTANTE):
 - Si el cliente NO ha indicado su zona/ubicación, pregúntale de forma natural: "¿En qué zona te encuentras? Operamos en *Talca*, *Puerto Montt* y *Santiago*."
 - Solo pregunta UNA VEZ por la zona, no insistas si ya la mencionó.
-- Si el cliente menciona una ciudad/comuna, asóciala a la zona más cercana.
+- Si el cliente menciona una ciudad/comuna, asóciala a la zona más cercana.` : ''}
 ${ragContext}`;
 
     const isChatbotOnly = workshop.booking_mode === 'chatbot_only';
