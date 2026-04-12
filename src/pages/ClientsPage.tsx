@@ -568,7 +568,7 @@ export default function ClientsPage() {
     </>
   );
 
-
+  return (
     <div className="page-shell page-stack animate-in">
       <div className="flex items-center justify-between">
         <PageHeader 
