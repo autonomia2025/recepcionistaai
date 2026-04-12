@@ -150,7 +150,8 @@ export default function ClientsPage() {
   const [closeStep, setCloseStep] = useState<1 | 2>(1);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
-  const showZoneFilter = profile?.workshop_id === '610fb257-a649-4115-b944-21f31e7952db';
+  const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
+  const showZoneTabs = isSOC && isAdmin;
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
