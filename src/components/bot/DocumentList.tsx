@@ -16,7 +16,7 @@ interface Document {
   id: string;
   file_name: string;
   file_size: number | null;
-  file_type: string | null;
+  file_type?: string | null;
   status: string;
   chunk_count: number | null;
   error_message: string | null;
