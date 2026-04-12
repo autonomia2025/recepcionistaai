@@ -3,10 +3,17 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ConversationList } from '@/components/inbox/ConversationList';
 import { ChatView } from '@/components/inbox/ChatView';
 import { useConversations, Conversation } from '@/hooks/useConversations';
-import { MessageSquare, ArrowLeft, Inbox } from 'lucide-react';
+import { MessageSquare, ArrowLeft, Inbox, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 function ConversationListSkeleton() {
   return (
@@ -29,7 +36,14 @@ export default function InboxPage() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showChat, setShowChat] = useState(false);
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
   const { data: conversations, isLoading } = useConversations();
+
+  // Filter conversations by zone
+  const filteredByZone = conversations?.filter(conv => {
+    if (zoneFilter === 'all') return true;
+    return (conv.contacts as any).zone === zoneFilter;
+  });
 
   // On mobile, when a conversation is selected, show chat
   const handleSelectConversation = (conv: Conversation) => {
@@ -80,7 +94,21 @@ export default function InboxPage() {
         "bg-background shrink-0",
         showChat && "hidden md:block"
       )}>
-        <PageHeader title="Inbox" description="Gestiona las conversaciones con tus clientes" />
+        <div className="flex items-center gap-3 flex-wrap">
+          <PageHeader title="Inbox" description="Gestiona las conversaciones con tus clientes" />
+          <Select value={zoneFilter} onValueChange={setZoneFilter}>
+            <SelectTrigger className="w-[150px] h-9 text-xs">
+              <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Zona" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las zonas</SelectItem>
+              <SelectItem value="santiago">📍 Santiago</SelectItem>
+              <SelectItem value="talca">📍 Talca</SelectItem>
+              <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       
       {/* Mobile header when in chat */}
@@ -105,7 +133,7 @@ export default function InboxPage() {
           showChat && "hidden md:block"
         )}>
           <ConversationList
-            conversations={conversations || []}
+            conversations={filteredByZone || []}
             selectedId={selectedConversation?.id || null}
             onSelect={handleSelectConversation}
             searchQuery={searchQuery}
