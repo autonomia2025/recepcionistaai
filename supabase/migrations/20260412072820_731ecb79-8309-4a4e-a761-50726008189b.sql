@@ -1,0 +1,1 @@
+ALTER TABLE public.workshops ADD COLUMN IF NOT EXISTS zone_notification_emails jsonb DEFAULT '{}'::jsonb;

@@ -523,6 +523,34 @@ Estructura de cada item:
       }
     }
 
+    // Trigger hot_lead notification if lead_score >= 80
+    const leadScore = contactUpdate.lead_score as number;
+    if (leadScore >= 80 && workshop_id) {
+      try {
+        const contactZone = contactUpdate.zone || currentContact?.zone || null;
+        await fetch(`${supabaseUrl}/functions/v1/send-internal-notification`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            workshop_id,
+            notification_type: 'hot_lead',
+            contact_id,
+            conversation_id,
+            extra_data: {
+              intent: contactUpdate.detected_intent,
+              lead_score: leadScore,
+              zone: contactZone,
+            }
+          })
+        });
+      } catch (notifError) {
+        console.error('Failed to send hot_lead notification:', notifError);
+      }
+    }
+
     console.log('Analysis complete:', {
       lead_score: contactUpdate.lead_score,
       intent: contactUpdate.detected_intent,

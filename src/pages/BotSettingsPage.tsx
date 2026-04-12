@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
 import { WebImporter } from '@/components/bot/WebImporter';
+import { ZoneEmailSettings } from '@/components/admin/ZoneEmailSettings';
 
 interface Service {
   name: string;
@@ -541,10 +542,11 @@ export default function BotSettingsPage() {
           </div>
         </div>
 
-        {/* Right column - Chat Simulator (visible on all screens) */}
-        <div className="xl:col-span-1">
-          <div className="xl:sticky xl:top-6">
+        {/* Right column - Chat Simulator + Zone Emails */}
+        <div className="xl:col-span-1 space-y-4">
+          <div className="xl:sticky xl:top-6 space-y-4">
             <ChatSimulator />
+            {profile?.workshop_id && <ZoneEmailSettings workshopId={profile.workshop_id} />}
           </div>
         </div>
       </div>
