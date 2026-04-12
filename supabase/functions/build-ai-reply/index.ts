@@ -41,9 +41,10 @@ interface KnowledgeMatch {
   similarity?: number;
 }
 
-// Escape SQL wildcards in user input to prevent pattern injection
-function escapeLikePattern(str: string): string {
-  return str.replace(/[%_\\]/g, '\\$&');
+// Sanitize a keyword for safe use in PostgREST ilike filters
+function sanitizeKeyword(str: string): string {
+  // Remove characters that break PostgREST .or() parsing: commas, parens, dots, percent, underscores
+  return str.replace(/[%_\\(),."']/g, '').trim();
 }
 
 // Use AI chat model to expand query into better search keywords
@@ -63,13 +64,18 @@ async function expandQueryWithAI(
         messages: [
           {
             role: 'system',
-            content: `Eres un experto en expansión de consultas de búsqueda. Dado un mensaje de usuario, genera una lista de 5-10 palabras clave y sinónimos relevantes para buscar en una base de conocimiento.
-Responde SOLO con un JSON array de strings, sin explicaciones. Ejemplo: ["palabra1","palabra2","sinónimo1"]
-Incluye: sinónimos, variaciones, términos técnicos relacionados, y palabras clave del contexto.`
+            content: `Eres un experto en expansión de consultas de búsqueda. Dado un mensaje de usuario, genera una lista de 8-15 PALABRAS INDIVIDUALES (no frases) relevantes para buscar en una base de conocimiento de productos/servicios.
+REGLAS ESTRICTAS:
+- Responde SOLO con un JSON array de strings
+- Cada string debe ser UNA SOLA PALABRA (sin espacios)
+- Incluye: el término original, sinónimos, variaciones sin acento, términos técnicos relacionados
+- NO incluyas artículos, preposiciones ni palabras menores a 3 caracteres
+- Ejemplo correcto: ["hidrolavadora","hidrolavadoras","presion","limpieza","karcher","agua","industrial"]
+- Ejemplo INCORRECTO: ["máquina hidrolavadora","equipo de limpieza"]`
           },
           { role: 'user', content: query }
         ],
-        max_tokens: 200,
+        max_tokens: 300,
       }),
     });
 
@@ -82,20 +88,60 @@ Incluye: sinónimos, variaciones, términos técnicos relacionados, y palabras c
     const content = result.choices?.[0]?.message?.content?.trim();
     if (!content) return [];
 
+    // Robust JSON extraction: find the array in the response
     let parsed = content;
-    if (parsed.startsWith('```')) {
+    // Remove markdown code blocks
+    if (parsed.includes('```')) {
       parsed = parsed.replace(/```json?\n?/g, '').replace(/```\n?$/g, '').trim();
     }
-    const keywords = JSON.parse(parsed);
-    if (Array.isArray(keywords)) {
-      console.log('AI expanded keywords:', keywords);
-      return keywords.map((k: string) => String(k).toLowerCase());
+    // Try to find JSON array in the text
+    const arrayMatch = parsed.match(/\[[\s\S]*?\]/);
+    if (!arrayMatch) {
+      console.warn('No JSON array found in AI response, extracting words manually');
+      // Fallback: extract quoted words
+      const wordMatches = content.match(/"([^"]+)"/g);
+      if (wordMatches) {
+        return wordMatches.map((w: string) => w.replace(/"/g, '').toLowerCase().trim()).filter((w: string) => w.length > 2);
+      }
+      return [];
+    }
+
+    try {
+      const keywords = JSON.parse(arrayMatch[0]);
+      if (Array.isArray(keywords)) {
+        // Split any multi-word entries into individual words and flatten
+        const singleWords: string[] = [];
+        for (const k of keywords) {
+          const word = String(k).toLowerCase().trim();
+          if (word.includes(' ')) {
+            // Split multi-word into individual words
+            for (const part of word.split(/\s+/)) {
+              if (part.length > 2) singleWords.push(part);
+            }
+          } else if (word.length > 2) {
+            singleWords.push(word);
+          }
+        }
+        console.log('AI expanded keywords:', singleWords);
+        return singleWords;
+      }
+    } catch (parseErr) {
+      console.warn('JSON parse failed, using regex fallback:', parseErr);
+      const wordMatches = content.match(/"([^"]+)"/g);
+      if (wordMatches) {
+        return wordMatches.map((w: string) => w.replace(/"/g, '').toLowerCase().trim()).filter((w: string) => w.length > 2 && !w.includes(' '));
+      }
     }
     return [];
   } catch (e) {
     console.error('Query expansion error:', e);
     return [];
   }
+}
+
+// Remove accents from text for accent-insensitive matching
+function removeAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 // AI-enhanced keyword search: expand query with AI then use ILIKE
@@ -110,37 +156,68 @@ async function searchKnowledge(
   const aiKeywords = await expandQueryWithAI(lovableApiKey, query);
 
   // 2. Also extract basic keywords from original query as fallback
-  const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por', 'me', 'mi', 'te', 'se', 'lo', 'le', 'su', 'nos', 'al'];
+  const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por', 'me', 'mi', 'te', 'se', 'lo', 'le', 'su', 'nos', 'al', 'hola', 'buenos', 'dias', 'buenas', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'necesito', 'busco', 'tienen', 'hay'];
   const basicKeywords = query
     .toLowerCase()
     .split(/\s+/)
     .filter(word => word.length > 2 && !stopWords.includes(word))
     .slice(0, 5);
 
-  // 3. Merge and deduplicate
-  const allKeywords = [...new Set([...aiKeywords, ...basicKeywords])]
-    .filter(k => k.length > 2)
-    .slice(0, 12)
-    .map(escapeLikePattern);
+  // 3. Also add accent-free versions
+  const accentFree: string[] = [];
+  for (const k of [...aiKeywords, ...basicKeywords]) {
+    const noAccent = removeAccents(k);
+    if (noAccent !== k) accentFree.push(noAccent);
+  }
+
+  // 4. Merge, deduplicate, sanitize - only single words
+  const allKeywords = [...new Set([...aiKeywords, ...basicKeywords, ...accentFree])]
+    .map(k => sanitizeKeyword(k))
+    .filter(k => k.length > 2 && !k.includes(' '))
+    .slice(0, 20);
 
   if (allKeywords.length === 0) return [];
 
-  console.log('Searching knowledge with keywords:', allKeywords);
+  console.log('Searching knowledge with sanitized keywords:', allKeywords);
 
-  const { data, error } = await supabase
-    .from('bot_knowledge')
-    .select('id, content, file_name')
-    .eq('workshop_id', workshopId)
-    .or(allKeywords.map((k: string) => `content.ilike.%${k}%`).join(','))
-    .limit(5);
+  // Build safe OR filter - each keyword is a single word, no spaces
+  const orFilter = allKeywords.map(k => `content.ilike.%${k}%`).join(',');
 
-  if (error) {
-    console.error('Knowledge search error:', error);
+  try {
+    const { data, error } = await supabase
+      .from('bot_knowledge')
+      .select('id, content, file_name')
+      .eq('workshop_id', workshopId)
+      .or(orFilter)
+      .limit(15);
+
+    if (error) {
+      console.error('Knowledge search error:', error);
+      // Fallback: try with just the first 3 basic keywords
+      if (basicKeywords.length > 0) {
+        console.log('Retrying with basic keywords only...');
+        const fallbackFilter = basicKeywords.slice(0, 3).map(k => `content.ilike.%${sanitizeKeyword(k)}%`).join(',');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('bot_knowledge')
+          .select('id, content, file_name')
+          .eq('workshop_id', workshopId)
+          .or(fallbackFilter)
+          .limit(15);
+        
+        if (!fallbackError && fallbackData) {
+          console.log('Fallback search returned', fallbackData.length, 'matches');
+          return fallbackData as KnowledgeMatch[];
+        }
+      }
+      return [];
+    }
+
+    console.log('AI-enhanced search returned', (data || []).length, 'matches');
+    return (data || []) as KnowledgeMatch[];
+  } catch (searchErr) {
+    console.error('Search execution error:', searchErr);
     return [];
   }
-
-  console.log('AI-enhanced search returned', (data || []).length, 'matches');
-  return (data || []) as KnowledgeMatch[];
 }
 
 serve(async (req) => {
