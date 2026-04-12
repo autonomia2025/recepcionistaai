@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
