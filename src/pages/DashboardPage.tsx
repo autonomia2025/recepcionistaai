@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { MetricCard } from '@/components/metrics';
+import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
 import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components/metrics/metricDefinitions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
@@ -153,6 +154,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Section: Zone Metrics (SOC Ingenieria only) */}
+      {workshopId && <ZoneMetrics workshopId={workshopId} />}
 
       {/* Section: Activity */}
       <div>
