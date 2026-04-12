@@ -284,27 +284,26 @@ serve(async (req) => {
 
 Se te entrega el texto de MÚLTIPLES PÁGINAS de un mismo sitio web. Tu tarea es crear un documento EXHAUSTIVO con toda la información.
 
-EXTRAE ABSOLUTAMENTE TODO:
+FORMATO DE SALIDA - USA EXACTAMENTE ESTA ESTRUCTURA:
 
-## PRODUCTOS
-Para CADA producto encontrado incluye:
-- Nombre completo y modelo
-- Marca
-- Descripción detallada
-- Especificaciones técnicas (presión, caudal, potencia, dimensiones, peso, etc.)
-- Precio (si existe, sino "Cotizar")
-- Categoría a la que pertenece
-- Usos recomendados
-- Accesorios incluidos o compatibles
+## PRODUCTO: [Nombre del producto]
+- **Categoría:** [categoría]
+- **Marca:** [marca]
+- **Descripción:** [descripción detallada]
+- **Especificaciones:** [todas las specs técnicas: presión, caudal, potencia, dimensiones, peso, etc.]
+- **Precio:** [precio o "Cotizar"]
+- **Usos:** [usos recomendados]
+- **Accesorios:** [accesorios incluidos o compatibles]
+- **URL:** [url de la página donde se encontró]
 
-## SERVICIOS
-- Nombre del servicio
-- Descripción detallada
-- Qué incluye
-- Para qué tipo de equipos/situaciones
+(Repite este bloque para CADA producto encontrado)
+
+## SERVICIO: [Nombre del servicio]
+- **Descripción:** [qué incluye, para qué sirve]
+- **Para qué equipos/situaciones:** [detalle]
 
 ## CATEGORÍAS
-Lista completa de categorías y subcategorías
+Lista completa de categorías y subcategorías del catálogo
 
 ## INFORMACIÓN DE LA EMPRESA
 - Nombre, descripción, historia, trayectoria
@@ -323,12 +322,13 @@ Todas las marcas que distribuyen/venden
 
 ## PREGUNTAS FRECUENTES
 
-REGLAS:
+REGLAS CRÍTICAS:
 - NO omitas NINGÚN producto. Lista TODOS con TODOS sus detalles.
+- Cada producto DEBE tener su propio bloque "## PRODUCTO:" para facilitar la búsqueda.
 - Si hay especificaciones técnicas, inclúyelas TODAS.
 - Si un producto no tiene precio, indica "Precio: Cotizar".
-- Organiza por categoría.
 - Escribe en español.
+- Incluye TODAS las variantes y modelos de cada producto.
 ${!isFirst ? '\nEsta es una CONTINUACIÓN del mismo sitio web. Agrega solo la información NUEVA que no se haya cubierto antes.' : ''}`
               },
               {
