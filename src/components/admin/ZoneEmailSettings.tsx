@@ -45,7 +45,7 @@ export function ZoneEmailSettings({ workshopId }: ZoneEmailSettingsProps) {
     setSaving(true);
     const { error } = await supabase
       .from('workshops')
-      .update({ zone_notification_emails: emails } as any)
+      .update({ zone_notification_emails: emails as unknown as Json })
       .eq('id', workshopId);
 
     if (error) {
