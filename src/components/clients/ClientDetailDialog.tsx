@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -290,9 +291,10 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
 }
 
 function ClientDetailContent({ contact }: { contact: Contact }) {
-
+  const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
+  const isSOC = profile?.workshop_id === '610fb257-a649-4115-b944-21f31e7952db';
   const queryClient = useQueryClient();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -617,18 +619,20 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
           </Card>
         )}
 
-        {/* Zone */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Zona
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ZoneSelector contactId={contact.id} initialValue={contact.zone || null} />
-          </CardContent>
-        </Card>
+        {/* Zone - only for SOC Ingenieria */}
+        {isSOC && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Zona
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ZoneSelector contactId={contact.id} initialValue={contact.zone || null} />
+            </CardContent>
+          </Card>
+        )}
 
 
         {!isChatbotOnly && (contact.vehicle_brand || contact.vehicle_model) && (

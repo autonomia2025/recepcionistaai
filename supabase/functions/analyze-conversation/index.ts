@@ -190,11 +190,11 @@ Busca en la conversación si el cliente menciona EXPLÍCITAMENTE:
    - "Es un Hyundai Accent año 2018"
    - "Mi auto es un Kia Sportage"
 
-5. ZONA: Detecta la zona del cliente. Las zonas válidas son: talca, puerto_montt, santiago
+${workshop_id === '610fb257-a649-4115-b944-21f31e7952db' ? `5. ZONA: Detecta la zona del cliente. Las zonas válidas son: talca, puerto_montt, santiago
    - Si menciona Talca, Maule, Curicó, Linares → zone = "talca"
    - Si menciona Puerto Montt, Osorno, Llanquihue, Los Lagos → zone = "puerto_montt"
    - Si menciona Santiago, Providencia, Las Condes, Maipú, La Florida, o cualquier comuna de la RM → zone = "santiago"
-   - Si no menciona ubicación → zone = null
+   - Si no menciona ubicación → zone = null` : '5. ZONA: No aplica para este negocio, siempre devolver zone = null'}
 
 REGLAS:
 - Solo incluir datos que el cliente mencione EXPLÍCITAMENTE
@@ -419,8 +419,8 @@ Estructura de cada item:
       }
     }
 
-    // Update zone if extracted and not already set
-    if (extracted.zone && ['talca', 'puerto_montt', 'santiago'].includes(extracted.zone) && !currentContact?.zone) {
+    // Update zone if extracted and not already set (only for SOC Ingenieria)
+    if (workshop_id === '610fb257-a649-4115-b944-21f31e7952db' && extracted.zone && ['talca', 'puerto_montt', 'santiago'].includes(extracted.zone) && !currentContact?.zone) {
       contactUpdate.zone = extracted.zone;
     }
 

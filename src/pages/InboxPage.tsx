@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { ConversationList } from '@/components/inbox/ConversationList';
 import { ChatView } from '@/components/inbox/ChatView';
 import { useConversations, Conversation } from '@/hooks/useConversations';
+import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare, ArrowLeft, Inbox, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,12 +33,16 @@ function ConversationListSkeleton() {
   );
 }
 
+const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
+
 export default function InboxPage() {
+  const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showChat, setShowChat] = useState(false);
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const { data: conversations, isLoading } = useConversations();
+  const showZoneFilter = profile?.workshop_id === SOC_WORKSHOP_ID;
 
   // Filter conversations by zone
   const filteredByZone = conversations?.filter(conv => {
@@ -96,18 +101,20 @@ export default function InboxPage() {
       )}>
         <div className="flex items-center gap-3 flex-wrap">
           <PageHeader title="Inbox" description="Gestiona las conversaciones con tus clientes" />
-          <Select value={zoneFilter} onValueChange={setZoneFilter}>
-            <SelectTrigger className="w-[150px] h-9 text-xs">
-              <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Zona" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las zonas</SelectItem>
-              <SelectItem value="santiago">📍 Santiago</SelectItem>
-              <SelectItem value="talca">📍 Talca</SelectItem>
-              <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
-            </SelectContent>
-          </Select>
+          {showZoneFilter && (
+            <Select value={zoneFilter} onValueChange={setZoneFilter}>
+              <SelectTrigger className="w-[150px] h-9 text-xs">
+                <MapPin className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Zona" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las zonas</SelectItem>
+                <SelectItem value="santiago">📍 Santiago</SelectItem>
+                <SelectItem value="talca">📍 Talca</SelectItem>
+                <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
       
