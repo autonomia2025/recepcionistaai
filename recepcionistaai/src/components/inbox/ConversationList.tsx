@@ -174,6 +174,11 @@ export function ConversationList({
                             Pausado
                           </span>
                         )}
+                        {zoneInfo && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200/50">
+                            {zoneInfo.emoji} {zoneInfo.label}
+                          </span>
+                        )}
                       </div>
                       
                       {/* AI Summary */}
