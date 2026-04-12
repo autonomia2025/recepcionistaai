@@ -95,3 +95,6 @@ verify_jwt = false
 
 [functions.generate-manual-quote]
 verify_jwt = false
+
+[functions.scrape-website]
+verify_jwt = false

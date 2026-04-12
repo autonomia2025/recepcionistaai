@@ -284,11 +284,11 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { document_id, workshop_id, file_name, file_content, file_type } = await req.json();
+    const { document_id, workshop_id, file_name, file_content, file_type, plain_text } = await req.json();
 
-    if (!document_id || !workshop_id || !file_name || !file_content) {
-      return new Response(JSON.stringify({
-        error: 'Missing required fields: document_id, workshop_id, file_name, file_content'
+    if (!document_id || !workshop_id || !file_name || (!file_content && !plain_text)) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: document_id, workshop_id, file_name, and either file_content or plain_text' 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -304,17 +304,25 @@ serve(async (req) => {
       .eq('id', document_id);
 
     try {
-      // Decode base64 content to Uint8Array
-      const binaryString = atob(file_content);
-      const buffer = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        buffer[i] = binaryString.charCodeAt(i);
+      let textContent: string;
+
+      if (plain_text) {
+        // Plain text provided directly (e.g. from web scraping)
+        console.log('Using plain text input, length:', plain_text.length);
+        textContent = plain_text;
+      } else {
+        // Decode base64 content to Uint8Array
+        const binaryString = atob(file_content);
+        const buffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          buffer[i] = binaryString.charCodeAt(i);
+        }
+
+        console.log('Decoded buffer size:', buffer.length);
+
+        // Extract text based on file type
+        textContent = await extractText(buffer, file_type, file_name, lovableApiKey);
       }
-
-      console.log('Decoded buffer size:', buffer.length);
-
-      // Extract text based on file type
-      const textContent = await extractText(buffer, file_type, file_name, lovableApiKey);
 
       if (!textContent || textContent.trim().length < 10) {
         throw new Error('No se pudo extraer texto del documento. Verifica que el archivo contenga texto legible.');

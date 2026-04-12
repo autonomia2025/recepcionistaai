@@ -22,6 +22,7 @@ import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
+import { WebImporter } from '@/components/bot/WebImporter';
 
 interface Service {
   name: string;
