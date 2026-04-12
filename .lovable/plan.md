@@ -1,43 +1,106 @@
 
+## Qué está pasando
+Sí, se puede hacer que responda exhaustivamente sobre productos, descripciones y características, pero ahora mismo el problema principal no es solo el scraping: la parte que busca esa información para responder está fallando.
 
-# Web Scraping para Base de Conocimiento del Bot
+Con lo que revisé en el código y los logs, hay 3 fallas claras:
 
-## Resumen
-Agregar la opción de ingresar una URL de sitio web en la configuración del bot. El sistema scrapeará la web, extraerá productos, servicios, descripciones y todo el contenido relevante, y lo almacenará como documento en la base de conocimiento (igual que los documentos subidos manualmente). El bot podrá responder preguntas basándose en esa información.
+1. **La búsqueda de conocimiento está rota en consultas con varias palabras**
+   - En `build-ai-reply`, la búsqueda arma un filtro `or(...)` con términos como `"máquina abrillantadora"` o `"pulidora de suelos"`.
+   - Eso está generando errores de parseo en la consulta (`PGRST100`) y hace que no encuentre chunks.
+   - Resultado: el bot responde “sin conocimiento” aunque el documento sí exista.
 
-## Flujo del usuario
-1. En la sección "Base de Conocimiento" del bot, aparece un nuevo campo de URL con botón "Importar Web"
-2. El usuario pega una URL (ej: `https://mitienda.com`)
-3. El sistema scrapea la página, extrae el contenido (productos, precios, descripciones)
-4. Se crea un documento en `bot_documents` con el contenido extraído
-5. Se procesa igual que cualquier documento: se divide en chunks y se almacena en `bot_knowledge`
-6. El bot puede responder preguntas sobre los productos/servicios de esa web
+2. **La expansión de palabras clave con IA es frágil**
+   - Los logs muestran `Query expansion error: SyntaxError...`.
+   - Eso significa que a veces la IA no devuelve JSON limpio, el parseo falla y se pierde una parte importante de la búsqueda.
 
-## Detalles Técnicos
+3. **El sistema muchas veces responde sin RAG activo**
+   - En logs aparece `hasRAG: false` y `AI-enhanced search returned 0 matches`.
+   - O sea: el contenido web puede haberse importado, pero al momento de contestar no se está recuperando correctamente.
 
-### 1. Nueva Edge Function: `scrape-website`
-- Recibe `url` y `workshop_id`
-- Usa Firecrawl si está disponible como conector, sino usa fetch nativo + Gemini para extraer contenido estructurado
-- Flujo: fetch HTML -> enviar a Gemini para extraer productos/servicios/descripciones en formato texto limpio -> crear registro en `bot_documents` -> llamar `process-rag-document` con el texto extraído
-- Gemini recibirá el HTML y se le pedirá que extraiga: nombre de productos, precios, descripciones, categorías, información de contacto, horarios, etc.
+Además hay un problema secundario:
+4. **La generación de embeddings está fallando**
+   - `generate-embedding` usa un modelo no soportado (`text-embedding-004`).
+   - Hoy no es la causa principal del fallo, porque la búsqueda actual es por texto, no por embeddings.
+   - Pero igual conviene corregirlo o desactivarlo bien para no meter errores innecesarios.
 
-### 2. Modificar `process-rag-document`
-- Agregar soporte para recibir texto plano directamente (además de archivos base64), para que la edge function de scraping pueda enviar el contenido extraído sin necesidad de encodear
+## Plan de solución
+### 1. Arreglar la recuperación de conocimiento en `build-ai-reply`
+- Reemplazar la búsqueda `.or(...)` actual por una estrategia segura:
+  - sanitizar términos,
+  - separar términos multi-palabra de forma controlada,
+  - evitar filtros que rompan el parser,
+  - combinar búsqueda por frase + palabras clave simples.
+- Subir la cantidad de resultados recuperados para que el contexto sea más completo.
+- Priorizar matches por relevancia y evitar devolver solo 5 fragmentos si el sitio es grande.
 
-### 3. UI en `BotSettingsPage.tsx`
-- Agregar un campo de input URL + botón "Importar desde Web" debajo del DocumentUploader
-- Mostrar estado de carga mientras scrapea
-- El documento aparecerá en la lista de documentos con el nombre del dominio
+### 2. Hacer robusta la expansión de consulta con IA
+- Cambiar el parseo para tolerar respuestas imperfectas de la IA.
+- Si no devuelve JSON válido:
+  - fallback a extracción local de keywords,
+  - normalización de acentos,
+  - singular/plural básico,
+  - limpieza de palabras basura.
+- Así nunca se cae toda la recuperación por un parseo fallido.
 
-### 4. Modificar `DocumentUploader.tsx` o crear componente separado `WebImporter.tsx`
-- Input de URL con validación
-- Botón de importar con estado de loading
-- Opción para re-scrapear (actualizar contenido)
+### 3. Mejorar el contenido que genera `scrape-website`
+- Mantener el crawl, pero cambiar la salida final para que quede más útil para RAG:
+  - una sección por producto,
+  - nombre del producto,
+  - descripción,
+  - características técnicas,
+  - precio/cotización,
+  - categoría,
+  - URL de origen.
+- Incluir más estructura por página para que luego las búsquedas por nombre/modelo funcionen mejor.
+- Registrar mejor cuántos productos/categorías se extrajeron y si hubo truncamiento del modelo.
 
-### Archivos a crear/modificar
-- **Crear**: `supabase/functions/scrape-website/index.ts`
-- **Crear**: `src/components/bot/WebImporter.tsx`
-- **Modificar**: `src/pages/BotSettingsPage.tsx` (agregar WebImporter)
-- **Modificar**: `supabase/functions/process-rag-document/index.ts` (aceptar texto plano)
-- **Modificar**: `supabase/config.toml` (agregar config de nueva función)
+### 4. Corregir o neutralizar el flujo de embeddings
+- Arreglar `generate-embedding` para no usar un modelo inválido, o dejar explícitamente desactivado si no se usará.
+- Evitar que el pipeline registre errores ruidosos mientras procesa documentos web.
 
+### 5. Mejorar la visibilidad para diagnosticar calidad
+- En el preview del documento, mostrar mejor el contenido importado desde web para revisar si realmente están quedando productos y fichas.
+- Agregar más logs útiles:
+  - keywords finales usadas,
+  - cantidad de matches,
+  - nombres de documentos consultados,
+  - si la respuesta salió con o sin contexto RAG.
+
+### 6. Reprocesamiento de documentos web ya cargados
+- Como el contenido viejo puede haber quedado mal indexado o mal resumido, voy a dejar el flujo listo para:
+  - borrar documento web viejo,
+  - reimportar la web,
+  - volver a probar en el simulador.
+- Si hace falta, también dejaré una opción de “reimportar sitio” más clara.
+
+## Resultado esperado
+Después de estos cambios, cuando preguntes por productos como “abrillantadoras”, “hidrolavadoras”, “extractores”, modelos o características:
+- el bot sí debería encontrar el contenido del sitio,
+- responder con descripciones reales del catálogo,
+- mencionar características técnicas y contexto comercial,
+- y dejar de caer en respuestas genéricas de derivación cuando sí hay información cargada.
+
+## Detalle técnico
+- Archivos principales a revisar/modificar:
+  - `supabase/functions/build-ai-reply/index.ts`
+  - `supabase/functions/scrape-website/index.ts`
+  - `supabase/functions/generate-embedding/index.ts`
+  - posiblemente `supabase/functions/process-rag-document/index.ts`
+  - opcionalmente `src/components/bot/DocumentList.tsx`
+
+- Hallazgos exactos detectados:
+  - `build-ai-reply/index.ts`: el `.or(allKeywords.map(...).join(','))` está provocando errores con términos complejos.
+  - logs:
+    - `Knowledge search error: PGRST100`
+    - `Query expansion error: SyntaxError`
+    - `Using system prompt ... hasRAG: false`
+    - `AI-enhanced search returned 0 matches`
+  - `generate-embedding/index.ts`: usa `text-embedding-004`, que no está permitido por el gateway actual.
+
+## Qué haré al implementar
+1. Reescribir la búsqueda de RAG para que sea estable.
+2. Reforzar el fallback de keywords.
+3. Mejorar la extracción estructurada del scraping.
+4. Corregir el error de embeddings.
+5. Validar que el simulador realmente reciba contexto RAG.
+6. Reimportar la web y probar preguntas reales de productos end-to-end.
