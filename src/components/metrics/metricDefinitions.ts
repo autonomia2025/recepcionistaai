@@ -146,17 +146,7 @@ export const metricDefinitions: Record<string, MetricDefinition> = {
     bgClass: 'bg-amber-500/10',
   },
 
-  active_requests: {
-    id: 'active_requests',
-    name: 'Solicitudes Activas',
-    description: 'Solicitudes de servicio que están en proceso o pendientes de atención.',
-    dataSource: 'Tabla de solicitudes de servicio, excluyendo las finalizadas (done) y perdidas (lost).',
-    formula: 'Conteo de solicitudes con status ≠ done y ≠ lost',
-    unit: 'count',
-    icon: ClipboardList,
-    colorClass: 'text-violet-600',
-    bgClass: 'bg-violet-500/10',
-  },
+  // active_requests removed
 
   closed_clients: {
     id: 'closed_clients',
