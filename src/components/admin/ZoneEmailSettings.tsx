@@ -58,37 +58,42 @@ export function ZoneEmailSettings({ workshopId }: ZoneEmailSettingsProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Mail className="w-5 h-5 text-primary" />
+    <Card className="border-2 border-primary/20">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary/10">
+            <Mail className="w-5 h-5 text-primary" />
+          </div>
           <div>
             <CardTitle className="text-base">Emails de notificación por zona</CardTitle>
             <CardDescription>
-              Configura un email diferente para cada zona. Cuando se detecte un lead caliente, la alerta se enviará al email de su zona.
+              Configura un email por zona. Cuando se detecte un lead caliente, la alerta se enviará al email correspondiente.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {ZONES.map(zone => (
-          <div key={zone.key} className="rounded-lg border p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${zone.color}`} />
-              <Label htmlFor={`zone-email-${zone.key}`} className="font-medium text-sm">
-                <MapPin className="w-3.5 h-3.5 inline mr-1 text-muted-foreground" />
-                {zone.label}
-              </Label>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
+          {ZONES.map(zone => (
+            <div key={zone.key} className="flex items-center gap-3 rounded-lg border p-3 bg-muted/30">
+              <div className="flex items-center gap-2 min-w-[120px]">
+                <div className={`w-3 h-3 rounded-full ${zone.color}`} />
+                <Label htmlFor={`zone-email-${zone.key}`} className="font-semibold text-sm whitespace-nowrap">
+                  <MapPin className="w-3.5 h-3.5 inline mr-1 text-muted-foreground" />
+                  {zone.label}
+                </Label>
+              </div>
+              <Input
+                id={`zone-email-${zone.key}`}
+                type="email"
+                placeholder={`email-${zone.label.toLowerCase().replace(' ', '')}@empresa.cl`}
+                value={emails[zone.key] || ''}
+                onChange={(e) => setEmails(prev => ({ ...prev, [zone.key]: e.target.value }))}
+                className="flex-1"
+              />
             </div>
-            <Input
-              id={`zone-email-${zone.key}`}
-              type="email"
-              placeholder={`email-${zone.label.toLowerCase().replace(' ', '')}@empresa.cl`}
-              value={emails[zone.key] || ''}
-              onChange={(e) => setEmails(prev => ({ ...prev, [zone.key]: e.target.value }))}
-            />
-          </div>
-        ))}
+          ))}
+        </div>
         <Button onClick={handleSave} disabled={saving} size="sm" className="w-full">
           <Save className="w-4 h-4 mr-2" />
           {saving ? 'Guardando...' : 'Guardar emails por zona'}
