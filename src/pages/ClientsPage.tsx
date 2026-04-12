@@ -43,9 +43,19 @@ import { ClientDetailDialog } from '@/components/clients/ClientDetailDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Users, Search, Phone, Target, Clock, Filter, CalendarCheck, CheckCircle2, XCircle, MoreHorizontal, Trash2, MessageSquare, CircleCheckBig, Undo2, LayoutList, Kanban, MapPin } from 'lucide-react';
 import { ClientsKanban } from '@/components/clients/ClientsKanban';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+
+const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
+const ZONE_TABS = ['all', 'talca', 'puerto_montt', 'santiago'];
+const ZONE_LABELS: Record<string, string> = {
+  all: 'Total',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+  santiago: 'Santiago',
+};
 
 interface Contact {
   id: string;

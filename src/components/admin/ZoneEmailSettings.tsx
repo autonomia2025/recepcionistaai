@@ -5,15 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { MapPin, Save } from 'lucide-react';
+import { MapPin, Save, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
 
 const ZONES = [
-  { key: 'talca', label: 'Talca' },
-  { key: 'puerto_montt', label: 'Puerto Montt' },
-  { key: 'santiago', label: 'Santiago' },
+  { key: 'talca', label: 'Talca', color: 'bg-blue-500' },
+  { key: 'puerto_montt', label: 'Puerto Montt', color: 'bg-emerald-500' },
+  { key: 'santiago', label: 'Santiago', color: 'bg-violet-500' },
 ];
 
 interface ZoneEmailSettingsProps {
@@ -61,19 +61,25 @@ export function ZoneEmailSettings({ workshopId }: ZoneEmailSettingsProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-primary" />
+          <Mail className="w-5 h-5 text-primary" />
           <div>
             <CardTitle className="text-base">Emails de notificación por zona</CardTitle>
             <CardDescription>
-              Cuando se detecte un lead caliente, se enviará la alerta al email de la zona correspondiente
+              Configura un email diferente para cada zona. Cuando se detecte un lead caliente, la alerta se enviará al email de su zona.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {ZONES.map(zone => (
-          <div key={zone.key} className="space-y-1">
-            <Label htmlFor={`zone-email-${zone.key}`}>{zone.label}</Label>
+          <div key={zone.key} className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-full ${zone.color}`} />
+              <Label htmlFor={`zone-email-${zone.key}`} className="font-medium text-sm">
+                <MapPin className="w-3.5 h-3.5 inline mr-1 text-muted-foreground" />
+                {zone.label}
+              </Label>
+            </div>
             <Input
               id={`zone-email-${zone.key}`}
               type="email"
