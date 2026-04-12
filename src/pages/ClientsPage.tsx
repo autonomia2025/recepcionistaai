@@ -150,10 +150,9 @@ export default function ClientsPage() {
   const [closeStep, setCloseStep] = useState<1 | 2>(1);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
+  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
   const showZoneTabs = isSOC && isAdmin;
-
-  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
 
   const { data: contacts, isLoading } = useQuery({
@@ -557,20 +556,6 @@ export default function ClientsPage() {
           </SelectContent>
         </Select>
 
-        {showZoneFilter && (
-          <Select value={zoneFilter} onValueChange={setZoneFilter}>
-            <SelectTrigger className="w-full sm:w-[140px] bg-background border-border/60 text-xs sm:text-sm">
-              <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Zona" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las zonas</SelectItem>
-              <SelectItem value="santiago">📍 Santiago</SelectItem>
-              <SelectItem value="talca">📍 Talca</SelectItem>
-              <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
         </div>
       </div>
 
