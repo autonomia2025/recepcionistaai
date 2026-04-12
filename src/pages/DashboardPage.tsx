@@ -32,13 +32,12 @@ export default function DashboardPage() {
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
       
-      const [conversations, contacts, appointments, messagesOut, messagesIn, activeRequests, closedClients] = await Promise.all([
+      const [conversations, contacts, appointments, messagesOut, messagesIn, closedClients] = await Promise.all([
         supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'outbound'),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'inbound'),
-        supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('status', 'in', '("done","lost")'),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('closed_at', 'is', null),
       ]);
       
@@ -53,7 +52,6 @@ export default function DashboardPage() {
         appointments: appointments.count || 0,
         messagesOut: messagesOut.count || 0,
         messagesIn: messagesIn.count || 0,
-        activeRequests: activeRequests.count || 0,
         closedClients: closedClients.count || 0,
         hoursSaved,
         valueGenerated,
