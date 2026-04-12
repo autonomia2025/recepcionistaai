@@ -72,6 +72,7 @@ interface Contact {
   notes: string | null;
   tags: string[] | null;
   last_analyzed_at: string | null;
+  zone?: string | null;
 }
 
 interface ServiceRequest {
@@ -565,7 +566,20 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
           </Card>
         )}
 
-        {/* Vehicle Info (only for scheduling mode) */}
+        {/* Zone */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Zona
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ZoneSelector contactId={contact.id} initialValue={contact.zone || null} />
+          </CardContent>
+        </Card>
+
+
         {!isChatbotOnly && (contact.vehicle_brand || contact.vehicle_model) && (
           <Card>
             <CardHeader className="pb-2">
