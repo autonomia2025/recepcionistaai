@@ -1,88 +1,43 @@
 
 
-# Plan: Ordenar Clientes por Ultimo Contacto + Mobile-First
+# Web Scraping para Base de Conocimiento del Bot
 
-## Dos cambios principales
+## Resumen
+Agregar la opción de ingresar una URL de sitio web en la configuración del bot. El sistema scrapeará la web, extraerá productos, servicios, descripciones y todo el contenido relevante, y lo almacenará como documento en la base de conocimiento (igual que los documentos subidos manualmente). El bot podrá responder preguntas basándose en esa información.
 
----
+## Flujo del usuario
+1. En la sección "Base de Conocimiento" del bot, aparece un nuevo campo de URL con botón "Importar Web"
+2. El usuario pega una URL (ej: `https://mitienda.com`)
+3. El sistema scrapea la página, extrae el contenido (productos, precios, descripciones)
+4. Se crea un documento en `bot_documents` con el contenido extraído
+5. Se procesa igual que cualquier documento: se divide en chunks y se almacena en `bot_knowledge`
+6. El bot puede responder preguntas sobre los productos/servicios de esa web
 
-## 1. Ordenar clientes por ultimo mensaje (como Inbox)
+## Detalles Técnicos
 
-**Problema actual:** La query de clientes ordena por `lead_score DESC`. El admin no ve quien le escribio mas recientemente.
+### 1. Nueva Edge Function: `scrape-website`
+- Recibe `url` y `workshop_id`
+- Usa Firecrawl si está disponible como conector, sino usa fetch nativo + Gemini para extraer contenido estructurado
+- Flujo: fetch HTML -> enviar a Gemini para extraer productos/servicios/descripciones en formato texto limpio -> crear registro en `bot_documents` -> llamar `process-rag-document` con el texto extraído
+- Gemini recibirá el HTML y se le pedirá que extraiga: nombre de productos, precios, descripciones, categorías, información de contacto, horarios, etc.
 
-**Solucion:** Hacer un LEFT JOIN con `conversations` para obtener el `MAX(last_message_at)` por contacto, y ordenar por esa fecha descendente (mas reciente primero). Tambien mostrar "hace X minutos" en la UI.
+### 2. Modificar `process-rag-document`
+- Agregar soporte para recibir texto plano directamente (además de archivos base64), para que la edge function de scraping pueda enviar el contenido extraído sin necesidad de encodear
 
-**Cambios en `ClientsPage.tsx`:**
-- Modificar la query para hacer una segunda consulta a `conversations` agrupada por `contact_id`, obteniendo el `MAX(last_message_at)` de cada contacto
-- Merge el resultado con los contactos y ordenar por `last_contact_at` DESC
-- Agregar campo visual "Ultimo contacto: hace 2h" en cada fila (visible en mobile y desktop)
-- La interfaz de contacto incluira `last_contact_at` como campo nuevo
+### 3. UI en `BotSettingsPage.tsx`
+- Agregar un campo de input URL + botón "Importar desde Web" debajo del DocumentUploader
+- Mostrar estado de carga mientras scrapea
+- El documento aparecerá en la lista de documentos con el nombre del dominio
 
-**No se necesita migracion SQL** - la data ya existe en `conversations.last_message_at`.
+### 4. Modificar `DocumentUploader.tsx` o crear componente separado `WebImporter.tsx`
+- Input de URL con validación
+- Botón de importar con estado de loading
+- Opción para re-scrapear (actualizar contenido)
 
----
-
-## 2. Mobile-First para todo el software
-
-**Principio:** No cambiar NADA en desktop (md+ breakpoints). Solo mejorar la experiencia en pantallas < 768px.
-
-### 2a. ClientsPage - Vista mobile de cards en vez de tabla
-
-En mobile, reemplazar la tabla (que se corta) por una lista de cards compactas con la info clave:
-- Nombre + emoji de score
-- Telefono
-- Score badge
-- "Hace 2h" (ultimo contacto)
-- Boton de acciones
-
-La tabla desktop se mantiene identica.
-
-### 2b. DashboardPage
-- Ya usa `grid-cols-1 sm:grid-cols-2` - esta bien
-- No requiere cambios
-
-### 2c. CalendarPage
-- El FullCalendar ya es responsive
-- No requiere cambios significativos
-
-### 2d. TeamPage
-- Ya usa Cards que se apilan en mobile
-- No requiere cambios
-
-### 2e. BotSettingsPage
-- Formularios se apilan naturalmente
-- El ChatSimulator se esconde en mobile con `hidden lg:block` actualmente - hacer visible en mobile como tab o debajo del form
-
-### 2f. RequestsPage
-- El Kanban es horizontal - en mobile, forzar vista "lista" por defecto en vez de kanban
-- Las columnas kanban overflow horizontal ya existen
-
-### 2g. AutomationsPage / EmailSettingsPage
-- Formularios simples, ya responsive
-- No requiere cambios
-
-### 2h. Sidebar (AppSidebar)
-- Ya tiene soporte mobile con hamburger menu + overlay
-- El breakpoint es `1023px` - cambiar a `767px` para alinear con `md` de Tailwind y que tablets vean el sidebar fijo
-- **DECISION:** Mantener como esta (1023px) ya que en tablets el sidebar ocupa mucho espacio y es mejor como drawer
-
-### 2i. AppLayout header
-- Ya tiene boton hamburger `md:hidden`
-- Esta correcto
-
----
-
-## Resumen de archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/ClientsPage.tsx` | Query con last_contact_at + sort + mobile card view |
-| `src/pages/BotSettingsPage.tsx` | Mostrar ChatSimulator en mobile |
-| `src/pages/RequestsPage.tsx` | Default a vista lista en mobile |
-
-## Orden de implementacion
-
-1. ClientsPage: query + sort + mobile cards
-2. BotSettingsPage: ChatSimulator visible en mobile
-3. RequestsPage: default list view en mobile
+### Archivos a crear/modificar
+- **Crear**: `supabase/functions/scrape-website/index.ts`
+- **Crear**: `src/components/bot/WebImporter.tsx`
+- **Modificar**: `src/pages/BotSettingsPage.tsx` (agregar WebImporter)
+- **Modificar**: `supabase/functions/process-rag-document/index.ts` (aceptar texto plano)
+- **Modificar**: `supabase/config.toml` (agregar config de nueva función)
 
