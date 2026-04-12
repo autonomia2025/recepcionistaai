@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { MetricCard } from '@/components/metrics';
 import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
@@ -25,20 +24,18 @@ function MetricSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
-  const { data: workshopMode } = useWorkshopMode();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats', profile?.workshop_id],
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
       
-      const [conversations, contacts, appointments, messagesOut, messagesIn, activeRequests, closedClients] = await Promise.all([
+      const [conversations, contacts, appointments, messagesOut, messagesIn, closedClients] = await Promise.all([
         supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'outbound'),
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'inbound'),
-        supabase.from('service_requests').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('status', 'in', '("done","lost")'),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('closed_at', 'is', null),
       ]);
       
@@ -53,7 +50,6 @@ export default function DashboardPage() {
         appointments: appointments.count || 0,
         messagesOut: messagesOut.count || 0,
         messagesIn: messagesIn.count || 0,
-        activeRequests: activeRequests.count || 0,
         closedClients: closedClients.count || 0,
         hoursSaved,
         valueGenerated,
@@ -62,7 +58,6 @@ export default function DashboardPage() {
     enabled: !!profile?.workshop_id,
   });
 
-  const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
   const workshopId = profile?.workshop_id;
 
   const conversionRate = stats?.conversations 
@@ -174,32 +169,16 @@ export default function DashboardPage() {
             value={stats.messagesIn}
             workshopId={workshopId}
           />
-          {isChatbotOnly ? (
-            <MetricCard
-              metricId="avg_response_time"
-              value="~3 min"
-              workshopId={workshopId}
-            />
-          ) : (
-            <MetricCard
-              metricId="appointments"
-              value={stats.appointments}
-              workshopId={workshopId}
-            />
-          )}
-          {isChatbotOnly ? (
-            <MetricCard
-              metricId="active_requests"
-              value={stats.activeRequests}
-              workshopId={workshopId}
-            />
-          ) : (
-            <MetricCard
-              metricId="conversion_rate"
-              value={conversionRate}
-              workshopId={workshopId}
-            />
-          )}
+          <MetricCard
+            metricId="appointments"
+            value={stats.appointments}
+            workshopId={workshopId}
+          />
+          <MetricCard
+            metricId="conversion_rate"
+            value={conversionRate}
+            workshopId={workshopId}
+          />
         </div>
       </div>
     </div>
