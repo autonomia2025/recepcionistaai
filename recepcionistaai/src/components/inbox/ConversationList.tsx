@@ -1,4 +1,4 @@
-import { Search, User, BotOff, MessageSquare } from 'lucide-react';
+import { Search, User, BotOff, MessageSquare, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,15 @@ function getSentimentEmoji(sentiment: string | null) {
     negative: '😟',
   };
   return sentiment ? sentiments[sentiment] || '' : '';
+}
+
+function getZoneLabel(zone: string | null) {
+  const zones: Record<string, { label: string; emoji: string }> = {
+    talca: { label: 'Talca', emoji: '📍' },
+    puerto_montt: { label: 'Pto. Montt', emoji: '📍' },
+    santiago: { label: 'Santiago', emoji: '📍' },
+  };
+  return zone ? zones[zone] || null : null;
 }
 
 function getStatusBadge(status: string) {
