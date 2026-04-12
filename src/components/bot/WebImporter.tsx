@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,50 @@ export function WebImporter({ workshopId, onImportComplete }: WebImporterProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const { toast } = useToast();
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+    setIsLoading(false);
+    setStatusText('');
+  }, []);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  const startPolling = (documentId: string) => {
+    setStatusText('Analizando sitio... esto puede tardar 1-2 minutos');
+
+    // 3-minute max timeout
+    timeoutRef.current = setTimeout(() => {
+      stopPolling();
+      toast({ title: 'Timeout', description: 'La importación tardó demasiado. Revisa el estado del documento.', variant: 'destructive' });
+    }, 180_000);
+
+    pollingRef.current = setInterval(async () => {
+      const { data, error } = await supabase
+        .from('bot_documents')
+        .select('status, chunk_count, error_message')
+        .eq('id', documentId)
+        .single();
+
+      if (error) return;
+
+      if (data.status === 'ready') {
+        stopPolling();
+        toast({
+          title: '¡Sitio importado!',
+          description: `Se crearon ${data.chunk_count ?? 0} fragmentos de conocimiento.`,
+        });
+        setUrl('');
+        onImportComplete();
+      } else if (data.status === 'error') {
+        stopPolling();
+        toast({ title: 'Error', description: data.error_message || 'Error al importar el sitio', variant: 'destructive' });
+      }
+    }, 4000);
+  };
 
   const handleImport = async () => {
     const trimmedUrl = url.trim();
@@ -24,15 +68,14 @@ export function WebImporter({ workshopId, onImportComplete }: WebImporterProps) 
     }
 
     setIsLoading(true);
-    setStatusText('Rastreando páginas del sitio...');
+    setStatusText('Enviando solicitud...');
 
     try {
-      // Use a manual fetch with longer timeout instead of supabase.functions.invoke
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
+
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000); // 120s timeout
+      const timeout = setTimeout(() => controller.abort(), 30000);
 
       const session = (await supabase.auth.getSession()).data.session;
 
@@ -55,22 +98,17 @@ export function WebImporter({ workshopId, onImportComplete }: WebImporterProps) 
         throw new Error(data?.error || 'Error al importar el sitio');
       }
 
-      if (data?.success) {
-        toast({
-          title: '¡Sitio importado!',
-          description: `Se analizaron ${data.pages_scraped || 1} páginas y se crearon ${data.chunks_created} fragmentos de ${data.domain}`,
-        });
-        setUrl('');
-        onImportComplete();
+      if (data?.success && data?.document_id) {
+        // Start polling for completion
+        startPolling(data.document_id);
       } else {
         throw new Error(data?.error || 'Error al importar el sitio');
       }
     } catch (err) {
       const message = err instanceof Error
-        ? (err.name === 'AbortError' ? 'La importación tardó demasiado. Intenta con una URL más específica.' : err.message)
+        ? (err.name === 'AbortError' ? 'La solicitud tardó demasiado. Intenta de nuevo.' : err.message)
         : 'Error al importar el sitio web';
       toast({ title: 'Error', description: message, variant: 'destructive' });
-    } finally {
       setIsLoading(false);
       setStatusText('');
     }

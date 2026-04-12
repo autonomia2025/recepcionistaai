@@ -106,7 +106,7 @@ async function fetchPage(url: string): Promise<string | null> {
 async function crawlSite(startUrl: string, baseUrl: URL, maxPages: number): Promise<{ url: string; text: string }[]> {
   const visited = new Set<string>();
   const results: { url: string; text: string }[] = [];
-  
+
   const startNormalized = baseUrl.origin + baseUrl.pathname.replace(/\/$/, '');
   const queue: string[] = [startUrl];
   visited.add(startNormalized);
@@ -118,17 +118,17 @@ async function crawlSite(startUrl: string, baseUrl: URL, maxPages: number): Prom
     const fetched = await Promise.all(batch.map(async (pageUrl) => {
       const html = await fetchPage(pageUrl);
       if (!html) return null;
-      
+
       const newLinks = extractInternalLinks(html, baseUrl);
       const clean = htmlToCleanText(html);
       if (clean.length < 150) return { links: newLinks, url: pageUrl, text: '' };
-      
+
       return { links: newLinks, url: pageUrl, text: clean };
     }));
 
     for (const r of fetched) {
       if (!r) continue;
-      
+
       for (const link of r.links) {
         const normalized = link.replace(/\/$/, '');
         if (!visited.has(normalized) && !isLowPriorityUrl(normalized)) {
@@ -185,9 +185,8 @@ serve(async (req) => {
 
     const baseUrl = new URL(formattedUrl);
     const domain = baseUrl.hostname;
-    console.log('Scraping URL (direct crawl, no AI):', formattedUrl);
 
-    // 1. Create bot_documents record
+    // 1. Create bot_documents record immediately
     const { data: doc, error: docError } = await supabase
       .from('bot_documents')
       .insert({
@@ -207,86 +206,98 @@ serve(async (req) => {
 
     const documentId = doc.id;
 
-    try {
-      // 2. Crawl up to 50 pages (keeps crawl under ~60s)
-      const maxPages = 50;
-      const allPageTexts = await crawlSite(formattedUrl, baseUrl, maxPages);
+    // 2. Background work: crawl + process
+    const backgroundWork = (async () => {
+      try {
+        console.log('Background: starting crawl for', formattedUrl);
+        const maxPages = 50;
+        const allPageTexts = await crawlSite(formattedUrl, baseUrl, maxPages);
 
-      console.log(`Crawl complete: ${allPageTexts.length} pages with content`);
+        console.log(`Background: crawl complete, ${allPageTexts.length} pages with content`);
 
-      if (allPageTexts.length === 0) {
-        throw new Error('No se pudo extraer contenido del sitio web.');
-      }
-
-      // 3. Combine all page texts with URL prefixes, cap at 500K chars
-      const MAX_TOTAL_CHARS = 500000;
-      let combinedText = '';
-      let pagesIncluded = 0;
-
-      for (const page of allPageTexts) {
-        const pageBlock = `\n\n===== PÁGINA: ${page.url} =====\n\n${page.text}`;
-        if (combinedText.length + pageBlock.length > MAX_TOTAL_CHARS && combinedText.length > 0) {
-          console.log(`Text cap reached at ${pagesIncluded} pages (${combinedText.length} chars)`);
-          break;
+        if (allPageTexts.length === 0) {
+          throw new Error('No se pudo extraer contenido del sitio web.');
         }
-        combinedText += pageBlock;
-        pagesIncluded++;
+
+        // Combine all page texts, cap at 500K chars
+        const MAX_TOTAL_CHARS = 500000;
+        let combinedText = '';
+        let pagesIncluded = 0;
+
+        for (const page of allPageTexts) {
+          const pageBlock = `\n\n===== PÁGINA: ${page.url} =====\n\n${page.text}`;
+          if (combinedText.length + pageBlock.length > MAX_TOTAL_CHARS && combinedText.length > 0) {
+            console.log(`Background: text cap reached at ${pagesIncluded} pages (${combinedText.length} chars)`);
+            break;
+          }
+          combinedText += pageBlock;
+          pagesIncluded++;
+        }
+
+        console.log(`Background: combined text ${combinedText.length} chars from ${pagesIncluded} pages`);
+
+        // Update file_size
+        await supabase
+          .from('bot_documents')
+          .update({ file_size: combinedText.length })
+          .eq('id', documentId);
+
+        // Send to process-rag-document
+        const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-rag-document`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            document_id: documentId,
+            workshop_id,
+            file_name: `🌐 ${domain}`,
+            plain_text: combinedText,
+          }),
+        });
+
+        const processResult = await processResponse.json();
+
+        if (!processResponse.ok || !processResult.success) {
+          throw new Error(processResult.error || 'Error al procesar el contenido');
+        }
+
+        // Mark as ready
+        await supabase
+          .from('bot_documents')
+          .update({
+            status: 'ready',
+            chunk_count: processResult.chunks_created || 0,
+          })
+          .eq('id', documentId);
+
+        console.log(`Background: done. ${processResult.chunks_created} chunks created for ${domain}`);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : 'Error desconocido';
+        console.error('Background scrape error:', errorMessage);
+        await supabase
+          .from('bot_documents')
+          .update({ status: 'error', error_message: errorMessage })
+          .eq('id', documentId);
       }
+    })();
 
-      console.log(`Combined text: ${combinedText.length} chars from ${pagesIncluded} pages`);
-
-      // Update file_size
-      await supabase
-        .from('bot_documents')
-        .update({ file_size: combinedText.length })
-        .eq('id', documentId);
-
-      // 4. Send directly to process-rag-document (no AI summarization)
-      const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-rag-document`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          document_id: documentId,
-          workshop_id,
-          file_name: `🌐 ${domain}`,
-          plain_text: combinedText,
-        }),
-      });
-
-      const processResult = await processResponse.json();
-
-      if (!processResponse.ok || !processResult.success) {
-        throw new Error(processResult.error || 'Error al procesar el contenido');
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        document_id: documentId,
-        domain,
-        pages_scraped: pagesIncluded,
-        content_length: combinedText.length,
-        chunks_created: processResult.chunks_created,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } catch (processingError: unknown) {
-      const errorMessage = processingError instanceof Error ? processingError.message : 'Error desconocido';
-      console.error('Scrape processing error:', errorMessage);
-
-      await supabase
-        .from('bot_documents')
-        .update({ status: 'error', error_message: errorMessage })
-        .eq('id', documentId);
-
-      return new Response(JSON.stringify({ success: false, error: errorMessage }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // 3. Keep background alive but return immediately
+    // @ts-ignore: EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== 'undefined') {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(backgroundWork);
     }
+
+    return new Response(JSON.stringify({
+      success: true,
+      document_id: documentId,
+      domain,
+      status: 'processing',
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error: unknown) {
     console.error('Scrape website error:', error);
