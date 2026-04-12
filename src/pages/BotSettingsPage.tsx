@@ -334,6 +334,10 @@ export default function BotSettingsPage() {
                     documentCount={documents.length}
                     maxDocuments={10}
                   />
+                  <WebImporter
+                    workshopId={profile.workshop_id}
+                    onImportComplete={() => refetchDocs()}
+                  />
                   <DocumentList
                     documents={documents}
                     onDelete={() => refetchDocs()}
