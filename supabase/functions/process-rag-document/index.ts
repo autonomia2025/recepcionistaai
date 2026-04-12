@@ -91,30 +91,29 @@ async function extractTextFromWord(buffer: Uint8Array): Promise<string> {
   }
 }
 
-// Extract text from Excel (XLSX) using JSZip
+// Extract text from Excel (XLSX) using JSZip - full row-by-row extraction
 async function extractTextFromExcel(buffer: Uint8Array): Promise<string> {
   try {
     const JSZip = (await import("https://esm.sh/jszip@3.10.1")).default;
     const zip = await JSZip.loadAsync(buffer);
 
-    const textParts: string[] = [];
-
-    // First get shared strings (text content is often stored here)
-    const sharedStringsFile = zip.files['xl/sharedStrings.xml'];
+    // 1. Build shared strings lookup
     const sharedStrings: string[] = [];
-
+    const sharedStringsFile = zip.files['xl/sharedStrings.xml'];
     if (sharedStringsFile) {
       const content = await sharedStringsFile.async('string');
-      const stringMatches = content.match(/<t[^>]*>([^<]*)<\/t>/g) || [];
-      for (const match of stringMatches) {
-        const text = match.replace(/<\/?t[^>]*>/g, '');
-        if (text.trim()) {
-          sharedStrings.push(text);
-        }
+      // Each <si> is one shared string entry; collect all <t> text inside it
+      const siMatches = content.match(/<si>([\s\S]*?)<\/si>/g) || [];
+      for (const si of siMatches) {
+        const tMatches = si.match(/<t[^>]*>([^<]*)<\/t>/g) || [];
+        const combined = tMatches.map(t => t.replace(/<\/?t[^>]*>/g, '')).join('');
+        sharedStrings.push(combined);
       }
     }
 
-    // Get sheet data
+    const allSheetTexts: string[] = [];
+
+    // 2. Process each sheet
     const sheetFiles = Object.keys(zip.files)
       .filter(name => name.startsWith('xl/worksheets/sheet') && name.endsWith('.xml'))
       .sort();
@@ -122,19 +121,72 @@ async function extractTextFromExcel(buffer: Uint8Array): Promise<string> {
     for (const sheetFile of sheetFiles) {
       const content = await zip.files[sheetFile].async('string');
 
-      // Extract inline strings and values
-      const inlineMatches = content.match(/<t[^>]*>([^<]*)<\/t>/g) || [];
-      for (const match of inlineMatches) {
-        const text = match.replace(/<\/?t[^>]*>/g, '');
-        if (text.trim() && isNaN(Number(text))) {
-          textParts.push(text);
+      // Extract all <row> elements
+      const rowMatches = content.match(/<row[^>]*>([\s\S]*?)<\/row>/g) || [];
+      const rows: string[][] = [];
+
+      for (const rowXml of rowMatches) {
+        const cellMatches = rowXml.match(/<c[^>]*>([\s\S]*?)<\/c>|<c[^\/]*\/>/g) || [];
+        const cellValues: string[] = [];
+
+        for (const cellXml of cellMatches) {
+          // Check cell type: t="s" = shared string, t="inlineStr" = inline, else number/formula
+          const typeMatch = cellXml.match(/\bt="([^"]*)"/);
+          const cellType = typeMatch ? typeMatch[1] : '';
+          const valueMatch = cellXml.match(/<v>([^<]*)<\/v>/);
+          const inlineMatch = cellXml.match(/<t[^>]*>([^<]*)<\/t>/);
+
+          let value = '';
+          if (cellType === 's' && valueMatch) {
+            // Shared string index
+            const idx = parseInt(valueMatch[1], 10);
+            value = sharedStrings[idx] ?? valueMatch[1];
+          } else if (cellType === 'inlineStr' && inlineMatch) {
+            value = inlineMatch[1];
+          } else if (valueMatch) {
+            value = valueMatch[1];
+          } else if (inlineMatch) {
+            value = inlineMatch[1];
+          }
+
+          cellValues.push(value.trim());
+        }
+
+        if (cellValues.some(v => v.length > 0)) {
+          rows.push(cellValues);
+        }
+      }
+
+      if (rows.length === 0) continue;
+
+      // Format as readable text: first row as header, rest as "Header: Value" pairs
+      const header = rows[0];
+      const hasHeader = header.some(h => h.length > 0 && isNaN(Number(h)));
+
+      if (hasHeader && rows.length > 1) {
+        for (let r = 1; r < rows.length; r++) {
+          const parts: string[] = [];
+          for (let c = 0; c < Math.max(header.length, rows[r].length); c++) {
+            const h = header[c] || `Col${c + 1}`;
+            const v = rows[r][c] || '';
+            if (v) parts.push(`${h}: ${v}`);
+          }
+          if (parts.length > 0) {
+            allSheetTexts.push(parts.join(' | '));
+          }
+        }
+      } else {
+        // No clear header - just join all cells
+        for (const row of rows) {
+          const line = row.filter(v => v).join(' | ');
+          if (line) allSheetTexts.push(line);
         }
       }
     }
 
-    // Combine shared strings and inline text
-    const allText = [...sharedStrings, ...textParts].filter(t => t.trim());
-    return allText.join(' ');
+    const result = allSheetTexts.join('\n');
+    console.log('Excel extraction result length:', result.length, 'rows:', allSheetTexts.length);
+    return result;
   } catch (error) {
     console.error('Excel extraction error:', error);
     throw new Error('Error al extraer texto del archivo Excel');
