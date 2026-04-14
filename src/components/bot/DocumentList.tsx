@@ -108,12 +108,15 @@ function DocumentPreviewDialog({
     }
   };
 
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && doc) {
+  useEffect(() => {
+    if (open && doc) {
       loadChunks(doc.id);
-    } else {
+    } else if (!open) {
       setChunks([]);
     }
+  }, [open, doc?.id]);
+
+  const handleOpenChange = (isOpen: boolean) => {
     onOpenChange(isOpen);
   };
 
