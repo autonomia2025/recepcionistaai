@@ -128,6 +128,19 @@ serve(async (req) => {
 
       console.log('Found workshop:', workshop.name, 'bot_enabled:', workshop.bot_enabled);
 
+      // Check if number is blocked
+      const { data: isBlocked } = await supabase.rpc('is_number_blocked', {
+        _workshop_id: workshop.id,
+        _phone: senderPhone
+      });
+
+      if (isBlocked) {
+        console.log('Blocked number detected, ignoring message from:', senderPhone);
+        return new Response(JSON.stringify({ success: true, blocked: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Find or create contact
       let contact;
       const { data: existingContact } = await supabase

@@ -64,6 +64,19 @@ serve(async (req) => {
 
     console.log('[twilio-webhook] Found workshop:', workshop.id, workshop.name);
 
+    // Check if number is blocked
+    const { data: isBlocked } = await supabase.rpc('is_number_blocked', {
+      _workshop_id: workshop.id,
+      _phone: senderPhone
+    });
+
+    if (isBlocked) {
+      console.log('[twilio-webhook] Blocked number detected, ignoring:', senderPhone);
+      return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+      });
+    }
+
     // Find or create contact
     let contact;
     const { data: existingContact } = await supabase

@@ -346,6 +346,45 @@ export type Database = {
           },
         ]
       }
+      blocked_numbers: {
+        Row: {
+          created_at: string
+          id: string
+          phone_number: string
+          reason: string | null
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone_number: string
+          reason?: string | null
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone_number?: string
+          reason?: string | null
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_numbers_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocked_numbers_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_documents: {
         Row: {
           chunk_count: number | null
@@ -2589,6 +2628,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_number_blocked: {
+        Args: { _phone: string; _workshop_id: string }
         Returns: boolean
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
