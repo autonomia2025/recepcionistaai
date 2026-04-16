@@ -1,12 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { MetricCard } from '@/components/metrics';
 import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
 import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components/metrics/metricDefinitions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
+
+const ZONE_LABELS: Record<string, string> = {
+  santiago: 'Santiago',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+};
 
 function MetricSkeleton() {
   return (
@@ -24,6 +31,7 @@ function MetricSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const { data: workshopMode } = useWorkshopMode();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats', profile?.workshop_id],
@@ -112,6 +120,14 @@ export default function DashboardPage() {
   return (
     <div className="page-shell page-stack animate-in">
       <PageHeader title="Dashboard" description="Resumen de tu negocio" />
+      
+      {profile?.role === 'STAFF' && (workshopMode?.name || profile?.zone) && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          Bienvenido, <span className="font-semibold">{profile.full_name}</span>.
+          {workshopMode?.name && <> Eres parte de <span className="font-semibold">{workshopMode.name}</span></>}
+          {profile.zone && ZONE_LABELS[profile.zone] && <> · Zona <span className="font-semibold">{ZONE_LABELS[profile.zone]}</span></>}
+        </div>
+      )}
       
       {/* Section: Key Metrics */}
       <div>

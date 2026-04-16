@@ -231,6 +231,25 @@ export const AppSidebar = () => {
               {profile.role}
               <Settings className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
+            {workshopMode?.name && (
+              <div className="text-xs text-emerald-200/80 truncate mt-1">
+                📍 {workshopMode.name}
+              </div>
+            )}
+            {profile.zone && (
+              <div className="mt-1.5">
+                <span className={cn(
+                  "inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                  profile.zone === 'santiago' && 'bg-blue-500/20 text-blue-200 border border-blue-400/30',
+                  profile.zone === 'talca' && 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+                  profile.zone === 'puerto_montt' && 'bg-violet-500/20 text-violet-200 border border-violet-400/30',
+                )}>
+                  {profile.zone === 'santiago' && 'Santiago'}
+                  {profile.zone === 'talca' && 'Talca'}
+                  {profile.zone === 'puerto_montt' && 'Puerto Montt'}
+                </span>
+              </div>
+            )}
           </button>}
 
           <UserSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
