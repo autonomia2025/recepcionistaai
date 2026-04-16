@@ -142,7 +142,8 @@ export function useServiceRequests() {
           *,
           contacts (id, name, phone, email, zone),
           conversations (id, ai_summary, sentiment),
-          assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name)
+          assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name),
+          quoted_by_profile:profiles!service_requests_quoted_by_fkey (id, full_name)
         `)
         .eq('workshop_id', profile.workshop_id)
         .order('created_at', { ascending: false });
