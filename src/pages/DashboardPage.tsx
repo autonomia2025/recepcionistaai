@@ -31,6 +31,7 @@ function MetricSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const { data: workshopMode } = useWorkshopMode();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats', profile?.workshop_id],
