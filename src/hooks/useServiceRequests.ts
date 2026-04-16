@@ -81,6 +81,13 @@ export interface UpdateServiceRequestData {
   estimated_value?: number | null;
   notes?: string;
   urgency?: RequestUrgency;
+  assigned_at?: string | null;
+  first_contact_at?: string | null;
+  quoted_at?: string | null;
+  quote_file_url?: string | null;
+  quote_amount?: number | null;
+  closed_at?: string | null;
+  quoted_by?: string | null;
 }
 
 export const STATUS_LABELS: Record<ServiceRequestStatus, string> = {
