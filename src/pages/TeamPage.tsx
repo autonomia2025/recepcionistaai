@@ -65,6 +65,9 @@ export default function TeamPage() {
       );
     },
     enabled: !!profile?.workshop_id,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const { data: pendingInvites } = useQuery({
@@ -132,6 +135,12 @@ export default function TeamPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{invite.role}</Badge>
+                    {(invite as any).zone && (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {ZONE_LABELS[(invite as any).zone] || (invite as any).zone}
+                      </Badge>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -171,7 +180,7 @@ export default function TeamPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline">{member.role}</Badge>
-                  {profile?.workshop_id === SOC_WORKSHOP_ID && member.role === 'STAFF' && (member as any).zone && (
+                  {member.role === 'STAFF' && (member as any).zone && (
                     <Badge variant="secondary" className="gap-1">
                       <MapPin className="w-3 h-3" />
                       {ZONE_LABELS[(member as any).zone] || (member as any).zone}
