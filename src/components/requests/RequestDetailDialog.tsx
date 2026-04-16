@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -62,6 +62,33 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
   const [quoteAmount, setQuoteAmount] = useState('');
   const [quoteFile, setQuoteFile] = useState<File | null>(null);
   const [uploadingQuote, setUploadingQuote] = useState(false);
+  const [signedQuoteUrl, setSignedQuoteUrl] = useState<string | null>(null);
+
+  // Generate a signed URL for the private quotation file (1h expiry)
+  useEffect(() => {
+    let active = true;
+    setSignedQuoteUrl(null);
+    const raw = request?.quote_file_url;
+    if (!raw) return;
+
+    // Extract storage path. Supports both raw paths ("workshop/req/file.pdf")
+    // and legacy public URLs (".../object/public/quotations/<path>").
+    let path = raw;
+    const marker = '/quotations/';
+    const idx = raw.indexOf(marker);
+    if (idx !== -1) path = raw.substring(idx + marker.length);
+
+    supabase.storage
+      .from('quotations')
+      .createSignedUrl(path, 3600)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error || !data?.signedUrl) return;
+        setSignedQuoteUrl(data.signedUrl);
+      });
+
+    return () => { active = false; };
+  }, [request?.quote_file_url]);
   
   // Fetch staff members for assignment
   const { data: staffMembers } = useQuery({
@@ -234,15 +261,21 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                             </p>
                           )}
                           {request.quote_file_url && (
-                            <a
-                              href={request.quote_file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline mt-1"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Ver archivo de cotización
-                            </a>
+                            signedQuoteUrl ? (
+                              <a
+                                href={signedQuoteUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline mt-1"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Ver archivo de cotización
+                              </a>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Generando enlace seguro...
+                              </p>
+                            )
                           )}
                         </div>
                       </div>
@@ -283,10 +316,8 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                                   .from('quotations')
                                   .upload(path, quoteFile, { upsert: true });
                                 if (upErr) throw upErr;
-                                const { data: pub } = supabase.storage
-                                  .from('quotations')
-                                  .getPublicUrl(path);
-                                fileUrl = pub.publicUrl;
+                                // Store the storage path; signed URLs are generated on demand.
+                                fileUrl = path;
                               }
                               await updateMutation.mutateAsync({
                                 id: request.id,
