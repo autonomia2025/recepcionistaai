@@ -25,6 +25,7 @@ import BookingPage from "@/pages/BookingPage";
 import CancelAppointmentPage from "@/pages/CancelAppointmentPage";
 import LandingWizardPage from "@/pages/LandingWizardPage";
 import EmailSettingsPage from "@/pages/EmailSettingsPage";
+import SalesControlPage from "@/pages/SalesControlPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import NotFound from "@/pages/NotFound";
@@ -75,6 +76,7 @@ const AppRoutes = () => {
         <Route path="/bot" element={<BotSettingsPage />} />
         <Route path="/automations" element={<AutomationsPage />} />
         <Route path="/email-settings" element={<EmailSettingsPage />} />
+        <Route path="/sales-control" element={profile?.role === 'ADMIN' ? <SalesControlPage /> : <Navigate to="/dashboard" replace />} />
         {/* Admin Routes */}
         <Route path="/admin/workshops" element={<SuperAdminRoute><AdminWorkshopsPage /></SuperAdminRoute>} />
         <Route path="/admin/cobranzas" element={<SuperAdminRoute><CobranzasPage /></SuperAdminRoute>} />

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeatInfo, useSubscription } from '@/hooks/useWorkshopData';
@@ -89,6 +89,15 @@ export const AppSidebar = () => {
 
     // Solicitudes removed
 
+    // Sales Control - ADMIN only
+    if (profile?.role === 'ADMIN') {
+      baseItems.push({
+        to: '/sales-control',
+        icon: BarChart2,
+        label: 'Control de Ventas'
+      });
+    }
+
     baseItems.push({
       to: '/team',
       icon: UserCog,
@@ -114,7 +123,7 @@ export const AppSidebar = () => {
       label: 'Correo'
     });
     return baseItems;
-  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId]);
+  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId, profile?.role]);
   const seatDisplay = seatInfo?.isUnlimited ? `${seatInfo.usedSeats} / ∞` : `${seatInfo?.usedSeats || 0} / ${seatInfo?.maxSeats || 0}`;
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1023px)');
