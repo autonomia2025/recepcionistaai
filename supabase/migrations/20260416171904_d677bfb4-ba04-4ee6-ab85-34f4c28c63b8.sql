@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN zone text DEFAULT NULL;
