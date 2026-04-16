@@ -35,6 +35,13 @@ export interface ServiceRequest {
   source: RequestSource;
   created_at: string;
   updated_at: string;
+  assigned_at: string | null;
+  first_contact_at: string | null;
+  quoted_at: string | null;
+  quote_file_url: string | null;
+  quote_amount: number | null;
+  closed_at: string | null;
+  quoted_by: string | null;
   contacts?: {
     id: string;
     name: string;
@@ -47,6 +54,10 @@ export interface ServiceRequest {
     sentiment: string | null;
   } | null;
   assigned_staff?: {
+    id: string;
+    full_name: string;
+  } | null;
+  quoted_by_profile?: {
     id: string;
     full_name: string;
   } | null;
@@ -70,6 +81,13 @@ export interface UpdateServiceRequestData {
   estimated_value?: number | null;
   notes?: string;
   urgency?: RequestUrgency;
+  assigned_at?: string | null;
+  first_contact_at?: string | null;
+  quoted_at?: string | null;
+  quote_file_url?: string | null;
+  quote_amount?: number | null;
+  closed_at?: string | null;
+  quoted_by?: string | null;
 }
 
 export const STATUS_LABELS: Record<ServiceRequestStatus, string> = {
@@ -124,7 +142,8 @@ export function useServiceRequests() {
           *,
           contacts (id, name, phone, email, zone),
           conversations (id, ai_summary, sentiment),
-          assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name)
+          assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name),
+          quoted_by_profile:profiles!service_requests_quoted_by_fkey (id, full_name)
         `)
         .eq('workshop_id', profile.workshop_id)
         .order('created_at', { ascending: false });

@@ -1932,16 +1932,23 @@ export type Database = {
       service_requests: {
         Row: {
           address: string | null
+          assigned_at: string | null
           assigned_staff_id: string | null
+          closed_at: string | null
           comuna: string | null
           contact_id: string
           conversation_id: string | null
           created_at: string
           description: string | null
           estimated_value: number | null
+          first_contact_at: string | null
           id: string
           notes: string | null
           preferred_time_window: string | null
+          quote_amount: number | null
+          quote_file_url: string | null
+          quoted_at: string | null
+          quoted_by: string | null
           service_category: string
           source: Database["public"]["Enums"]["request_source"]
           status: Database["public"]["Enums"]["service_request_status"]
@@ -1951,16 +1958,23 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          assigned_at?: string | null
           assigned_staff_id?: string | null
+          closed_at?: string | null
           comuna?: string | null
           contact_id: string
           conversation_id?: string | null
           created_at?: string
           description?: string | null
           estimated_value?: number | null
+          first_contact_at?: string | null
           id?: string
           notes?: string | null
           preferred_time_window?: string | null
+          quote_amount?: number | null
+          quote_file_url?: string | null
+          quoted_at?: string | null
+          quoted_by?: string | null
           service_category: string
           source?: Database["public"]["Enums"]["request_source"]
           status?: Database["public"]["Enums"]["service_request_status"]
@@ -1970,16 +1984,23 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          assigned_at?: string | null
           assigned_staff_id?: string | null
+          closed_at?: string | null
           comuna?: string | null
           contact_id?: string
           conversation_id?: string | null
           created_at?: string
           description?: string | null
           estimated_value?: number | null
+          first_contact_at?: string | null
           id?: string
           notes?: string | null
           preferred_time_window?: string | null
+          quote_amount?: number | null
+          quote_file_url?: string | null
+          quoted_at?: string | null
+          quoted_by?: string | null
           service_category?: string
           source?: Database["public"]["Enums"]["request_source"]
           status?: Database["public"]["Enums"]["service_request_status"]
@@ -2007,6 +2028,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_requests_quoted_by_fkey"
+            columns: ["quoted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
