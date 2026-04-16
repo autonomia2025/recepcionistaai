@@ -121,10 +121,12 @@ export default function DashboardPage() {
     <div className="page-shell page-stack animate-in">
       <PageHeader title="Dashboard" description="Resumen de tu negocio" />
       
-      {profile?.role === 'STAFF' && (workshopMode?.name || profile?.zone) && (
+      {profile?.role === 'STAFF' && (
         <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
           Bienvenido, <span className="font-semibold">{profile.full_name}</span>.
-          {workshopMode?.name && <> Eres parte de <span className="font-semibold">{workshopMode.name}</span></>}
+          {workshopMode?.name
+            ? <> Trabajas en <span className="font-semibold">{workshopMode.name}</span></>
+            : <> Tu cuenta aún no está asociada a un negocio.</>}
           {profile.zone && ZONE_LABELS[profile.zone] && <> · Zona <span className="font-semibold">{ZONE_LABELS[profile.zone]}</span></>}
         </div>
       )}
