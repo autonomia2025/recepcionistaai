@@ -7,6 +7,7 @@ export type BookingMode = 'with_scheduling' | 'chatbot_only';
 interface WorkshopModeData {
   booking_mode: BookingMode;
   category: string | null;
+  name: string | null;
 }
 
 export function useWorkshopMode() {
