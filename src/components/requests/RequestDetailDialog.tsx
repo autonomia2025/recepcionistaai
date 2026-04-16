@@ -4,10 +4,11 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   User, Phone, Mail, MapPin, Clock, MessageSquare, 
-  FileText, DollarSign, AlertCircle, Calendar 
+  FileText, DollarSign, AlertCircle, Calendar, CheckCircle2, Upload, ExternalLink
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
