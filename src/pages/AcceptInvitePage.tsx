@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, XCircle, Building2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, XCircle, Building2, MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface InviteData {
   id: string;
@@ -17,7 +19,22 @@ interface InviteData {
   status: string;
   expires_at: string;
   workshop_name: string | null;
+  zone: string | null;
 }
+
+const ZONE_LABELS: Record<string, string> = {
+  santiago: 'Santiago',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+};
+
+const ZONE_STYLES: Record<string, string> = {
+  santiago: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-300',
+  talca: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-300',
+  puerto_montt: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-300',
+};
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export default function AcceptInvitePage() {
   const { token } = useParams<{ token: string }>();
@@ -29,13 +46,14 @@ export default function AcceptInvitePage() {
   const [invite, setInvite] = useState<InviteData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [isSignUp, setIsSignUp] = useState(true);
+  // Mode: 'signup' (default - create password) | 'login' (already has account)
+  const [mode, setMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch invite data using the secure RPC
+  // Fetch invite data
   useEffect(() => {
     const fetchInvite = async () => {
       if (!token) {
@@ -82,67 +100,53 @@ export default function AcceptInvitePage() {
     fetchInvite();
   }, [token]);
 
-  // If user is already logged in, try to accept invite using secure RPC
+  // Auto-accept ONLY if user is already logged in AND not currently submitting (avoids race)
   useEffect(() => {
     const acceptForLoggedInUser = async () => {
-      if (user && invite && !submitting && token) {
-        // Check if user email matches invite email
-        if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
-          setError(`Esta invitación es para ${invite.email}. Cierra sesión e intenta de nuevo.`);
-          return;
-        }
-
-        setSubmitting(true);
-        await acceptInviteSecure();
+      if (!user || !invite || submitting || !token) return;
+      if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
+        setError(`Esta invitación es para ${invite.email}. Cierra sesión e intenta de nuevo.`);
+        return;
       }
+      setSubmitting(true);
+      await acceptInviteWithRetry();
     };
-
     acceptForLoggedInUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, invite]);
 
-  const acceptInviteSecure = async (userIdOverride?: string) => {
-    if (!token) return;
+  // RPC call with retry to overcome handle_new_user trigger race
+  const acceptInviteWithRetry = async (attempts = 3): Promise<void> => {
+    if (!token || !invite) return;
 
-    try {
-      // Fetch invite zone before accepting
-      const { data: inviteWithZone } = await supabase
-        .from('invites')
-        .select('zone')
-        .eq('token', token)
-        .maybeSingle();
-
+    let lastErr: any = null;
+    for (let i = 0; i < attempts; i++) {
       const { data, error: rpcError } = await supabase
         .rpc('accept_invite', { invite_token: token });
 
-      if (rpcError) {
-        console.error('Accept invite error:', rpcError);
-        throw new Error(rpcError.message);
+      if (!rpcError) {
+        const result = data as { success: boolean; workshop_name?: string } | null;
+        await refreshProfile();
+        toast({
+          title: '¡Bienvenido al equipo!',
+          description: `Te has unido a ${result?.workshop_name || 'el negocio'}${invite.zone ? ` · Zona ${ZONE_LABELS[invite.zone] || invite.zone}` : ''}`,
+        });
+        navigate('/dashboard');
+        return;
       }
 
-      const result = data as { success: boolean; workshop_name?: string } | null;
-
-      // Persist zone on profile (in case RPC didn't propagate it)
-      const targetUserId = userIdOverride || user?.id;
-      if (inviteWithZone?.zone && targetUserId) {
-        await supabase
-          .from('profiles')
-          .update({ zone: inviteWithZone.zone })
-          .eq('id', targetUserId);
+      lastErr = rpcError;
+      // Retry on the "profile not yet created" race
+      if (rpcError.message?.includes('Profile not yet created')) {
+        await sleep(600);
+        continue;
       }
-
-      await refreshProfile();
-
-      toast({
-        title: '¡Bienvenido al equipo!',
-        description: `Te has unido a ${result?.workshop_name || 'el negocio'}`,
-      });
-
-      navigate('/dashboard');
-    } catch (err: any) {
-      console.error('Accept invite error:', err);
-      setError(err.message || 'Error al aceptar la invitación');
-      setSubmitting(false);
+      break;
     }
+
+    console.error('Accept invite error:', lastErr);
+    setError(lastErr?.message || 'Error al aceptar la invitación');
+    setSubmitting(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -153,16 +157,12 @@ export default function AcceptInvitePage() {
     setError(null);
 
     try {
-      if (isSignUp) {
-        // Sign up new user with metadata
+      if (mode === 'signup') {
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              full_name: fullName,
-              role: invite.role,
-            },
+            data: { full_name: fullName, role: invite.role },
             emailRedirectTo: `${window.location.origin}/invite/${token}`,
           },
         });
@@ -170,58 +170,34 @@ export default function AcceptInvitePage() {
         if (signUpError) {
           const msg = signUpError.message?.toLowerCase() || '';
           if (msg.includes('already registered') || msg.includes('already been registered')) {
-            // User already exists (probably created via OTP link). Try direct login.
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email,
-              password,
-            });
-
-            if (signInError) {
-              setError('Esta dirección ya tiene una cuenta. Usa "¿Ya tienes cuenta? Inicia sesión" e ingresa tu contraseña.');
-              setIsSignUp(false);
-              setSubmitting(false);
-              return;
-            }
-
-            if (signInData.user) {
-              await acceptInviteSecure(signInData.user.id);
-              return;
-            }
+            setError('Ya tienes una cuenta con este correo. Cambia a "Ya tengo cuenta" e ingresa tu contraseña existente.');
+            setMode('login');
+            setSubmitting(false);
+            return;
           }
           throw signUpError;
         }
 
-        if (signUpData.user) {
-          // Try to sign in immediately to bypass email verification gate
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
+        // Try to sign in immediately (works when email confirmation is disabled)
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          toast({
+            title: 'Cuenta creada',
+            description: 'Revisa tu correo para confirmar tu cuenta y luego abre este link de invitación de nuevo.',
           });
-
-          if (signInError) {
-            toast({
-              title: 'Cuenta creada',
-              description: 'Por favor inicia sesión con tu email y contraseña.',
-            });
-            setIsSignUp(false);
-            setSubmitting(false);
-            return;
-          }
-
-          await acceptInviteSecure(signUpData.user.id);
+          setSubmitting(false);
+          return;
         }
+
+        // Wait for handle_new_user trigger to populate profile, then accept with retry
+        await sleep(800);
+        await acceptInviteWithRetry();
       } else {
-        // Sign in existing user
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        // Login mode: existing account
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
-
-        if (signInData.user) {
-          await acceptInviteSecure(signInData.user.id);
-        }
+        await sleep(300);
+        await acceptInviteWithRetry();
       }
     } catch (err: any) {
       setError(err.message || 'Error al procesar la solicitud');
@@ -273,8 +249,19 @@ export default function AcceptInvitePage() {
             <Building2 className="h-6 w-6 text-emerald-600" />
           </div>
           <CardTitle>Te han invitado a unirte</CardTitle>
-          <CardDescription>
-            {invite?.workshop_name || 'Un negocio'} te ha invitado como <strong>{invite?.role}</strong>
+          <CardDescription className="space-y-3 mt-2">
+            <div>
+              <strong className="text-foreground">{invite?.workshop_name || 'Un negocio'}</strong> te ha invitado
+            </div>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Badge variant="secondary">{invite?.role}</Badge>
+              {invite?.zone && (
+                <Badge variant="outline" className={cn('gap-1', ZONE_STYLES[invite.zone])}>
+                  <MapPin className="h-3 w-3" />
+                  Zona {ZONE_LABELS[invite.zone] || invite.zone}
+                </Badge>
+              )}
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -284,8 +271,14 @@ export default function AcceptInvitePage() {
             </div>
           )}
 
+          <div className="text-center text-sm text-muted-foreground mb-4">
+            {mode === 'signup'
+              ? 'Crea tu contraseña para activar tu cuenta'
+              : 'Ingresa tu contraseña para unirte'}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
+            {mode === 'signup' && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nombre completo</Label>
                 <Input
@@ -304,20 +297,22 @@ export default function AcceptInvitePage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={!!invite?.email}
+                disabled
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">
+                {mode === 'signup' ? 'Crea tu contraseña' : 'Tu contraseña'}
+              </Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={isSignUp ? 'Crea una contraseña' : 'Tu contraseña'}
+                placeholder={mode === 'signup' ? 'Mínimo 6 caracteres' : 'Tu contraseña'}
+                minLength={6}
                 required
               />
             </div>
@@ -328,8 +323,8 @@ export default function AcceptInvitePage() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Procesando...
                 </>
-              ) : isSignUp ? (
-                'Crear cuenta y unirme'
+              ) : mode === 'signup' ? (
+                'Crear contraseña y unirme'
               ) : (
                 'Iniciar sesión y unirme'
               )}
@@ -339,11 +334,11 @@ export default function AcceptInvitePage() {
           <div className="mt-4 text-center">
             <Button
               variant="link"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError(null); }}
               className="text-sm"
             >
-              {isSignUp
-                ? '¿Ya recibiste un link de acceso por correo? Inicia sesión aquí'
+              {mode === 'signup'
+                ? '¿Ya tienes cuenta? Inicia sesión'
                 : '¿Primera vez? Crea tu contraseña'}
             </Button>
           </div>

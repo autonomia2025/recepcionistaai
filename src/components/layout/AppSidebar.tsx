@@ -59,11 +59,12 @@ export const AppSidebar = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const isSuperAdmin = profile?.role === 'SUPERADMIN';
   const isImpersonating = !!impersonatedWorkshopId;
-  const showLandingButton = (!isSuperAdmin || isImpersonating) && workshopMode?.booking_mode === 'with_scheduling';
+  const showLandingButton = (!isSuperAdmin || isImpersonating) && profile?.role === 'ADMIN' && workshopMode?.booking_mode === 'with_scheduling';
 
   // Dynamic nav items based on booking mode
   const navItems = useMemo(() => {
     if (isSuperAdmin && !isImpersonating) return superadminNavItems;
+    const isAdmin = profile?.role === 'ADMIN';
     const baseItems = [{
       to: '/dashboard',
       icon: LayoutDashboard,
@@ -87,16 +88,14 @@ export const AppSidebar = () => {
       });
     }
 
-    // Solicitudes removed
+    // Everything below is ADMIN-only
+    if (!isAdmin) return baseItems;
 
-    // Sales Control - ADMIN only
-    if (profile?.role === 'ADMIN') {
-      baseItems.push({
-        to: '/sales-control',
-        icon: BarChart2,
-        label: 'Control de Ventas'
-      });
-    }
+    baseItems.push({
+      to: '/sales-control',
+      icon: BarChart2,
+      label: 'Control de Ventas'
+    });
 
     baseItems.push({
       to: '/team',

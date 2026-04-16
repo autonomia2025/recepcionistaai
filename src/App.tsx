@@ -46,6 +46,15 @@ const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { profile, loading } = useAuth();
+  if (loading) return <div className="flex h-screen items-center justify-center">Cargando...</div>;
+  if (profile?.role !== 'ADMIN' && profile?.role !== 'SUPERADMIN') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+};
+
 const AppRoutes = () => {
   const { user, profile, loading } = useAuth();
   
@@ -64,19 +73,20 @@ const AppRoutes = () => {
       <Route path="/update-password" element={<UpdatePasswordPage />} />
       <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route path="/" element={<Navigate to={user ? defaultRoute : "/auth"} replace />} />
-      {/* Landing Wizard - Full screen, outside AppLayout */}
-      <Route path="/landing-wizard" element={<ProtectedRoute><LandingWizardPage /></ProtectedRoute>} />
+      {/* Landing Wizard - Full screen, outside AppLayout - ADMIN only */}
+      <Route path="/landing-wizard" element={<ProtectedRoute><AdminOnlyRoute><LandingWizardPage /></AdminOnlyRoute></ProtectedRoute>} />
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/requests" element={<RequestsPage />} />
-        <Route path="/team" element={<TeamPage />} />
-        <Route path="/bot" element={<BotSettingsPage />} />
-        <Route path="/automations" element={<AutomationsPage />} />
-        <Route path="/email-settings" element={<EmailSettingsPage />} />
-        <Route path="/sales-control" element={profile?.role === 'ADMIN' ? <SalesControlPage /> : <Navigate to="/dashboard" replace />} />
+        {/* ADMIN-only routes */}
+        <Route path="/team" element={<AdminOnlyRoute><TeamPage /></AdminOnlyRoute>} />
+        <Route path="/bot" element={<AdminOnlyRoute><BotSettingsPage /></AdminOnlyRoute>} />
+        <Route path="/automations" element={<AdminOnlyRoute><AutomationsPage /></AdminOnlyRoute>} />
+        <Route path="/email-settings" element={<AdminOnlyRoute><EmailSettingsPage /></AdminOnlyRoute>} />
+        <Route path="/sales-control" element={<AdminOnlyRoute><SalesControlPage /></AdminOnlyRoute>} />
         {/* Admin Routes */}
         <Route path="/admin/workshops" element={<SuperAdminRoute><AdminWorkshopsPage /></SuperAdminRoute>} />
         <Route path="/admin/cobranzas" element={<SuperAdminRoute><CobranzasPage /></SuperAdminRoute>} />
