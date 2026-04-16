@@ -1758,6 +1758,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           status: Database["public"]["Enums"]["user_status"]
           workshop_id: string | null
+          zone: string | null
         }
         Insert: {
           created_at?: string
@@ -1772,6 +1773,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           status?: Database["public"]["Enums"]["user_status"]
           workshop_id?: string | null
+          zone?: string | null
         }
         Update: {
           created_at?: string
@@ -1786,6 +1788,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           status?: Database["public"]["Enums"]["user_status"]
           workshop_id?: string | null
+          zone?: string | null
         }
         Relationships: [
           {

@@ -52,7 +52,7 @@ export function useConversations() {
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
 
   const query = useQuery({
-    queryKey: ['conversations', profile?.workshop_id, profile?.id, isAdmin],
+    queryKey: ['conversations', profile?.workshop_id, profile?.id, isAdmin, (profile as any)?.zone],
     queryFn: async () => {
       if (!profile?.workshop_id) return [];
 
@@ -105,6 +105,12 @@ export function useConversations() {
       // Staff only sees conversations assigned to them
       if (!isAdmin && profile?.id) {
         queryBuilder = queryBuilder.eq('assigned_to_user_id', profile.id);
+      }
+
+      // Staff with zone: filter by contact zone (SOC Ingenieria only)
+      const staffZone = profile?.role === 'STAFF' ? (profile as any).zone : null;
+      if (staffZone) {
+        queryBuilder = queryBuilder.eq('contacts.zone', staffZone);
       }
 
       const { data, error } = await queryBuilder;
