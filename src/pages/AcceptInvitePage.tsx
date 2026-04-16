@@ -342,7 +342,9 @@ export default function AcceptInvitePage() {
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm"
             >
-              {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
+              {isSignUp
+                ? '¿Ya recibiste un link de acceso por correo? Inicia sesión aquí'
+                : '¿Primera vez? Crea tu contraseña'}
             </Button>
           </div>
         </CardContent>
