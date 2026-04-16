@@ -123,7 +123,7 @@ export const AppSidebar = () => {
       label: 'Correo'
     });
     return baseItems;
-  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId]);
+  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId, profile?.role]);
   const seatDisplay = seatInfo?.isUnlimited ? `${seatInfo.usedSeats} / ∞` : `${seatInfo?.usedSeats || 0} / ${seatInfo?.maxSeats || 0}`;
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1023px)');
