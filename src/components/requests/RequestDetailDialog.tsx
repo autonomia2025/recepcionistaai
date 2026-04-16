@@ -53,12 +53,15 @@ const STATUS_ORDER: ServiceRequestStatus[] = [
 ];
 
 export function RequestDetailDialog({ request, open, onOpenChange }: RequestDetailDialogProps) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const updateMutation = useUpdateServiceRequest();
   const isAdmin = profile?.role === 'ADMIN';
   
   const [notes, setNotes] = useState(request?.notes || '');
   const [estimatedValue, setEstimatedValue] = useState(request?.estimated_value?.toString() || '');
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [quoteFile, setQuoteFile] = useState<File | null>(null);
+  const [uploadingQuote, setUploadingQuote] = useState(false);
   
   // Fetch staff members for assignment
   const { data: staffMembers } = useQuery({
