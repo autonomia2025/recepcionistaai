@@ -167,7 +167,29 @@ export default function AcceptInvitePage() {
           },
         });
 
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          const msg = signUpError.message?.toLowerCase() || '';
+          if (msg.includes('already registered') || msg.includes('already been registered')) {
+            // User already exists (probably created via OTP link). Try direct login.
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+
+            if (signInError) {
+              setError('Esta dirección ya tiene una cuenta. Usa "¿Ya tienes cuenta? Inicia sesión" e ingresa tu contraseña.');
+              setIsSignUp(false);
+              setSubmitting(false);
+              return;
+            }
+
+            if (signInData.user) {
+              await acceptInviteSecure(signInData.user.id);
+              return;
+            }
+          }
+          throw signUpError;
+        }
 
         if (signUpData.user) {
           // Try to sign in immediately to bypass email verification gate
@@ -320,7 +342,9 @@ export default function AcceptInvitePage() {
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm"
             >
-              {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
+              {isSignUp
+                ? '¿Ya recibiste un link de acceso por correo? Inicia sesión aquí'
+                : '¿Primera vez? Crea tu contraseña'}
             </Button>
           </div>
         </CardContent>
