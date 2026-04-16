@@ -87,7 +87,10 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   // Save landing profile mutation
   const saveLandingProfile = useMutation({
     mutationFn: async () => {
-      if (!user?.id || !profile?.workshop_id) throw new Error('No user/workshop');
+      if (!profile?.workshop_id) {
+        throw new Error('Tu cuenta aún no está asociada a un negocio. Acepta la invitación primero.');
+      }
+      if (!user?.id) throw new Error('No user');
 
       const updates = {
         name: profile.full_name || profile.email,
