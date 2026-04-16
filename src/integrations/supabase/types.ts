@@ -2613,6 +2613,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           status: Database["public"]["Enums"]["user_status"]
           workshop_id: string
+          zone: string
         }[]
       }
       get_workshop_seats: {
