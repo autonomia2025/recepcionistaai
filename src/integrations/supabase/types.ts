@@ -1075,6 +1075,7 @@ export type Database = {
           status: Database["public"]["Enums"]["invite_status"]
           token: string
           workshop_id: string
+          zone: string | null
         }
         Insert: {
           created_at?: string
@@ -1085,6 +1086,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["invite_status"]
           token?: string
           workshop_id: string
+          zone?: string | null
         }
         Update: {
           created_at?: string
@@ -1095,6 +1097,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["invite_status"]
           token?: string
           workshop_id?: string
+          zone?: string | null
         }
         Relationships: [
           {
@@ -2562,6 +2565,7 @@ export type Database = {
           status: Database["public"]["Enums"]["invite_status"]
           workshop_id: string
           workshop_name: string
+          zone: string
         }[]
       }
       get_public_calendar_events: {
@@ -2609,6 +2613,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           status: Database["public"]["Enums"]["user_status"]
           workshop_id: string
+          zone: string
         }[]
       }
       get_workshop_seats: {

@@ -6,13 +6,20 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Clock, Mail, Trash2 } from 'lucide-react';
+import { AlertCircle, Clock, Mail, Trash2, MapPin } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InviteDialog } from '@/components/team/InviteDialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+
+const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
+const ZONE_LABELS: Record<string, string> = {
+  santiago: 'Santiago',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+};
 
 export default function TeamPage() {
   const { profile } = useAuth();
@@ -162,8 +169,14 @@ export default function TeamPage() {
                     <p className="text-sm text-muted-foreground">{member.email}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline">{member.role}</Badge>
+                  {profile?.workshop_id === SOC_WORKSHOP_ID && member.role === 'STAFF' && (member as any).zone && (
+                    <Badge variant="secondary" className="gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {ZONE_LABELS[(member as any).zone] || (member as any).zone}
+                    </Badge>
+                  )}
                   <StatusBadge status={member.status} />
                 </div>
               </div>
