@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Conversation } from '@/hooks/useConversations';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -61,10 +62,15 @@ export function ConversationList({
   searchQuery,
   onSearchChange,
 }: ConversationListProps) {
-  const filteredConversations = conversations.filter((conv) =>
-    conv.contacts.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.contacts.phone?.includes(searchQuery)
-  );
+  const { profile } = useAuth();
+  const staffZone = profile?.role === 'STAFF' ? (profile as any)?.zone : null;
+
+  const filteredConversations = conversations
+    .filter((conv) => (staffZone ? conv.contacts.zone === staffZone : true))
+    .filter((conv) =>
+      conv.contacts.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.contacts.phone?.includes(searchQuery)
+    );
 
   return (
     <div className="h-full flex flex-col border-r border-border/60 bg-card/70 backdrop-blur-sm">
