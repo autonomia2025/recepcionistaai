@@ -78,6 +78,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "api_usage_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       appointment_actions: {
@@ -134,6 +141,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_actions_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -229,6 +243,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       automations_settings: {
@@ -281,6 +302,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: true
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automations_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -344,6 +372,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "billing_events_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       blocked_numbers: {
@@ -381,6 +416,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocked_numbers_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -432,6 +474,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_documents_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -492,6 +541,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bot_knowledge_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bot_settings: {
@@ -541,6 +597,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: true
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -624,6 +687,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -737,6 +807,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contacts_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       conversations: {
@@ -808,6 +885,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "conversations_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       email_reminder_logs: {
@@ -861,6 +945,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reminder_logs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -924,6 +1015,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "health_logs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       integrations: {
@@ -973,6 +1071,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1063,6 +1168,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "internal_notification_logs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invites: {
@@ -1112,6 +1224,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1204,6 +1323,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "landing_config_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       landing_services: {
@@ -1253,6 +1379,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landing_services_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1311,6 +1444,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landing_team_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1433,6 +1573,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "message_batches_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       messages: {
@@ -1486,6 +1633,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1546,6 +1700,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_reports_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1610,6 +1771,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1677,6 +1845,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_records_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1806,6 +1981,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2051,6 +2233,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "service_requests_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       subscriptions: {
@@ -2104,6 +2293,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2165,6 +2361,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_alerts_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2234,6 +2437,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_chat_logs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2329,6 +2539,13 @@ export type Database = {
             referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "workshop_billing_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       workshop_gmail_tokens: {
@@ -2381,6 +2598,13 @@ export type Database = {
             columns: ["workshop_id"]
             isOneToOne: true
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workshop_gmail_tokens_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2563,6 +2787,120 @@ export type Database = {
             | Database["public"]["Enums"]["subscription_status"]
             | null
           whatsapp_connected: boolean | null
+        }
+        Relationships: []
+      }
+      workshops_safe: {
+        Row: {
+          address: string | null
+          admin_notification_email: string | null
+          booking_mode: string | null
+          booking_url: string | null
+          bot_enabled: boolean | null
+          category: string | null
+          city: string | null
+          created_at: string | null
+          email_button_color: string | null
+          email_logo_url: string | null
+          email_monthly_report: boolean | null
+          email_notifications_appointment: boolean | null
+          email_notifications_handoff: boolean | null
+          email_notifications_hot_lead: boolean | null
+          email_notifications_quotation: boolean | null
+          email_primary_color: string | null
+          email_reminders_enabled: boolean | null
+          email_sender_name: string | null
+          email_use_branding: boolean | null
+          gmail_connected: boolean | null
+          gmail_connected_at: string | null
+          gmail_email: string | null
+          id: string | null
+          instagram_connected: boolean | null
+          instagram_connected_at: string | null
+          is_active: boolean | null
+          name: string | null
+          phone: string | null
+          slug: string | null
+          web_chat_allowed_domains: string[] | null
+          web_chat_enabled: boolean | null
+          whatsapp_connected: boolean | null
+          whatsapp_connected_at: string | null
+          whatsapp_provider: string | null
+          zone_notification_emails: Json | null
+        }
+        Insert: {
+          address?: string | null
+          admin_notification_email?: string | null
+          booking_mode?: string | null
+          booking_url?: string | null
+          bot_enabled?: boolean | null
+          category?: string | null
+          city?: string | null
+          created_at?: string | null
+          email_button_color?: string | null
+          email_logo_url?: string | null
+          email_monthly_report?: boolean | null
+          email_notifications_appointment?: boolean | null
+          email_notifications_handoff?: boolean | null
+          email_notifications_hot_lead?: boolean | null
+          email_notifications_quotation?: boolean | null
+          email_primary_color?: string | null
+          email_reminders_enabled?: boolean | null
+          email_sender_name?: string | null
+          email_use_branding?: boolean | null
+          gmail_connected?: boolean | null
+          gmail_connected_at?: string | null
+          gmail_email?: string | null
+          id?: string | null
+          instagram_connected?: boolean | null
+          instagram_connected_at?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          phone?: string | null
+          slug?: string | null
+          web_chat_allowed_domains?: string[] | null
+          web_chat_enabled?: boolean | null
+          whatsapp_connected?: boolean | null
+          whatsapp_connected_at?: string | null
+          whatsapp_provider?: string | null
+          zone_notification_emails?: Json | null
+        }
+        Update: {
+          address?: string | null
+          admin_notification_email?: string | null
+          booking_mode?: string | null
+          booking_url?: string | null
+          bot_enabled?: boolean | null
+          category?: string | null
+          city?: string | null
+          created_at?: string | null
+          email_button_color?: string | null
+          email_logo_url?: string | null
+          email_monthly_report?: boolean | null
+          email_notifications_appointment?: boolean | null
+          email_notifications_handoff?: boolean | null
+          email_notifications_hot_lead?: boolean | null
+          email_notifications_quotation?: boolean | null
+          email_primary_color?: string | null
+          email_reminders_enabled?: boolean | null
+          email_sender_name?: string | null
+          email_use_branding?: boolean | null
+          gmail_connected?: boolean | null
+          gmail_connected_at?: string | null
+          gmail_email?: string | null
+          id?: string | null
+          instagram_connected?: boolean | null
+          instagram_connected_at?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          phone?: string | null
+          slug?: string | null
+          web_chat_allowed_domains?: string[] | null
+          web_chat_enabled?: boolean | null
+          whatsapp_connected?: boolean | null
+          whatsapp_connected_at?: string | null
+          whatsapp_provider?: string | null
+          zone_notification_emails?: Json | null
         }
         Relationships: []
       }
