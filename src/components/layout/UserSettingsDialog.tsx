@@ -87,7 +87,10 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   // Save landing profile mutation
   const saveLandingProfile = useMutation({
     mutationFn: async () => {
-      if (!user?.id || !profile?.workshop_id) throw new Error('No user/workshop');
+      if (!profile?.workshop_id) {
+        throw new Error('Tu cuenta aún no está asociada a un negocio. Acepta la invitación primero.');
+      }
+      if (!user?.id) throw new Error('No user');
 
       const updates = {
         name: profile.full_name || profile.email,
@@ -243,60 +246,68 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
               Este perfil se muestra en la página de agendamiento de tu negocio.
             </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="landing-photo">URL de foto de perfil</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Camera className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {!profile?.workshop_id ? (
+              <div className="text-sm text-muted-foreground text-center py-6">
+                Tu cuenta aún no está asociada a un negocio.
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="landing-photo">URL de foto de perfil</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Camera className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="landing-photo"
+                        value={landingPhotoUrl}
+                        onChange={(e) => setLandingPhotoUrl(e.target.value)}
+                        placeholder="https://ejemplo.com/mi-foto.jpg"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  {landingPhotoUrl && (
+                    <div className="flex justify-center pt-2">
+                      <img
+                        src={landingPhotoUrl}
+                        alt="Preview"
+                        className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="landing-role">Especialidad / Cargo</Label>
                   <Input
-                    id="landing-photo"
-                    value={landingPhotoUrl}
-                    onChange={(e) => setLandingPhotoUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/mi-foto.jpg"
-                    className="pl-10"
+                    id="landing-role"
+                    value={landingRole}
+                    onChange={(e) => setLandingRole(e.target.value)}
+                    placeholder="Ej: Mecánico Jefe, Terapeuta, Instructor"
                   />
                 </div>
-              </div>
-              {landingPhotoUrl && (
-                <div className="flex justify-center pt-2">
-                  <img
-                    src={landingPhotoUrl}
-                    alt="Preview"
-                    className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="text-sm font-medium">Visible en la landing</p>
+                    <p className="text-xs text-muted-foreground">Mostrar tu perfil en la página de agendamiento</p>
+                  </div>
+                  <Switch
+                    checked={landingShowOnLanding}
+                    onCheckedChange={setLandingShowOnLanding}
                   />
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="landing-role">Especialidad / Cargo</Label>
-              <Input
-                id="landing-role"
-                value={landingRole}
-                onChange={(e) => setLandingRole(e.target.value)}
-                placeholder="Ej: Mecánico Jefe, Terapeuta, Instructor"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg border">
-              <div>
-                <p className="text-sm font-medium">Visible en la landing</p>
-                <p className="text-xs text-muted-foreground">Mostrar tu perfil en la página de agendamiento</p>
-              </div>
-              <Switch
-                checked={landingShowOnLanding}
-                onCheckedChange={setLandingShowOnLanding}
-              />
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={() => saveLandingProfile.mutate()}
-              disabled={saveLandingProfile.isPending || loadingLandingProfile}
-            >
-              {saveLandingProfile.isPending ? 'Guardando...' : 'Guardar Perfil Público'}
-            </Button>
+                <Button
+                  className="w-full"
+                  onClick={() => saveLandingProfile.mutate()}
+                  disabled={saveLandingProfile.isPending || loadingLandingProfile}
+                >
+                  {saveLandingProfile.isPending ? 'Guardando...' : 'Guardar Perfil Público'}
+                </Button>
+              </>
+            )}
           </TabsContent>
 
           {/* Security Tab */}
