@@ -1,12 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { MetricCard } from '@/components/metrics';
 import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
 import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components/metrics/metricDefinitions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
+
+const ZONE_LABELS: Record<string, string> = {
+  santiago: 'Santiago',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+};
 
 function MetricSkeleton() {
   return (
