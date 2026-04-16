@@ -100,10 +100,17 @@ export default function AcceptInvitePage() {
     acceptForLoggedInUser();
   }, [user, invite]);
 
-  const acceptInviteSecure = async () => {
+  const acceptInviteSecure = async (userIdOverride?: string) => {
     if (!token) return;
 
     try {
+      // Fetch invite zone before accepting
+      const { data: inviteWithZone } = await supabase
+        .from('invites')
+        .select('zone')
+        .eq('token', token)
+        .maybeSingle();
+
       const { data, error: rpcError } = await supabase
         .rpc('accept_invite', { invite_token: token });
 
@@ -113,6 +120,15 @@ export default function AcceptInvitePage() {
       }
 
       const result = data as { success: boolean; workshop_name?: string } | null;
+
+      // Persist zone on profile (in case RPC didn't propagate it)
+      const targetUserId = userIdOverride || user?.id;
+      if (inviteWithZone?.zone && targetUserId) {
+        await supabase
+          .from('profiles')
+          .update({ zone: inviteWithZone.zone })
+          .eq('id', targetUserId);
+      }
 
       await refreshProfile();
 
@@ -154,22 +170,23 @@ export default function AcceptInvitePage() {
         if (signUpError) throw signUpError;
 
         if (signUpData.user) {
-          // Use the secure RPC to accept invite (this will update profile and invite)
-          const { data, error: rpcError } = await supabase
-            .rpc('accept_invite', { invite_token: token });
-
-          if (rpcError) {
-            console.error('Accept invite after signup error:', rpcError);
-          }
-
-          const result = data as { success: boolean; workshop_name?: string } | null;
-
-          toast({
-            title: '¡Cuenta creada!',
-            description: `Bienvenido a ${result?.workshop_name || invite.workshop_name || 'el negocio'}`,
+          // Try to sign in immediately to bypass email verification gate
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
           });
 
-          navigate('/dashboard');
+          if (signInError) {
+            toast({
+              title: 'Cuenta creada',
+              description: 'Por favor inicia sesión con tu email y contraseña.',
+            });
+            setIsSignUp(false);
+            setSubmitting(false);
+            return;
+          }
+
+          await acceptInviteSecure(signUpData.user.id);
         }
       } else {
         // Sign in existing user
@@ -181,7 +198,7 @@ export default function AcceptInvitePage() {
         if (signInError) throw signInError;
 
         if (signInData.user) {
-          await acceptInviteSecure();
+          await acceptInviteSecure(signInData.user.id);
         }
       }
     } catch (err: any) {
