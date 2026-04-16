@@ -86,11 +86,13 @@ export default function RequestsPage() {
     };
   }, [profile?.workshop_id, queryClient]);
 
+  const isStaffWithZone = profile?.role === 'STAFF' && !!(profile as any)?.zone;
+
   // Filter requests
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
-    
-    return requests.filter((req) => {
+
+    const filtered = requests.filter((req) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -115,7 +117,13 @@ export default function RequestsPage() {
       
       return true;
     });
-  }, [requests, searchQuery, statusFilter, urgencyFilter, assignedFilter]);
+
+    // Si es STAFF con zona, filtrar solo requests de su zona
+    if (isStaffWithZone) {
+      return filtered.filter((req) => (req.contacts as any)?.zone === (profile as any).zone);
+    }
+    return filtered;
+  }, [requests, searchQuery, statusFilter, urgencyFilter, assignedFilter, isStaffWithZone, profile]);
 
   // Group requests by status for Kanban
   const requestsByStatus = useMemo(() => {
