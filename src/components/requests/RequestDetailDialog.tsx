@@ -4,10 +4,11 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   User, Phone, Mail, MapPin, Clock, MessageSquare, 
-  FileText, DollarSign, AlertCircle, Calendar 
+  FileText, DollarSign, AlertCircle, Calendar, CheckCircle2, Upload, ExternalLink
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -52,12 +53,15 @@ const STATUS_ORDER: ServiceRequestStatus[] = [
 ];
 
 export function RequestDetailDialog({ request, open, onOpenChange }: RequestDetailDialogProps) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const updateMutation = useUpdateServiceRequest();
   const isAdmin = profile?.role === 'ADMIN';
   
   const [notes, setNotes] = useState(request?.notes || '');
   const [estimatedValue, setEstimatedValue] = useState(request?.estimated_value?.toString() || '');
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [quoteFile, setQuoteFile] = useState<File | null>(null);
+  const [uploadingQuote, setUploadingQuote] = useState(false);
   
   // Fetch staff members for assignment
   const { data: staffMembers } = useQuery({
@@ -196,6 +200,129 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
               </div>
 
               <Separator />
+
+              {/* Quotation Section */}
+              {request.status !== 'done' && request.status !== 'lost' && (
+                <>
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Cotización
+                    </h4>
+
+                    {request.quoted_at ? (
+                      <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-lg p-4 space-y-2">
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Cotización enviada
+                        </Badge>
+                        <div className="text-sm space-y-1 mt-2">
+                          <p className="text-muted-foreground">
+                            <span className="font-medium text-foreground">Fecha: </span>
+                            {format(new Date(request.quoted_at), "d 'de' MMMM yyyy, HH:mm", { locale: es })}
+                          </p>
+                          {request.quoted_by_profile?.full_name && (
+                            <p className="text-muted-foreground">
+                              <span className="font-medium text-foreground">Enviada por: </span>
+                              {request.quoted_by_profile.full_name}
+                            </p>
+                          )}
+                          {request.quote_amount != null && (
+                            <p className="text-muted-foreground">
+                              <span className="font-medium text-foreground">Monto: </span>
+                              ${Number(request.quote_amount).toLocaleString('es-CL')} CLP
+                            </p>
+                          )}
+                          {request.quote_file_url && (
+                            <a
+                              href={request.quote_file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline mt-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Ver archivo de cotización
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+                        <div className="space-y-2">
+                          <Label>Monto cotizado (CLP)</Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={quoteAmount}
+                            onChange={(e) => setQuoteAmount(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Archivo de cotización (PDF o imagen)</Label>
+                          <Input
+                            type="file"
+                            accept=".pdf,image/*"
+                            onChange={(e) => setQuoteFile(e.target.files?.[0] || null)}
+                          />
+                          {quoteFile && (
+                            <p className="text-xs text-muted-foreground">
+                              {quoteFile.name} ({(quoteFile.size / 1024).toFixed(1)} KB)
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          onClick={async () => {
+                            if (!user || !profile?.workshop_id) return;
+                            setUploadingQuote(true);
+                            try {
+                              let fileUrl: string | null = null;
+                              if (quoteFile) {
+                                const ext = quoteFile.name.split('.').pop() || 'pdf';
+                                const path = `${profile.workshop_id}/${request.id}/cotizacion.${ext}`;
+                                const { error: upErr } = await supabase.storage
+                                  .from('quotations')
+                                  .upload(path, quoteFile, { upsert: true });
+                                if (upErr) throw upErr;
+                                const { data: pub } = supabase.storage
+                                  .from('quotations')
+                                  .getPublicUrl(path);
+                                fileUrl = pub.publicUrl;
+                              }
+                              await updateMutation.mutateAsync({
+                                id: request.id,
+                                data: {
+                                  quoted_at: new Date().toISOString(),
+                                  quoted_by: user.id,
+                                  quote_amount: quoteAmount ? parseFloat(quoteAmount) : null,
+                                  quote_file_url: fileUrl,
+                                  status: 'quoted',
+                                },
+                              });
+                              toast.success('Cotización marcada como enviada');
+                              setQuoteAmount('');
+                              setQuoteFile(null);
+                            } catch (err: any) {
+                              toast.error('Error al guardar cotización', { description: err.message });
+                            } finally {
+                              setUploadingQuote(false);
+                            }
+                          }}
+                          disabled={uploadingQuote}
+                          className="w-full"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          {uploadingQuote ? 'Guardando...' : 'Marcar cotización enviada'}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Una vez marcada, no se puede deshacer desde la interfaz.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+                </>
+              )}
 
               {/* Status & Assignment Controls */}
               <div className="space-y-4">
