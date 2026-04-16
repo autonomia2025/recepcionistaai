@@ -52,7 +52,7 @@ export function useConversations() {
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
 
   const query = useQuery({
-    queryKey: ['conversations', profile?.workshop_id, profile?.id, isAdmin],
+    queryKey: ['conversations', profile?.workshop_id, profile?.id, isAdmin, (profile as any)?.zone],
     queryFn: async () => {
       if (!profile?.workshop_id) return [];
 
