@@ -152,8 +152,12 @@ export default function ClientsPage() {
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
+  const isStaffWithZone = profile?.role === 'STAFF' && !!profile?.zone;
   const showZoneTabs = isSOC && isAdmin;
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
+
+  // For STAFF with zone, force zone filter silently
+  const effectiveZoneFilter = isStaffWithZone ? profile.zone! : zoneFilter;
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['clients', profile?.workshop_id, profile?.id, isAdmin, isChatbotOnly],
@@ -348,7 +352,7 @@ export default function ClientsPage() {
       matchesLastContact = !contact.last_contact_at;
     }
 
-    const matchesZone = zoneFilter === 'all' || contact.zone === zoneFilter;
+    const matchesZone = effectiveZoneFilter === 'all' || contact.zone === effectiveZoneFilter;
     
     return matchesSearch && matchesScore && matchesIntent && matchesRecontact && matchesSchedule && matchesLastContact && matchesZone;
   });

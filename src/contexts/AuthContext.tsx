@@ -15,6 +15,7 @@ interface Profile {
   google_calendar_email?: string | null;
   google_calendar_id?: string | null;
   google_connected_at?: string | null;
+  zone?: string | null;
 }
 
 interface AuthContextType {

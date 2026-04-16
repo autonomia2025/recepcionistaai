@@ -110,26 +110,37 @@ export const URGENCY_COLORS: Record<RequestUrgency, string> = {
 
 export function useServiceRequests() {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'ADMIN';
+  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
+  const staffZone = profile?.role === 'STAFF' ? (profile as any).zone : null;
   
   return useQuery({
-    queryKey: ['service-requests', profile?.workshop_id],
+    queryKey: ['service-requests', profile?.workshop_id, staffZone],
     queryFn: async () => {
       if (!profile?.workshop_id) return [];
       
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('service_requests')
         .select(`
           *,
-          contacts (id, name, phone, email),
+          contacts (id, name, phone, email, zone),
           conversations (id, ai_summary, sentiment),
           assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name)
         `)
         .eq('workshop_id', profile.workshop_id)
         .order('created_at', { ascending: false });
       
+      const { data, error } = await queryBuilder;
+      
       if (error) throw error;
-      return data as ServiceRequest[];
+      
+      let results = data as ServiceRequest[];
+      
+      // Staff with zone: filter by contact zone client-side
+      if (staffZone) {
+        results = results.filter((sr: any) => sr.contacts?.zone === staffZone);
+      }
+      
+      return results;
     },
     enabled: !!profile?.workshop_id,
   });

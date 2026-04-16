@@ -107,6 +107,12 @@ export function useConversations() {
         queryBuilder = queryBuilder.eq('assigned_to_user_id', profile.id);
       }
 
+      // Staff with zone: filter by contact zone (SOC Ingenieria only)
+      const staffZone = profile?.role === 'STAFF' ? (profile as any).zone : null;
+      if (staffZone) {
+        queryBuilder = queryBuilder.eq('contacts.zone', staffZone);
+      }
+
       const { data, error } = await queryBuilder;
 
       if (error) throw error;
