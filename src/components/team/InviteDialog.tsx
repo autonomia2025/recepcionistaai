@@ -30,6 +30,14 @@ interface InviteDialogProps {
   disabled?: boolean;
 }
 
+const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
+
+const ZONE_OPTIONS = [
+  { value: 'santiago', label: 'Santiago' },
+  { value: 'talca', label: 'Talca' },
+  { value: 'puerto_montt', label: 'Puerto Montt' },
+];
+
 export function InviteDialog({ disabled }: InviteDialogProps) {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -38,10 +46,14 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<AppRole>('STAFF');
+  const [zone, setZone] = useState<string>('');
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'failed'>('idle');
   const [sendingEmail, setSendingEmail] = useState(false);
+
+  const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
+  const showZoneSelector = isSOC && role === 'STAFF';
 
   const sendInviteEmail = async (link: string) => {
     setSendingEmail(true);
@@ -93,13 +105,18 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
       }
 
       // Create new invite
+      const insertData: any = {
+        workshop_id: profile.workshop_id,
+        email: email.toLowerCase(),
+        role: role,
+      };
+      if (showZoneSelector && zone) {
+        insertData.zone = zone;
+      }
+
       const { data, error } = await supabase
         .from('invites')
-        .insert({
-          workshop_id: profile.workshop_id,
-          email: email.toLowerCase(),
-          role: role,
-        })
+        .insert(insertData)
         .select('token')
         .single();
 
@@ -139,6 +156,7 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
     setOpen(false);
     setEmail('');
     setRole('STAFF');
+    setZone('');
     setInviteLink(null);
     setCopied(false);
     setEmailStatus('idle');
@@ -190,10 +208,26 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
               </Select>
             </div>
 
+            {showZoneSelector && (
+              <div className="space-y-2">
+                <Label htmlFor="zone">Zona <span className="text-destructive">*</span></Label>
+                <Select value={zone} onValueChange={setZone}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una zona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ZONE_OPTIONS.map(z => (
+                      <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Button
               className="w-full"
               onClick={() => createInviteMutation.mutate()}
-              disabled={!email || createInviteMutation.isPending}
+              disabled={!email || createInviteMutation.isPending || (showZoneSelector && !zone)}
             >
               {createInviteMutation.isPending ? 'Enviando invitación...' : 'Enviar invitación por correo'}
             </Button>
