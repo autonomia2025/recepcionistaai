@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
-import { AlertTriangle, BarChart2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ZONE_LABELS: Record<string, string> = {
@@ -116,7 +116,6 @@ export default function SalesControlPage() {
       <PageHeader
         title="Control de Ventas"
         description="Seguimiento de vendedores, cotizaciones y cierres"
-        icon={BarChart2}
       />
 
       {/* Section A - Staff cards */}
