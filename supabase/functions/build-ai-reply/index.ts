@@ -651,6 +651,93 @@ Criterios:${isChatbotOnly ? '' : `
 
     console.log('AI reply result:', result);
 
+    // ===== Zone detection & auto-assignment =====
+    if (zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
+      let detectedZone: 'talca' | 'puerto_montt' | 'santiago' | null = null;
+      const aiZone = (result as any).detected_zone;
+      if (aiZone === 'talca' || aiZone === 'puerto_montt' || aiZone === 'santiago') {
+        detectedZone = aiZone;
+      } else {
+        // Regex fallback on the latest user message
+        const txt = removeAccents(message_text.toLowerCase());
+        const talcaRe = /\b(talca|maule|curico|linares|san javier|constitucion|cauquenes|molina)\b/;
+        const pmRe = /\b(puerto montt|pto\.? montt|los lagos|osorno|puerto varas|llanquihue|castro|chiloe|ancud)\b/;
+        const stgoRe = /\b(santiago|stgo|region metropolitana|\brm\b|providencia|las condes|maipu|nunoa|la florida|puente alto|san bernardo|vitacura|la reina|penalolen|quilicura|recoleta|independencia|estacion central|macul|lo barnechea|huechuraba)\b/;
+        if (talcaRe.test(txt)) detectedZone = 'talca';
+        else if (pmRe.test(txt)) detectedZone = 'puerto_montt';
+        else if (stgoRe.test(txt)) detectedZone = 'santiago';
+      }
+
+      if (detectedZone) {
+        try {
+          const { error: updErr } = await supabase
+            .from('contacts')
+            .update({ zone: detectedZone })
+            .eq('id', contactRecord.id);
+          if (updErr) {
+            console.error('Failed to update contact zone:', updErr);
+          } else {
+            console.log(`Contact ${contactRecord.id} assigned to zone: ${detectedZone}`);
+
+            // Auto-assign conversation to a STAFF in that zone (if currently unassigned)
+            if (!conversation?.assigned_to_user_id) {
+              const { data: staffList } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('workshop_id', workshop_id)
+                .eq('status', 'active')
+                .eq('zone', detectedZone);
+
+              const staff = (staffList || []) as Array<{ id: string }>;
+              let chosen: string | null = null;
+              if (staff.length === 1) {
+                chosen = staff[0].id;
+              } else if (staff.length > 1) {
+                // Round-robin: pick STAFF with fewest open conversations
+                const counts = await Promise.all(
+                  staff.map(async (s) => {
+                    const { count } = await supabase
+                      .from('conversations')
+                      .select('id', { count: 'exact', head: true })
+                      .eq('workshop_id', workshop_id)
+                      .eq('assigned_to_user_id', s.id)
+                      .in('status', ['new', 'in_progress']);
+                    return { id: s.id, count: count || 0 };
+                  })
+                );
+                counts.sort((a, b) => a.count - b.count);
+                chosen = counts[0].id;
+              }
+
+              if (chosen) {
+                await supabase
+                  .from('conversations')
+                  .update({ assigned_to_user_id: chosen })
+                  .eq('id', conversation_id);
+                console.log(`Conversation ${conversation_id} auto-assigned to staff ${chosen}`);
+              }
+            }
+
+            // Audit log
+            await supabase.from('health_logs').insert({
+              workshop_id,
+              event_type: 'info',
+              category: 'bot',
+              message: `Zona asignada automáticamente: ${detectedZone}`,
+              metadata: {
+                contact_id: contactRecord.id,
+                conversation_id,
+                zone: detectedZone,
+                source: aiZone ? 'ai' : 'regex',
+              },
+            });
+          }
+        } catch (zoneErr) {
+          console.error('Zone assignment error:', zoneErr);
+        }
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       ...result,
