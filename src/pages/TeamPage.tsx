@@ -13,6 +13,17 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
 const ZONE_LABELS: Record<string, string> = {
@@ -27,6 +38,31 @@ export default function TeamPage() {
   const { data: subscription } = useSubscription();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const deleteMemberMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('delete-workshop-user', {
+        body: { user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team'] });
+      queryClient.invalidateQueries({ queryKey: ['invites'] });
+      toast({
+        title: 'Miembro eliminado',
+        description: 'El usuario fue eliminado completamente. Puedes volver a invitarlo.',
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Error al eliminar',
+        description: err?.message || 'No se pudo eliminar el miembro',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const deleteInviteMutation = useMutation({
     mutationFn: async (inviteId: string) => {
@@ -187,6 +223,39 @@ export default function TeamPage() {
                     </Badge>
                   )}
                   <StatusBadge status={member.status} />
+                  {isAdmin && member.id !== profile?.id && member.role !== 'SUPERADMIN' && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          disabled={deleteMemberMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Eliminar a {member.full_name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se eliminará permanentemente la cuenta de <strong>{member.email}</strong>.
+                            El usuario perderá acceso de inmediato y su correo quedará liberado para
+                            volver a invitarlo. Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => deleteMemberMutation.mutate(member.id)}
+                          >
+                            Sí, eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </div>
             ))}
