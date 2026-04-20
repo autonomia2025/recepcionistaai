@@ -2,56 +2,75 @@
 
 ## Diagnóstico
 
-**1. STAFF ve todas las zonas en el Inbox**
-- En `InboxPage.tsx`, el dropdown `zoneFilter` se muestra cuando `workshop_id === SOC_WORKSHOP_ID` para **cualquier rol**, y el filtro inicial es `'all'`. El STAFF puede cambiar entre Santiago, Talca y Puerto Montt manualmente.
-- En `useConversations.ts` ya existe filtro por `contacts.zone` para STAFF, pero el `inner` join + el dropdown de UI permiten al STAFF ver/cambiar zonas igualmente.
+El bot debe **detectar la zona del cliente durante la conversación** y, en ese momento, asignar el contacto al pool de la zona correspondiente para que el STAFF de esa zona lo vea automáticamente en su Inbox.
 
-**2. STAFF ve métricas de todo el workshop en el Dashboard**
-- `DashboardPage.tsx` hace `count` de conversations/contacts/appointments/messages **sin filtrar por zona**. El STAFF de Talca ve el total de SOC Ingeniería completo (Santiago + Talca + Puerto Montt).
-- Además se renderiza `<ZoneMetrics>` que muestra tabs con todas las zonas — STAFF no debería ver eso.
-
-**3. La invitación entra directo a la app sin pedir contraseña**
-- En `AcceptInvitePage.tsx` hay un `useEffect` (líneas 104-116) que auto-acepta el invite si `user` ya está logueado, **sin mostrar el formulario de contraseña**.
-- Caso típico: el invitado fue creado vía Supabase Auth (signInWithOtp/magic link/edge function), abre el link de invitación ya con sesión activa → el efecto dispara `acceptInviteWithRetry()` directamente y lo lleva a `/dashboard` **sin que jamás haya creado su propia contraseña**.
+Hoy:
+- Los contactos se crean con `zone = NULL`.
+- El bot no tiene instrucción explícita de preguntar la zona.
+- El filtro del STAFF ya funciona (`contacts.zone = profile.zone`), pero como nadie asigna zona, no ve nada.
 
 ---
 
 ## Plan
 
-### Paso 1 — Forzar creación de contraseña en `AcceptInvitePage.tsx`
+### Paso 1 — Toggle de configuración por workshop (opt-in)
 
-- **Eliminar el `useEffect` de auto-aceptación** (líneas 104-116). El usuario SIEMPRE debe pasar por el formulario.
-- Si detectamos que `user` ya tiene sesión activa al abrir el link, mostrar un nuevo card con dos opciones:
-  - **"Crear contraseña ahora"** (opción primaria) → form que llama `supabase.auth.updateUser({ password })` y luego `accept_invite`. Garantiza que el invitado defina su propia contraseña antes de entrar.
-  - **"Cerrar sesión y empezar de nuevo"** (secundaria) → `signOut()` y vuelve al modo signup normal.
-- Validar email match: si la sesión activa no coincide con `invite.email`, forzar signOut.
-- Mantener el flujo signup/login existente para usuarios no logueados.
+Como dijiste *"si es que lo tienen configurado así"*, agrego un switch para que SOC (y futuros workshops multi-zona) lo activen.
 
-### Paso 2 — Restringir zonas en el Inbox para STAFF
+**Migración SQL:**
+- Agregar columna `workshops.zone_detection_enabled boolean DEFAULT false`.
+- Activarla solo para SOC Ingeniería (`610fb257…`).
 
-**`src/pages/InboxPage.tsx`:**
-- Mostrar el dropdown de zona **solo** si el usuario es ADMIN o SUPERADMIN del workshop SOC. STAFF nunca lo ve.
-- Si el STAFF tiene `profile.zone`, fijar `zoneFilter` automáticamente a esa zona (no editable) y mostrar un badge visual "Zona: Santiago" en el header (no como dropdown).
-- Asegurar que `filteredByZone` aplique siempre el zone del STAFF aunque el state local intente otra cosa.
+**UI (`BotSettingsEditor.tsx` o sección bot):**
+- Switch visible solo para ADMIN/SUPERADMIN: *"Detección automática de zona"* con descripción: *"El bot preguntará al cliente desde qué ciudad escribe y lo asignará a la zona correspondiente."*
 
-**`src/hooks/useConversations.ts`:** ya filtra por `contacts.zone` para STAFF — verificar que el `!inner` join no dé conversaciones sin zona. Cambiar de `contacts!inner` a filtro explícito que excluya conversaciones cuyos contactos no tengan zona asignada cuando el STAFF tiene zona.
+### Paso 2 — El bot pregunta la zona en cuanto sea necesario
 
-### Paso 3 — Restringir métricas en Dashboard para STAFF
+**`supabase/functions/build-ai-reply/index.ts`:**
+- Si `workshop.zone_detection_enabled === true` Y `contact.zone IS NULL`:
+  - Inyectar al system prompt: *"REGLA CRÍTICA: Antes de cotizar, agendar o derivar al equipo, debes preguntar al cliente desde qué ciudad/comuna escribe. Las zonas válidas son: **Talca/Maule**, **Puerto Montt/Los Lagos**, **Santiago/RM**. Hazlo de forma natural en el saludo o cuando el cliente mencione su necesidad."*
+- Esto asegura que en los primeros 1-2 mensajes el bot pida la zona.
 
-**`src/pages/DashboardPage.tsx`:**
-- Detectar `staffZone = profile.role === 'STAFF' ? profile.zone : null`.
-- Si `staffZone` existe, cambiar las queries de count para usar joins/filtros por zona:
-  - `contacts`: agregar `.eq('zone', staffZone)`
-  - `conversations`: hacer query con `contacts!inner(zone)` y filtrar `contacts.zone = staffZone` (igual que en useConversations)
-  - `appointments`: igual, join con contacts y filtrar por zona
-  - `messages`: join con conversations.contacts.zone, filtrar
-  - `closedClients`: `.eq('zone', staffZone)`
-- **Ocultar `<ZoneMetrics>` para STAFF** (solo ADMIN/SUPERADMIN ve las tabs cross-zone).
-- Cambiar el título del banner del STAFF: "Estás viendo solo las métricas de tu zona: **Santiago**".
+### Paso 3 — Detección y asignación en tiempo real
 
-### Paso 4 — Verificar filtros consistentes en otras páginas STAFF
+**`build-ai-reply/index.ts`:**
+- Pedir al modelo que devuelva en su JSON un campo `detected_zone: "talca" | "puerto_montt" | "santiago" | null` analizando el último mensaje del cliente.
+- Si viene zona y `contact.zone IS NULL`:
+  - `UPDATE contacts SET zone = ... WHERE id = contact_id` inmediatamente.
+  - Loggear evento `health_logs` tipo `info` para auditoría: *"Contacto X asignado a zona Y"*.
+- Fallback regex: si el modelo no detecta pero el texto del cliente menciona claramente "Talca", "Puerto Montt", "Santiago", "Maule", "Los Lagos", "RM", o comunas conocidas → aplicar zona vía regex.
 
-Revisar rápido `ClientsPage`, `RequestsPage`, `CalendarPage` para confirmar que también filtran por zona cuando el usuario es STAFF con zona asignada. Si no lo hacen, agregar el mismo filtro `.eq('zone', staffZone)` en sus hooks de datos. (Solo lectura — confirmaré durante implementación si necesitan cambios.)
+### Paso 4 — Asignación automática al STAFF de esa zona
+
+Cuando se asigna `contact.zone`, también actualizar la conversación:
+- Buscar STAFF activos de ese workshop con `profile.zone = nueva_zona`.
+- Si hay uno solo → `UPDATE conversations SET assigned_to_user_id = staff.id WHERE contact_id = ...` (auto-asignación directa).
+- Si hay varios → asignación round-robin simple (al de menor carga actual de conversaciones abiertas en esa zona).
+- Si no hay ninguno → dejar sin asignar pero con `zone` ya seteada (el ADMIN lo ve en el Inbox con el badge de zona).
+
+### Paso 5 — Indicador visual en Inbox para ADMIN
+
+**`ConversationList.tsx`** (solo ADMIN/SUPERADMIN, solo workshops con `zone_detection_enabled`):
+- Badge amarillo *"⚠ Sin zona"* en conversaciones cuyo contacto tiene `zone IS NULL` (para que sepan que el bot aún no la detectó o el cliente no la dijo).
+- Badge informativo cuando una conversación se auto-asigna por zona: *"🎯 Auto-asignado por zona"* (visible 1 vez al cambiar).
+
+### Paso 6 — Selector manual de zona (override) en `ChatView.tsx`
+
+Para ADMIN/SUPERADMIN: agregar un `Select` pequeño en el header del chat para sobrescribir o asignar manualmente la zona del contacto. Útil cuando el cliente no responde la pregunta o el bot no detecta.
+
+---
+
+## Flujo completo (ejemplo)
+
+```text
+Cliente: "Hola, quiero una cotización"
+Bot:    "¡Hola! Con gusto. ¿Desde qué ciudad nos escribes?"
+Cliente: "Desde Talca"
+Bot:    [Detecta zone=talca → UPDATE contacts.zone='talca'
+         → busca STAFF con zone='talca' → asigna conversation
+         → STAFF de Talca ve la conversación en su Inbox al instante]
+Bot:    "Perfecto, en Talca atendemos... ¿qué servicio necesitas?"
+```
 
 ---
 
@@ -59,11 +78,11 @@ Revisar rápido `ClientsPage`, `RequestsPage`, `CalendarPage` para confirmar que
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/AcceptInvitePage.tsx` | Eliminar auto-accept; forzar form de contraseña incluso para usuarios logueados |
-| `src/pages/InboxPage.tsx` | Ocultar dropdown de zona a STAFF; fijar zona automáticamente |
-| `src/hooks/useConversations.ts` | Reforzar filtro de zona para STAFF |
-| `src/pages/DashboardPage.tsx` | Filtrar todas las métricas por `staff.zone`; ocultar `ZoneMetrics` a STAFF |
-| `src/hooks/useServiceRequests.ts`, `useCalendarEvents.ts` (si aplica) | Agregar filtro por zona del STAFF |
+| Migración SQL | Agregar `workshops.zone_detection_enabled`; activar para SOC |
+| `src/components/admin/BotSettingsEditor.tsx` | Switch de detección de zona |
+| `supabase/functions/build-ai-reply/index.ts` | Inyectar regla de pregunta + parsear `detected_zone` + UPDATE inmediato + auto-asignación a STAFF |
+| `src/components/inbox/ConversationList.tsx` | Badge "Sin zona" para ADMIN |
+| `src/components/inbox/ChatView.tsx` | Selector manual de zona (override) para ADMIN/SUPERADMIN |
 
-No tocaré: `AppSidebar`, `App.tsx` (route guards ya están), migraciones SQL, `ZoneMetrics` component (solo lo oculto a STAFF), ni el flujo de invitación email.
+No tocaré: filtros del STAFF (ya funcionan), `analyze-conversation` (queda como respaldo), RLS, ni `whatsapp-webhook` (la detección queda concentrada en el bot, no en el primer mensaje crudo).
 
