@@ -344,11 +344,13 @@ serve(async (req) => {
 
     // ===== RAG: AI-enhanced keyword search =====
     let ragContext = '';
+    let ragMatchCount = 0;
     try {
       const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
+        ragMatchCount = knowledgeMatches.length;
         ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${knowledgeMatches
           .map((k, i) => `[${i + 1}] ${k.content}`)
           .join('\n---\n')
@@ -357,6 +359,12 @@ serve(async (req) => {
     } catch (ragError) {
       console.error('RAG error (continuing without RAG):', ragError);
     }
+
+    // ===== Detect product/catalog query for anti-hallucination =====
+    const lowerMsg = removeAccents(message_text.toLowerCase());
+    const productQueryRe = /\b(producto|productos|categoria|categorias|catalogo|marca|marcas|modelo|modelos|precio|precios|valor|cuanto cuesta|cuanto vale|stock|disponible|tienen|venden|ofrecen|vendes|ofreces|tienes|que ofrecen|que venden|que tienen|cuanto)\b/;
+    const isProductQuery = productQueryRe.test(lowerMsg);
+    const ragEmpty = ragMatchCount === 0;
 
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
