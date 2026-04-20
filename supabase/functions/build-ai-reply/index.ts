@@ -311,7 +311,7 @@ serve(async (req) => {
     // Get workshop info
     const { data: workshop, error: workshopError } = await supabase
       .from('workshops')
-      .select('id, name, booking_url, slug, phone, address, city, booking_mode')
+      .select('id, name, booking_url, slug, phone, address, city, booking_mode, zone_detection_enabled')
       .eq('id', workshop_id)
       .single();
 
