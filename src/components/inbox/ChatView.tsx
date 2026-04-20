@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 
 interface ChatViewProps {
   conversation: Conversation;
@@ -529,6 +529,24 @@ export function ChatView({ conversation }: ChatViewProps) {
             <Badge variant="outline" className={cn('text-[10px] hidden lg:flex', statusBadge.style)}>
               {statusBadge.label}
             </Badge>
+
+            {zoneDetectionEnabled && isAdminLike && (
+              <Select
+                value={(contact as any).zone || 'none'}
+                onValueChange={handleZoneChange}
+                disabled={isUpdatingZone}
+              >
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectValue placeholder="Zona" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin zona</SelectItem>
+                  <SelectItem value="talca">📍 Talca</SelectItem>
+                  <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+                  <SelectItem value="santiago">📍 Santiago</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
             <Button
               variant="ghost"

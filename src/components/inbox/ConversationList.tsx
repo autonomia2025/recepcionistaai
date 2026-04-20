@@ -6,6 +6,8 @@ import { Conversation } from '@/hooks/useConversations';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -64,6 +66,22 @@ export function ConversationList({
 }: ConversationListProps) {
   const { profile } = useAuth();
   const staffZone = profile?.role === 'STAFF' ? (profile as any)?.zone : null;
+  const isAdminLike = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
+
+  const { data: workshopFlags } = useQuery({
+    queryKey: ['workshop-zone-flag', profile?.workshop_id],
+    queryFn: async () => {
+      if (!profile?.workshop_id) return null;
+      const { data } = await supabase
+        .from('workshops')
+        .select('zone_detection_enabled')
+        .eq('id', profile.workshop_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!profile?.workshop_id && isAdminLike,
+  });
+  const zoneDetectionEnabled = !!(workshopFlags as any)?.zone_detection_enabled;
 
   const filteredConversations = conversations
     .filter((conv) => (staffZone ? conv.contacts.zone === staffZone : true))
@@ -168,6 +186,16 @@ export function ConversationList({
                           <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-orange-200/50">
                             <BotOff className="w-2.5 h-2.5" />
                             Pausado
+                          </span>
+                        )}
+                        {zoneDetectionEnabled && isAdminLike && !conv.contacts.zone && (
+                          <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full border border-amber-200/50">
+                            ⚠ Sin zona
+                          </span>
+                        )}
+                        {zoneDetectionEnabled && conv.contacts.zone && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200/50">
+                            📍 {conv.contacts.zone === 'puerto_montt' ? 'Pto. Montt' : conv.contacts.zone === 'talca' ? 'Talca' : 'Santiago'}
                           </span>
                         )}
                       </div>
