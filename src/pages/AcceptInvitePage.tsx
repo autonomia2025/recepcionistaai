@@ -158,7 +158,7 @@ export default function AcceptInvitePage() {
 
     try {
       if (mode === 'signup') {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -170,7 +170,15 @@ export default function AcceptInvitePage() {
         if (signUpError) {
           const msg = signUpError.message?.toLowerCase() || '';
           if (msg.includes('already registered') || msg.includes('already been registered')) {
-            setError('Ya tienes una cuenta con este correo. Cambia a "Ya tengo cuenta" e ingresa tu contraseña existente.');
+            // Try logging in with the password they just typed (maybe they remember it)
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+            if (!signInError) {
+              await sleep(400);
+              await acceptInviteWithRetry();
+              return;
+            }
+            // Wrong password: switch to login mode and offer reset
+            setError('Ya existe una cuenta con este correo pero esa contraseña es incorrecta. Si no la recuerdas, usa "Olvidé mi contraseña" abajo.');
             setMode('login');
             setSubmitting(false);
             return;
@@ -331,7 +339,7 @@ export default function AcceptInvitePage() {
             </Button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center space-y-2">
             <Button
               variant="link"
               onClick={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError(null); }}
@@ -341,6 +349,30 @@ export default function AcceptInvitePage() {
                 ? '¿Ya tienes cuenta? Inicia sesión'
                 : '¿Primera vez? Crea tu contraseña'}
             </Button>
+            {mode === 'login' && (
+              <div>
+                <Button
+                  variant="link"
+                  className="text-sm text-muted-foreground"
+                  onClick={async () => {
+                    if (!email) return;
+                    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/update-password`,
+                    });
+                    if (resetErr) {
+                      toast({ title: 'Error', description: resetErr.message, variant: 'destructive' });
+                    } else {
+                      toast({
+                        title: 'Correo enviado',
+                        description: 'Revisa tu bandeja: te enviamos un link para crear una nueva contraseña. Luego vuelve a abrir esta invitación.',
+                      });
+                    }
+                  }}
+                >
+                  Olvidé mi contraseña
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
