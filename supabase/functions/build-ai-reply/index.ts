@@ -553,6 +553,44 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
 
     console.log('Using system prompt length:', systemPrompt.length, 'custom:', !!settings.system_prompt, 'hasRAG:', !!ragContext);
 
+    // ===== Short-circuit: product/catalog query with empty RAG → force handoff =====
+    // Avoids the AI inventing products/prices when there's zero documented info.
+    if (isProductQuery && ragEmpty) {
+      console.log('Product query detected with empty RAG → forcing handoff');
+
+      // Audit log (best-effort, non-blocking)
+      try {
+        await supabase.from('health_logs').insert({
+          workshop_id,
+          event_type: 'info',
+          category: 'bot',
+          message: `Handoff por falta de conocimiento: ${message_text.substring(0, 200)}`,
+          metadata: {
+            conversation_id,
+            query: message_text.substring(0, 500),
+            reason: 'rag_empty_on_product_query',
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to log handoff to health_logs:', logErr);
+      }
+
+      const handoffReply = `Esa información específica no la tengo documentada por aquí 🙏\n\nTe voy a conectar con un ejecutivo del equipo para que pueda ayudarte mejor con tu consulta. En breve te responderá. ✅`;
+
+      return new Response(JSON.stringify({
+        success: true,
+        replies: [handoffReply],
+        intent: 'humano',
+        confidence: 0.9,
+        should_handoff: true,
+        should_send_booking_link: false,
+        reasoning: 'Consulta sobre producto/categoría/precio sin información en RAG. Handoff forzado para evitar alucinación.',
+        booking_url: fullBookingUrl,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Call Lovable AI
     console.log('Calling Lovable AI gateway...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
