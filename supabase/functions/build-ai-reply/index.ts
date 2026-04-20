@@ -344,11 +344,13 @@ serve(async (req) => {
 
     // ===== RAG: AI-enhanced keyword search =====
     let ragContext = '';
+    let ragMatchCount = 0;
     try {
       const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
+        ragMatchCount = knowledgeMatches.length;
         ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${knowledgeMatches
           .map((k, i) => `[${i + 1}] ${k.content}`)
           .join('\n---\n')
@@ -357,6 +359,12 @@ serve(async (req) => {
     } catch (ragError) {
       console.error('RAG error (continuing without RAG):', ragError);
     }
+
+    // ===== Detect product/catalog query for anti-hallucination =====
+    const lowerMsg = removeAccents(message_text.toLowerCase());
+    const productQueryRe = /\b(producto|productos|categoria|categorias|catalogo|marca|marcas|modelo|modelos|precio|precios|valor|cuanto cuesta|cuanto vale|stock|disponible|tienen|venden|ofrecen|vendes|ofreces|tienes|que ofrecen|que venden|que tienen|cuanto)\b/;
+    const isProductQuery = productQueryRe.test(lowerMsg);
+    const ragEmpty = ragMatchCount === 0;
 
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
@@ -452,6 +460,13 @@ ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}` : ''}
 
 ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGENDAMIENTO: ${fullBookingUrl}` : ''}
 
+REGLA CRÍTICA ANTI-INVENCIÓN (PRIORIDAD MÁXIMA):
+- ESTÁ ESTRICTAMENTE PROHIBIDO inventar, suponer o "deducir" productos, categorías, marcas, modelos, precios, stocks, características técnicas o servicios que NO aparezcan literalmente en el bloque "DOCUMENTACIÓN DE REFERENCIA" o en "SERVICIOS DISPONIBLES".
+- NO digas frases como "tenemos varios modelos", "manejamos las principales marcas", "contamos con un amplio catálogo" si no hay datos concretos en el contexto. Eso es ALUCINAR.
+- Si el cliente pregunta por un producto/categoría/precio/marca específico y NO está en el contexto, responde EXACTAMENTE algo como: "No tengo esa información específica documentada en este momento, déjame conectarte con un ejecutivo que podrá ayudarte mejor 👤" y marca should_handoff=true e intent="humano".
+- Es 100x mejor decir "no tengo esa información, te derivo con un ejecutivo" que inventar un dato falso. La honestidad construye confianza, la invención destruye la marca.
+- Si el contexto SÍ tiene la información, úsala literalmente (no la "embellezcas" con datos extra que no aparecen).
+
 ${zoneDetectionEnabled ? `ZONA DEL CLIENTE (REGLA CRÍTICA):
 ${needsZone
   ? `- El contacto AÚN NO tiene zona asignada. ANTES de cotizar, agendar o derivar al equipo, DEBES preguntar de forma natural desde qué ciudad o comuna escribe.
@@ -537,6 +552,44 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
     }
 
     console.log('Using system prompt length:', systemPrompt.length, 'custom:', !!settings.system_prompt, 'hasRAG:', !!ragContext);
+
+    // ===== Short-circuit: product/catalog query with empty RAG → force handoff =====
+    // Avoids the AI inventing products/prices when there's zero documented info.
+    if (isProductQuery && ragEmpty) {
+      console.log('Product query detected with empty RAG → forcing handoff');
+
+      // Audit log (best-effort, non-blocking)
+      try {
+        await supabase.from('health_logs').insert({
+          workshop_id,
+          event_type: 'info',
+          category: 'bot',
+          message: `Handoff por falta de conocimiento: ${message_text.substring(0, 200)}`,
+          metadata: {
+            conversation_id,
+            query: message_text.substring(0, 500),
+            reason: 'rag_empty_on_product_query',
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to log handoff to health_logs:', logErr);
+      }
+
+      const handoffReply = `Esa información específica no la tengo documentada por aquí 🙏\n\nTe voy a conectar con un ejecutivo del equipo para que pueda ayudarte mejor con tu consulta. En breve te responderá. ✅`;
+
+      return new Response(JSON.stringify({
+        success: true,
+        replies: [handoffReply],
+        intent: 'humano',
+        confidence: 0.9,
+        should_handoff: true,
+        should_send_booking_link: false,
+        reasoning: 'Consulta sobre producto/categoría/precio sin información en RAG. Handoff forzado para evitar alucinación.',
+        booking_url: fullBookingUrl,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Call Lovable AI
     console.log('Calling Lovable AI gateway...');

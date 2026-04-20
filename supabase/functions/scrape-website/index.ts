@@ -6,150 +6,125 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function htmlToCleanText(html: string): string {
-  let text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
-    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
-    .replace(/<footer[\s\S]*?<\/footer>/gi, '');
+const FIRECRAWL_BASE = 'https://api.firecrawl.dev/v2';
+const MAX_PAGES = 50;
+const MAX_TOTAL_CHARS = 500_000;
+const POLL_INTERVAL_MS = 5_000;
+const MAX_POLL_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
-  text = text
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<\/tr>/gi, '\n')
-    .replace(/<\/h[1-6]>/gi, '\n\n')
-    .replace(/<h[1-6][^>]*>/gi, '\n### ')
-    .replace(/<li[^>]*>/gi, '- ')
-    .replace(/<td[^>]*>/gi, ' | ')
-    .replace(/<a[^>]*href="([^"]*)"[^>]*>/gi, '[$1] ')
-    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, '(imagen: $1) ');
-
-  text = text.replace(/<[^>]+>/g, ' ');
-
-  text = text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec)));
-
-  text = text
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .replace(/^\s+/gm, '')
-    .trim();
-
-  return text;
+interface FirecrawlPage {
+  markdown?: string;
+  metadata?: {
+    sourceURL?: string;
+    url?: string;
+    title?: string;
+  };
 }
 
-function extractInternalLinks(html: string, baseUrl: URL): string[] {
-  const links: string[] = [];
-  const regex = /<a[^>]*href="([^"#]*)"[^>]*>/gi;
-  let match;
-
-  while ((match = regex.exec(html)) !== null) {
-    let href = match[1].trim();
-    if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;
-
-    try {
-      const fullUrl = new URL(href, baseUrl.origin);
-      if (fullUrl.hostname !== baseUrl.hostname) continue;
-      if (/\.(jpg|jpeg|png|gif|svg|css|js|pdf|zip|mp4|mp3|woff|woff2|ttf|ico)$/i.test(fullUrl.pathname)) continue;
-      if (/\/(cart|checkout|mi-cuenta|my-account|login|wp-admin|wp-login|feed|xmlrpc|wp-json|wp-content|wp-includes)/i.test(fullUrl.pathname)) continue;
-
-      const clean = fullUrl.origin + fullUrl.pathname.replace(/\/$/, '');
-      links.push(clean);
-    } catch { /* skip */ }
-  }
-
-  return links;
-}
-
-function isHighPriorityUrl(url: string): boolean {
-  return /\/(categor|product|servic|tienda|shop|store|nosotros|about|quienes|contacto|equipo|producto|item|precio|faq|arriendo|venta|marca)/i.test(url);
-}
-
-function isLowPriorityUrl(url: string): boolean {
-  return /\/(blog|noticias|news|tag\/|author\/|comment|attachment|page\/\d|#|replyto|\?replyto)/i.test(url);
-}
-
-async function fetchPage(url: string): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8',
+async function startCrawl(firecrawlApiKey: string, url: string): Promise<string> {
+  const resp = await fetch(`${FIRECRAWL_BASE}/crawl`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url,
+      limit: MAX_PAGES,
+      excludePaths: [
+        '/cart', '/checkout', '/mi-cuenta', '/my-account',
+        '/wp-admin', '/wp-login', '/feed', '/xmlrpc',
+        '/wp-json', '/wp-content', '/wp-includes',
+      ],
+      scrapeOptions: {
+        formats: ['markdown'],
+        onlyMainContent: true,
       },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!resp.ok) return null;
-    const contentType = resp.headers.get('content-type') || '';
-    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) return null;
-    return await resp.text();
-  } catch {
-    return null;
+    }),
+  });
+
+  const data = await resp.json();
+  if (!resp.ok) {
+    throw new Error(`Firecrawl /crawl failed [${resp.status}]: ${JSON.stringify(data)}`);
   }
+
+  const id = data?.id || data?.jobId;
+  if (!id) {
+    throw new Error(`Firecrawl /crawl returned no job id: ${JSON.stringify(data)}`);
+  }
+  return id as string;
 }
 
-async function crawlSite(startUrl: string, baseUrl: URL, maxPages: number): Promise<{ url: string; text: string }[]> {
-  const visited = new Set<string>();
-  const results: { url: string; text: string }[] = [];
+async function pollCrawl(firecrawlApiKey: string, jobId: string): Promise<FirecrawlPage[]> {
+  const startedAt = Date.now();
+  let allPages: FirecrawlPage[] = [];
+  let nextUrl: string | null = `${FIRECRAWL_BASE}/crawl/${jobId}`;
 
-  const startNormalized = baseUrl.origin + baseUrl.pathname.replace(/\/$/, '');
-  const queue: string[] = [startUrl];
-  visited.add(startNormalized);
+  while (Date.now() - startedAt < MAX_POLL_DURATION_MS) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
 
-  while (queue.length > 0 && results.length < maxPages) {
-    const batchSize = Math.min(10, maxPages - results.length, queue.length);
-    const batch = queue.splice(0, batchSize);
-
-    const fetched = await Promise.all(batch.map(async (pageUrl) => {
-      const html = await fetchPage(pageUrl);
-      if (!html) return null;
-
-      const newLinks = extractInternalLinks(html, baseUrl);
-      const clean = htmlToCleanText(html);
-      if (clean.length < 150) return { links: newLinks, url: pageUrl, text: '' };
-
-      return { links: newLinks, url: pageUrl, text: clean };
-    }));
-
-    for (const r of fetched) {
-      if (!r) continue;
-
-      for (const link of r.links) {
-        const normalized = link.replace(/\/$/, '');
-        if (!visited.has(normalized) && !isLowPriorityUrl(normalized)) {
-          visited.add(normalized);
-          if (isHighPriorityUrl(normalized)) {
-            queue.unshift(normalized);
-          } else {
-            queue.push(normalized);
-          }
-        }
-      }
-
-      if (r.text && r.text.length >= 150) {
-        results.push({ url: r.url, text: r.text });
-      }
+    const resp = await fetch(nextUrl!, {
+      headers: { 'Authorization': `Bearer ${firecrawlApiKey}` },
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      throw new Error(`Firecrawl status poll failed [${resp.status}]: ${JSON.stringify(json)}`);
     }
 
-    console.log(`Crawled batch: ${results.length} pages collected, ${queue.length} in queue`);
+    const status = json?.status;
+    const completed = json?.completed ?? 0;
+    const total = json?.total ?? 0;
+    console.log(`Firecrawl poll: status=${status}, ${completed}/${total} pages`);
+
+    if (Array.isArray(json?.data)) {
+      allPages = allPages.concat(json.data as FirecrawlPage[]);
+    }
+
+    if (status === 'completed') {
+      // Walk pagination if present
+      let next = json?.next as string | null | undefined;
+      while (next) {
+        const nResp = await fetch(next, {
+          headers: { 'Authorization': `Bearer ${firecrawlApiKey}` },
+        });
+        const nJson = await nResp.json();
+        if (!nResp.ok) break;
+        if (Array.isArray(nJson?.data)) {
+          allPages = allPages.concat(nJson.data as FirecrawlPage[]);
+        }
+        next = nJson?.next as string | null | undefined;
+      }
+      return allPages;
+    }
+
+    if (status === 'failed' || status === 'cancelled') {
+      throw new Error(`Firecrawl crawl ${status}: ${JSON.stringify(json)}`);
+    }
+
+    // status === 'scraping' | 'queued' | etc → keep polling
   }
 
-  return results;
+  throw new Error(`Firecrawl crawl timeout after ${MAX_POLL_DURATION_MS / 1000}s`);
+}
+
+function buildCombinedText(pages: FirecrawlPage[]): { combined: string; included: number } {
+  let combined = '';
+  let included = 0;
+
+  for (const page of pages) {
+    const md = (page.markdown || '').trim();
+    if (md.length < 80) continue;
+    const url = page.metadata?.sourceURL || page.metadata?.url || '';
+    const block = `\n\n===== PÁGINA: ${url} =====\n\n${md}`;
+    if (combined.length + block.length > MAX_TOTAL_CHARS && combined.length > 0) {
+      console.log(`Text cap reached at ${included} pages (${combined.length} chars)`);
+      break;
+    }
+    combined += block;
+    included++;
+  }
+
+  return { combined, included };
 }
 
 serve(async (req) => {
@@ -159,7 +134,17 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  if (!firecrawlApiKey) {
+    return new Response(JSON.stringify({
+      error: 'FIRECRAWL_API_KEY no está configurado. Conecta Firecrawl en Connectors.',
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     const { url, workshop_id } = await req.json();
@@ -171,19 +156,19 @@ serve(async (req) => {
       });
     }
 
-    let formattedUrl = url.trim();
+    let formattedUrl = String(url).trim();
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    try { new URL(formattedUrl); } catch {
+    let baseUrl: URL;
+    try { baseUrl = new URL(formattedUrl); } catch {
       return new Response(JSON.stringify({ error: 'URL no válida' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const baseUrl = new URL(formattedUrl);
     const domain = baseUrl.hostname;
 
     // 1. Create bot_documents record immediately
@@ -206,40 +191,31 @@ serve(async (req) => {
 
     const documentId = doc.id;
 
-    // 2. Background work: crawl + process
+    // 2. Background work: Firecrawl crawl + polling + process-rag
     const backgroundWork = (async () => {
       try {
-        console.log('Background: starting crawl for', formattedUrl);
-        const maxPages = 50;
-        const allPageTexts = await crawlSite(formattedUrl, baseUrl, maxPages);
+        console.log(`Background: starting Firecrawl crawl for ${formattedUrl}`);
+        const jobId = await startCrawl(firecrawlApiKey!, formattedUrl);
+        console.log(`Background: Firecrawl job started: ${jobId}`);
 
-        console.log(`Background: crawl complete, ${allPageTexts.length} pages with content`);
+        const pages = await pollCrawl(firecrawlApiKey!, jobId);
+        console.log(`Background: crawl complete, ${pages.length} pages received`);
 
-        if (allPageTexts.length === 0) {
-          throw new Error('No se pudo extraer contenido del sitio web.');
+        if (pages.length === 0) {
+          throw new Error('Firecrawl no devolvió ninguna página. El sitio puede estar bloqueado o no tener contenido accesible.');
         }
 
-        // Combine all page texts, cap at 500K chars
-        const MAX_TOTAL_CHARS = 500000;
-        let combinedText = '';
-        let pagesIncluded = 0;
+        const { combined, included } = buildCombinedText(pages);
+        console.log(`Background: combined ${combined.length} chars from ${included} pages`);
 
-        for (const page of allPageTexts) {
-          const pageBlock = `\n\n===== PÁGINA: ${page.url} =====\n\n${page.text}`;
-          if (combinedText.length + pageBlock.length > MAX_TOTAL_CHARS && combinedText.length > 0) {
-            console.log(`Background: text cap reached at ${pagesIncluded} pages (${combinedText.length} chars)`);
-            break;
-          }
-          combinedText += pageBlock;
-          pagesIncluded++;
+        if (combined.length < 200) {
+          throw new Error('No se pudo extraer suficiente contenido legible del sitio web.');
         }
-
-        console.log(`Background: combined text ${combinedText.length} chars from ${pagesIncluded} pages`);
 
         // Update file_size
         await supabase
           .from('bot_documents')
-          .update({ file_size: combinedText.length })
+          .update({ file_size: combined.length })
           .eq('id', documentId);
 
         // Send to process-rag-document
@@ -253,17 +229,15 @@ serve(async (req) => {
             document_id: documentId,
             workshop_id,
             file_name: `🌐 ${domain}`,
-            plain_text: combinedText,
+            plain_text: combined,
           }),
         });
 
         const processResult = await processResponse.json();
-
         if (!processResponse.ok || !processResult.success) {
           throw new Error(processResult.error || 'Error al procesar el contenido');
         }
 
-        // Mark as ready
         await supabase
           .from('bot_documents')
           .update({
@@ -295,6 +269,7 @@ serve(async (req) => {
       document_id: documentId,
       domain,
       status: 'processing',
+      engine: 'firecrawl',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
