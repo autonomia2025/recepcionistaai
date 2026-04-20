@@ -339,7 +339,7 @@ export default function AcceptInvitePage() {
             </Button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center space-y-2">
             <Button
               variant="link"
               onClick={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError(null); }}
@@ -349,6 +349,30 @@ export default function AcceptInvitePage() {
                 ? '¿Ya tienes cuenta? Inicia sesión'
                 : '¿Primera vez? Crea tu contraseña'}
             </Button>
+            {mode === 'login' && (
+              <div>
+                <Button
+                  variant="link"
+                  className="text-sm text-muted-foreground"
+                  onClick={async () => {
+                    if (!email) return;
+                    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/update-password`,
+                    });
+                    if (resetErr) {
+                      toast({ title: 'Error', description: resetErr.message, variant: 'destructive' });
+                    } else {
+                      toast({
+                        title: 'Correo enviado',
+                        description: 'Revisa tu bandeja: te enviamos un link para crear una nueva contraseña. Luego vuelve a abrir esta invitación.',
+                      });
+                    }
+                  }}
+                >
+                  Olvidé mi contraseña
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
