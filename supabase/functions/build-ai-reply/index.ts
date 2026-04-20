@@ -452,10 +452,14 @@ ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}` : ''}
 
 ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGENDAMIENTO: ${fullBookingUrl}` : ''}
 
-${workshop.id === '610fb257-a649-4115-b944-21f31e7952db' ? `ZONA DEL CLIENTE (IMPORTANTE):
-- Si el cliente NO ha indicado su zona/ubicación, pregúntale de forma natural: "¿En qué zona te encuentras? Operamos en *Talca*, *Puerto Montt* y *Santiago*."
-- Solo pregunta UNA VEZ por la zona, no insistas si ya la mencionó.
-- Si el cliente menciona una ciudad/comuna, asóciala a la zona más cercana.` : ''}
+${zoneDetectionEnabled ? `ZONA DEL CLIENTE (REGLA CRÍTICA):
+${needsZone
+  ? `- El contacto AÚN NO tiene zona asignada. ANTES de cotizar, agendar o derivar al equipo, DEBES preguntar de forma natural desde qué ciudad o comuna escribe.
+- Zonas válidas: *Talca / Maule*, *Puerto Montt / Los Lagos*, *Santiago / RM*.
+- Hazlo en el saludo o apenas el cliente mencione su necesidad. Solo una vez, no insistas si ya la mencionó.
+- Si el cliente menciona una ciudad o comuna, asóciala a la zona más cercana.`
+  : `- El contacto ya tiene zona asignada: *${contactRecord?.zone}*. NO vuelvas a preguntarla. Personaliza la respuesta según esa zona cuando sea relevante.`}
+- Si en este mensaje el cliente menciona explícitamente una ciudad/comuna, devuelve también el campo "detected_zone" en el JSON ("talca" | "puerto_montt" | "santiago" | null). Si no la menciona, usa null.` : ''}
 ${ragContext}`;
 
     const isChatbotOnly = workshop.booking_mode === 'chatbot_only';
