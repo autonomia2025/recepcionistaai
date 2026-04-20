@@ -158,7 +158,7 @@ export default function AcceptInvitePage() {
 
     try {
       if (mode === 'signup') {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -170,7 +170,15 @@ export default function AcceptInvitePage() {
         if (signUpError) {
           const msg = signUpError.message?.toLowerCase() || '';
           if (msg.includes('already registered') || msg.includes('already been registered')) {
-            setError('Ya tienes una cuenta con este correo. Cambia a "Ya tengo cuenta" e ingresa tu contraseña existente.');
+            // Try logging in with the password they just typed (maybe they remember it)
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+            if (!signInError) {
+              await sleep(400);
+              await acceptInviteWithRetry();
+              return;
+            }
+            // Wrong password: switch to login mode and offer reset
+            setError('Ya existe una cuenta con este correo pero esa contraseña es incorrecta. Si no la recuerdas, usa "Olvidé mi contraseña" abajo.');
             setMode('login');
             setSubmitting(false);
             return;
