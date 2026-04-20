@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, XCircle, Building2, MapPin } from 'lucide-react';
+import { Loader2, XCircle, Building2, MapPin, LogOut, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface InviteData {
@@ -39,7 +39,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 export default function AcceptInvitePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -100,20 +100,30 @@ export default function AcceptInvitePage() {
     fetchInvite();
   }, [token]);
 
-  // Auto-accept ONLY if user is already logged in AND not currently submitting (avoids race)
+  // If session is logged in but with the wrong email, force signOut
   useEffect(() => {
-    const acceptForLoggedInUser = async () => {
-      if (!user || !invite || submitting || !token) return;
-      if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
-        setError(`Esta invitación es para ${invite.email}. Cierra sesión e intenta de nuevo.`);
-        return;
-      }
-      setSubmitting(true);
-      await acceptInviteWithRetry();
-    };
-    acceptForLoggedInUser();
+    if (user && invite && user.email?.toLowerCase() !== invite.email.toLowerCase()) {
+      signOut();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, invite]);
+
+  // Set new password for already-logged-in user, then accept invite
+  const handleSetPasswordAndAccept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invite || !token || !password) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { error: updErr } = await supabase.auth.updateUser({ password });
+      if (updErr) throw updErr;
+      await sleep(300);
+      await acceptInviteWithRetry();
+    } catch (err: any) {
+      setError(err.message || 'No se pudo establecer la contraseña');
+      setSubmitting(false);
+    }
+  };
 
   // RPC call with retry to overcome handle_new_user trigger race
   const acceptInviteWithRetry = async (attempts = 3): Promise<void> => {
