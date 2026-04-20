@@ -361,7 +361,7 @@ serve(async (req) => {
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('workshop_id')
+      .select('workshop_id, contact_id, assigned_to_user_id')
       .eq('id', conversation_id)
       .maybeSingle();
 
@@ -371,6 +371,19 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Load contact zone (for zone-detection feature)
+    let contactRecord: { id: string; zone: string | null } | null = null;
+    if (conversation?.contact_id) {
+      const { data: c } = await supabase
+        .from('contacts')
+        .select('id, zone')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      if (c) contactRecord = c as { id: string; zone: string | null };
+    }
+    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
+    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
 
     // Get conversation history (last 10 messages)
     const { data: messages, error: messagesError } = await supabase
