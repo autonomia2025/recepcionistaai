@@ -33,25 +33,41 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
 
+  const staffZone = profile?.role === 'STAFF' ? profile?.zone : null;
+
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats', profile?.workshop_id],
+    queryKey: ['dashboard-stats', profile?.workshop_id, staffZone],
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
-      
+
+      // Helper to fetch counts; when staffZone is set, we restrict by zone via contacts join
+      const wid = profile.workshop_id;
+
+      let conversationsQ = supabase.from('conversations').select('*, contacts!inner(zone)', { count: 'exact', head: true }).eq('workshop_id', wid);
+      let contactsQ = supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', wid);
+      let appointmentsQ = supabase.from('appointments').select('*, contacts!inner(zone)', { count: 'exact', head: true }).eq('workshop_id', wid);
+      let messagesOutQ = supabase.from('messages').select('*, conversations!inner(contacts!inner(zone))', { count: 'exact', head: true }).eq('workshop_id', wid).eq('direction', 'outbound');
+      let messagesInQ = supabase.from('messages').select('*, conversations!inner(contacts!inner(zone))', { count: 'exact', head: true }).eq('workshop_id', wid).eq('direction', 'inbound');
+      let closedQ = supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', wid).not('closed_at', 'is', null);
+
+      if (staffZone) {
+        conversationsQ = conversationsQ.eq('contacts.zone', staffZone);
+        contactsQ = contactsQ.eq('zone', staffZone);
+        appointmentsQ = appointmentsQ.eq('contacts.zone', staffZone);
+        messagesOutQ = messagesOutQ.eq('conversations.contacts.zone', staffZone);
+        messagesInQ = messagesInQ.eq('conversations.contacts.zone', staffZone);
+        closedQ = closedQ.eq('zone', staffZone);
+      }
+
       const [conversations, contacts, appointments, messagesOut, messagesIn, closedClients] = await Promise.all([
-        supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
-        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
-        supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id),
-        supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'outbound'),
-        supabase.from('messages').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).eq('direction', 'inbound'),
-        supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('workshop_id', profile.workshop_id).not('closed_at', 'is', null),
+        conversationsQ, contactsQ, appointmentsQ, messagesOutQ, messagesInQ, closedQ,
       ]);
-      
+
       const conversationCount = conversations.count || 0;
       const minutesSaved = conversationCount * MINUTES_SAVED_PER_CONVERSATION;
       const hoursSaved = minutesSaved / 60;
       const valueGenerated = Math.round(hoursSaved * VALUE_PER_HOUR_CLP);
-      
+
       return {
         conversations: conversationCount,
         contacts: contacts.count || 0,
@@ -128,6 +144,11 @@ export default function DashboardPage() {
             ? <> Trabajas en <span className="font-semibold">{workshopMode.name}</span></>
             : <> Tu cuenta aún no está asociada a un negocio.</>}
           {profile.zone && ZONE_LABELS[profile.zone] && <> · Zona <span className="font-semibold">{ZONE_LABELS[profile.zone]}</span></>}
+          {staffZone && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Estás viendo solo las métricas de tu zona: <span className="font-semibold text-foreground">{ZONE_LABELS[staffZone] || staffZone}</span>
+            </div>
+          )}
         </div>
       )}
       
@@ -168,8 +189,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Section: Zone Metrics (SOC Ingenieria only) */}
-      {workshopId && <ZoneMetrics workshopId={workshopId} />}
+      {/* Section: Zone Metrics (SOC Ingenieria only — hidden for STAFF) */}
+      {workshopId && profile?.role !== 'STAFF' && <ZoneMetrics workshopId={workshopId} />}
 
       {/* Section: Activity */}
       <div>

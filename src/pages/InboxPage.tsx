@@ -35,6 +35,12 @@ function ConversationListSkeleton() {
 
 const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
 
+const ZONE_LABELS: Record<string, string> = {
+  santiago: 'Santiago',
+  talca: 'Talca',
+  puerto_montt: 'Puerto Montt',
+};
+
 export default function InboxPage() {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -42,10 +48,22 @@ export default function InboxPage() {
   const [showChat, setShowChat] = useState(false);
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const { data: conversations, isLoading } = useConversations();
-  const showZoneFilter = profile?.workshop_id === SOC_WORKSHOP_ID;
+
+  const isAdminOrSuperadmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
+  const isStaff = profile?.role === 'STAFF';
+  const staffZone = isStaff ? profile?.zone : null;
+
+  // Show zone dropdown ONLY for ADMIN/SUPERADMIN of SOC workshop
+  const showZoneFilter = isAdminOrSuperadmin && profile?.workshop_id === SOC_WORKSHOP_ID;
+  // Show zone badge for STAFF with assigned zone
+  const showZoneBadge = isStaff && !!staffZone;
 
   // Filter conversations by zone
   const filteredByZone = conversations?.filter(conv => {
+    // STAFF with zone: hard-lock to their zone (defense in depth — useConversations also filters)
+    if (staffZone) {
+      return (conv.contacts as any).zone === staffZone;
+    }
     if (zoneFilter === 'all') return true;
     return (conv.contacts as any).zone === zoneFilter;
   });
@@ -114,6 +132,12 @@ export default function InboxPage() {
                 <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
               </SelectContent>
             </Select>
+          )}
+          {showZoneBadge && (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
+              <MapPin className="w-3.5 h-3.5 text-primary" />
+              Zona: <span className="font-semibold">{ZONE_LABELS[staffZone!] || staffZone}</span>
+            </div>
           )}
         </div>
       </div>
