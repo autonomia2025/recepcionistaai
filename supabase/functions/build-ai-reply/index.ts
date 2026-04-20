@@ -32,6 +32,7 @@ interface AIReplyResult {
   should_handoff: boolean;
   should_send_booking_link: boolean;
   reasoning?: string;
+  detected_zone?: 'talca' | 'puerto_montt' | 'santiago' | null;
 }
 
 interface KnowledgeMatch {
