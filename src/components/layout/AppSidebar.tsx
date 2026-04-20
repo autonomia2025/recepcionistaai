@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSeatInfo, useSubscription } from '@/hooks/useWorkshopData';
+import { useSeatInfo, useSubscription, useWorkshop } from '@/hooks/useWorkshopData';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { Button } from '@/components/ui/button';
 import { useEffect, useMemo, useState } from 'react';
@@ -51,6 +51,10 @@ export const AppSidebar = () => {
   const {
     data: workshopMode
   } = useWorkshopMode();
+  const {
+    data: workshop
+  } = useWorkshop();
+  const workshopName = workshopMode?.name || workshop?.name || null;
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -230,9 +234,9 @@ export const AppSidebar = () => {
               {profile.role}
               <Settings className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            {workshopMode?.name && (
+            {workshopName && (
               <div className="text-xs text-emerald-200/80 truncate mt-1">
-                📍 {workshopMode.name}
+                📍 {workshopName}
               </div>
             )}
             {profile.zone && (
