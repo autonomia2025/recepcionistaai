@@ -218,14 +218,12 @@ const BookingPage = () => {
           setWorkshopName(workshop.name);
 
           // Get services from bot_settings
-          const { data: botSettings, error: botError } = await supabase
-            .from('bot_settings')
-            .select('services_json')
-            .eq('workshop_id', workshop.id)
-            .maybeSingle();
+          // Use secure RPC (no direct access to bot_settings from public page)
+          const { data: servicesJson, error: botError } = await supabase
+            .rpc('get_public_bot_services', { _workshop_id: workshop.id });
 
-          if (!botError && botSettings?.services_json && Array.isArray(botSettings.services_json)) {
-            const parsedServices = botSettings.services_json as unknown as Service[];
+          if (!botError && Array.isArray(servicesJson)) {
+            const parsedServices = servicesJson as unknown as Service[];
             setServices(parsedServices);
 
             // Pre-select service from URL
