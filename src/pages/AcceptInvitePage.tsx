@@ -248,13 +248,88 @@ export default function AcceptInvitePage() {
     );
   }
 
-  if (user && submitting) {
+  // Logged-in user with matching email: force password creation before joining
+  if (user && invite && user.email?.toLowerCase() === invite.email.toLowerCase()) {
     return (
-      <div className="public-shell flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Uniéndote al equipo...</p>
-        </div>
+      <div className="public-shell flex items-center justify-center p-4">
+        <Card className="public-card w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
+              <Building2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <CardTitle>Te han invitado a unirte</CardTitle>
+            <CardDescription className="space-y-3 mt-2">
+              <div>
+                <strong className="text-foreground">{invite.workshop_name || 'Un negocio'}</strong> te ha invitado
+              </div>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Badge variant="secondary">{invite.role}</Badge>
+                {invite.zone && (
+                  <Badge variant="outline" className={cn('gap-1', ZONE_STYLES[invite.zone])}>
+                    <MapPin className="h-3 w-3" />
+                    Zona {ZONE_LABELS[invite.zone] || invite.zone}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground pt-1">
+                Sesión activa: <span className="font-medium">{user.email}</span>
+              </div>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="text-center text-sm text-muted-foreground mb-4">
+              Para activar tu acceso, primero crea tu contraseña personal.
+            </div>
+
+            <form onSubmit={handleSetPasswordAndAccept} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nueva contraseña</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  minLength={6}
+                  required
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={submitting || password.length < 6}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4 mr-2" />
+                    Crear contraseña y unirme
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => { await signOut(); }}
+                className="text-xs text-muted-foreground"
+                disabled={submitting}
+              >
+                <LogOut className="w-3 h-3 mr-1" />
+                Cerrar sesión y empezar de nuevo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
