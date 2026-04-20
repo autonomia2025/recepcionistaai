@@ -316,6 +316,22 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
                       URL donde el bot enviará a los clientes para agendar. Se genera automáticamente al publicar la landing.
                     </p>
                   </div>
+
+                  <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30">
+                    <div className="space-y-1">
+                      <Label htmlFor="zone_detection" className="text-sm font-medium cursor-pointer">
+                        Detección automática de zona
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        El bot preguntará al cliente desde qué ciudad escribe (Talca, Puerto Montt, Santiago) y asignará la conversación al equipo de esa zona.
+                      </p>
+                    </div>
+                    <Switch
+                      id="zone_detection"
+                      checked={zoneDetectionEnabled}
+                      onCheckedChange={setZoneDetectionEnabled}
+                    />
+                  </div>
                 </AccordionContent>
               </AccordionItem>
 
