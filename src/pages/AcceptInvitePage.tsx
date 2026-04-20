@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, XCircle, Building2, MapPin } from 'lucide-react';
+import { Loader2, XCircle, Building2, MapPin, LogOut, KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface InviteData {
@@ -39,7 +39,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 export default function AcceptInvitePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -100,20 +100,30 @@ export default function AcceptInvitePage() {
     fetchInvite();
   }, [token]);
 
-  // Auto-accept ONLY if user is already logged in AND not currently submitting (avoids race)
+  // If session is logged in but with the wrong email, force signOut
   useEffect(() => {
-    const acceptForLoggedInUser = async () => {
-      if (!user || !invite || submitting || !token) return;
-      if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
-        setError(`Esta invitación es para ${invite.email}. Cierra sesión e intenta de nuevo.`);
-        return;
-      }
-      setSubmitting(true);
-      await acceptInviteWithRetry();
-    };
-    acceptForLoggedInUser();
+    if (user && invite && user.email?.toLowerCase() !== invite.email.toLowerCase()) {
+      signOut();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, invite]);
+
+  // Set new password for already-logged-in user, then accept invite
+  const handleSetPasswordAndAccept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invite || !token || !password) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { error: updErr } = await supabase.auth.updateUser({ password });
+      if (updErr) throw updErr;
+      await sleep(300);
+      await acceptInviteWithRetry();
+    } catch (err: any) {
+      setError(err.message || 'No se pudo establecer la contraseña');
+      setSubmitting(false);
+    }
+  };
 
   // RPC call with retry to overcome handle_new_user trigger race
   const acceptInviteWithRetry = async (attempts = 3): Promise<void> => {
@@ -238,13 +248,88 @@ export default function AcceptInvitePage() {
     );
   }
 
-  if (user && submitting) {
+  // Logged-in user with matching email: force password creation before joining
+  if (user && invite && user.email?.toLowerCase() === invite.email.toLowerCase()) {
     return (
-      <div className="public-shell flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Uniéndote al equipo...</p>
-        </div>
+      <div className="public-shell flex items-center justify-center p-4">
+        <Card className="public-card w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
+              <Building2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <CardTitle>Te han invitado a unirte</CardTitle>
+            <CardDescription className="space-y-3 mt-2">
+              <div>
+                <strong className="text-foreground">{invite.workshop_name || 'Un negocio'}</strong> te ha invitado
+              </div>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Badge variant="secondary">{invite.role}</Badge>
+                {invite.zone && (
+                  <Badge variant="outline" className={cn('gap-1', ZONE_STYLES[invite.zone])}>
+                    <MapPin className="h-3 w-3" />
+                    Zona {ZONE_LABELS[invite.zone] || invite.zone}
+                  </Badge>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground pt-1">
+                Sesión activa: <span className="font-medium">{user.email}</span>
+              </div>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="text-center text-sm text-muted-foreground mb-4">
+              Para activar tu acceso, primero crea tu contraseña personal.
+            </div>
+
+            <form onSubmit={handleSetPasswordAndAccept} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">Nueva contraseña</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  minLength={6}
+                  required
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={submitting || password.length < 6}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4 mr-2" />
+                    Crear contraseña y unirme
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => { await signOut(); }}
+                className="text-xs text-muted-foreground"
+                disabled={submitting}
+              >
+                <LogOut className="w-3 h-3 mr-1" />
+                Cerrar sesión y empezar de nuevo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
