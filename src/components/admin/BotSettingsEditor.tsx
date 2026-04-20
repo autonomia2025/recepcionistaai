@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Bot, MessageSquare, HelpCircle, Settings2, MapPin, Sparkles } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface Service {
   name: string;
@@ -56,6 +57,7 @@ interface WorkshopInfo {
   phone: string | null;
   city: string | null;
   booking_url: string | null;
+  zone_detection_enabled?: boolean | null;
 }
 
 interface BotSettingsEditorProps {
@@ -88,6 +90,7 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
   const [workshopPhone, setWorkshopPhone] = useState('');
   const [workshopCity, setWorkshopCity] = useState('');
   const [bookingUrl, setBookingUrl] = useState('');
+  const [zoneDetectionEnabled, setZoneDetectionEnabled] = useState(false);
 
   // Fetch current settings
   const { data: botSettings, isLoading: isLoadingBot } = useQuery({
@@ -111,7 +114,7 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workshops')
-        .select('address, phone, city, booking_url')
+        .select('address, phone, city, booking_url, zone_detection_enabled')
         .eq('id', workshopId)
         .single();
       
@@ -148,6 +151,7 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
       setWorkshopPhone(workshopInfo.phone || '');
       setWorkshopCity(workshopInfo.city || '');
       setBookingUrl(workshopInfo.booking_url || '');
+      setZoneDetectionEnabled(!!workshopInfo.zone_detection_enabled);
     }
   }, [workshopInfo]);
 
@@ -165,6 +169,7 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
           phone: workshopPhone || null,
           city: workshopCity || null,
           booking_url: bookingUrl || null,
+          zone_detection_enabled: zoneDetectionEnabled,
         })
         .eq('id', workshopId);
       
@@ -310,6 +315,22 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
                     <p className="text-xs text-muted-foreground">
                       URL donde el bot enviará a los clientes para agendar. Se genera automáticamente al publicar la landing.
                     </p>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-muted/30">
+                    <div className="space-y-1">
+                      <Label htmlFor="zone_detection" className="text-sm font-medium cursor-pointer">
+                        Detección automática de zona
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        El bot preguntará al cliente desde qué ciudad escribe (Talca, Puerto Montt, Santiago) y asignará la conversación al equipo de esa zona.
+                      </p>
+                    </div>
+                    <Switch
+                      id="zone_detection"
+                      checked={zoneDetectionEnabled}
+                      onCheckedChange={setZoneDetectionEnabled}
+                    />
                   </div>
                 </AccordionContent>
               </AccordionItem>

@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 
 interface ChatViewProps {
   conversation: Conversation;
@@ -130,6 +131,42 @@ export function ChatView({ conversation }: ChatViewProps) {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const isSuperAdmin = profile?.role === 'SUPERADMIN';
+  const isAdminLike = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
+  const [isUpdatingZone, setIsUpdatingZone] = useState(false);
+
+  // Fetch workshop's zone_detection_enabled flag
+  const { data: workshopFlags } = useQuery({
+    queryKey: ['workshop-zone-flag', conversation.workshop_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('workshops')
+        .select('zone_detection_enabled')
+        .eq('id', conversation.workshop_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!conversation.workshop_id && isAdminLike,
+  });
+  const zoneDetectionEnabled = !!(workshopFlags as any)?.zone_detection_enabled;
+
+  const handleZoneChange = async (newZone: string) => {
+    setIsUpdatingZone(true);
+    try {
+      const value = newZone === 'none' ? null : newZone;
+      const { error } = await supabase
+        .from('contacts')
+        .update({ zone: value })
+        .eq('id', contact.id);
+      if (error) throw error;
+      toast.success(value ? `Zona asignada: ${value}` : 'Zona removida');
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    } catch (err) {
+      console.error('Error updating zone:', err);
+      toast.error('No se pudo actualizar la zona');
+    } finally {
+      setIsUpdatingZone(false);
+    }
+  };
 
   const contact = conversation.contacts;
   const scoreColors = getLeadScoreColor(contact.lead_score);
@@ -492,6 +529,24 @@ export function ChatView({ conversation }: ChatViewProps) {
             <Badge variant="outline" className={cn('text-[10px] hidden lg:flex', statusBadge.style)}>
               {statusBadge.label}
             </Badge>
+
+            {zoneDetectionEnabled && isAdminLike && (
+              <Select
+                value={(contact as any).zone || 'none'}
+                onValueChange={handleZoneChange}
+                disabled={isUpdatingZone}
+              >
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectValue placeholder="Zona" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin zona</SelectItem>
+                  <SelectItem value="talca">📍 Talca</SelectItem>
+                  <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+                  <SelectItem value="santiago">📍 Santiago</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
             <Button
               variant="ghost"

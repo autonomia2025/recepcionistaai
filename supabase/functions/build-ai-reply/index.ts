@@ -32,6 +32,7 @@ interface AIReplyResult {
   should_handoff: boolean;
   should_send_booking_link: boolean;
   reasoning?: string;
+  detected_zone?: 'talca' | 'puerto_montt' | 'santiago' | null;
 }
 
 interface KnowledgeMatch {
@@ -310,7 +311,7 @@ serve(async (req) => {
     // Get workshop info
     const { data: workshop, error: workshopError } = await supabase
       .from('workshops')
-      .select('id, name, booking_url, slug, phone, address, city, booking_mode')
+      .select('id, name, booking_url, slug, phone, address, city, booking_mode, zone_detection_enabled')
       .eq('id', workshop_id)
       .single();
 
@@ -360,7 +361,7 @@ serve(async (req) => {
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('workshop_id')
+      .select('workshop_id, contact_id, assigned_to_user_id')
       .eq('id', conversation_id)
       .maybeSingle();
 
@@ -370,6 +371,19 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Load contact zone (for zone-detection feature)
+    let contactRecord: { id: string; zone: string | null } | null = null;
+    if (conversation?.contact_id) {
+      const { data: c } = await supabase
+        .from('contacts')
+        .select('id, zone')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      if (c) contactRecord = c as { id: string; zone: string | null };
+    }
+    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
+    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
 
     // Get conversation history (last 10 messages)
     const { data: messages, error: messagesError } = await supabase
@@ -438,10 +452,14 @@ ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}` : ''}
 
 ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGENDAMIENTO: ${fullBookingUrl}` : ''}
 
-${workshop.id === '610fb257-a649-4115-b944-21f31e7952db' ? `ZONA DEL CLIENTE (IMPORTANTE):
-- Si el cliente NO ha indicado su zona/ubicación, pregúntale de forma natural: "¿En qué zona te encuentras? Operamos en *Talca*, *Puerto Montt* y *Santiago*."
-- Solo pregunta UNA VEZ por la zona, no insistas si ya la mencionó.
-- Si el cliente menciona una ciudad/comuna, asóciala a la zona más cercana.` : ''}
+${zoneDetectionEnabled ? `ZONA DEL CLIENTE (REGLA CRÍTICA):
+${needsZone
+  ? `- El contacto AÚN NO tiene zona asignada. ANTES de cotizar, agendar o derivar al equipo, DEBES preguntar de forma natural desde qué ciudad o comuna escribe.
+- Zonas válidas: *Talca / Maule*, *Puerto Montt / Los Lagos*, *Santiago / RM*.
+- Hazlo en el saludo o apenas el cliente mencione su necesidad. Solo una vez, no insistas si ya la mencionó.
+- Si el cliente menciona una ciudad o comuna, asóciala a la zona más cercana.`
+  : `- El contacto ya tiene zona asignada: *${contactRecord?.zone}*. NO vuelvas a preguntarla. Personaliza la respuesta según esa zona cuando sea relevante.`}
+- Si en este mensaje el cliente menciona explícitamente una ciudad/comuna, devuelve también el campo "detected_zone" en el JSON ("talca" | "puerto_montt" | "santiago" | null). Si no la menciona, usa null.` : ''}
 ${ragContext}`;
 
     const isChatbotOnly = workshop.booking_mode === 'chatbot_only';
@@ -546,7 +564,8 @@ Analiza el mensaje y responde con este JSON exacto:
   "confidence": 0.95,
   "should_handoff": false,
   "should_send_booking_link": false,
-  "reasoning": "Breve explicación técnica de por qué se eligió esta respuesta y este intent"
+  "reasoning": "Breve explicación técnica de por qué se eligió esta respuesta y este intent"${zoneDetectionEnabled ? `,
+  "detected_zone": ${needsZone ? '"talca" | "puerto_montt" | "santiago" | null' : 'null'}` : ''}
 }
 
 REGLAS DE FORMATO:
@@ -631,6 +650,93 @@ Criterios:${isChatbotOnly ? '' : `
     }
 
     console.log('AI reply result:', result);
+
+    // ===== Zone detection & auto-assignment =====
+    if (zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
+      let detectedZone: 'talca' | 'puerto_montt' | 'santiago' | null = null;
+      const aiZone = (result as any).detected_zone;
+      if (aiZone === 'talca' || aiZone === 'puerto_montt' || aiZone === 'santiago') {
+        detectedZone = aiZone;
+      } else {
+        // Regex fallback on the latest user message
+        const txt = removeAccents(message_text.toLowerCase());
+        const talcaRe = /\b(talca|maule|curico|linares|san javier|constitucion|cauquenes|molina)\b/;
+        const pmRe = /\b(puerto montt|pto\.? montt|los lagos|osorno|puerto varas|llanquihue|castro|chiloe|ancud)\b/;
+        const stgoRe = /\b(santiago|stgo|region metropolitana|\brm\b|providencia|las condes|maipu|nunoa|la florida|puente alto|san bernardo|vitacura|la reina|penalolen|quilicura|recoleta|independencia|estacion central|macul|lo barnechea|huechuraba)\b/;
+        if (talcaRe.test(txt)) detectedZone = 'talca';
+        else if (pmRe.test(txt)) detectedZone = 'puerto_montt';
+        else if (stgoRe.test(txt)) detectedZone = 'santiago';
+      }
+
+      if (detectedZone) {
+        try {
+          const { error: updErr } = await supabase
+            .from('contacts')
+            .update({ zone: detectedZone })
+            .eq('id', contactRecord.id);
+          if (updErr) {
+            console.error('Failed to update contact zone:', updErr);
+          } else {
+            console.log(`Contact ${contactRecord.id} assigned to zone: ${detectedZone}`);
+
+            // Auto-assign conversation to a STAFF in that zone (if currently unassigned)
+            if (!conversation?.assigned_to_user_id) {
+              const { data: staffList } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('workshop_id', workshop_id)
+                .eq('status', 'active')
+                .eq('zone', detectedZone);
+
+              const staff = (staffList || []) as Array<{ id: string }>;
+              let chosen: string | null = null;
+              if (staff.length === 1) {
+                chosen = staff[0].id;
+              } else if (staff.length > 1) {
+                // Round-robin: pick STAFF with fewest open conversations
+                const counts = await Promise.all(
+                  staff.map(async (s) => {
+                    const { count } = await supabase
+                      .from('conversations')
+                      .select('id', { count: 'exact', head: true })
+                      .eq('workshop_id', workshop_id)
+                      .eq('assigned_to_user_id', s.id)
+                      .in('status', ['new', 'in_progress']);
+                    return { id: s.id, count: count || 0 };
+                  })
+                );
+                counts.sort((a, b) => a.count - b.count);
+                chosen = counts[0].id;
+              }
+
+              if (chosen) {
+                await supabase
+                  .from('conversations')
+                  .update({ assigned_to_user_id: chosen })
+                  .eq('id', conversation_id);
+                console.log(`Conversation ${conversation_id} auto-assigned to staff ${chosen}`);
+              }
+            }
+
+            // Audit log
+            await supabase.from('health_logs').insert({
+              workshop_id,
+              event_type: 'info',
+              category: 'bot',
+              message: `Zona asignada automáticamente: ${detectedZone}`,
+              metadata: {
+                contact_id: contactRecord.id,
+                conversation_id,
+                zone: detectedZone,
+                source: aiZone ? 'ai' : 'regex',
+              },
+            });
+          }
+        } catch (zoneErr) {
+          console.error('Zone assignment error:', zoneErr);
+        }
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,

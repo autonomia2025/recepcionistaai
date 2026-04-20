@@ -2659,6 +2659,7 @@ export type Database = {
           whatsapp_phone_number_id: string | null
           whatsapp_provider: string
           whatsapp_verify_token: string | null
+          zone_detection_enabled: boolean
           zone_notification_emails: Json | null
         }
         Insert: {
@@ -2710,6 +2711,7 @@ export type Database = {
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string
           whatsapp_verify_token?: string | null
+          zone_detection_enabled?: boolean
           zone_notification_emails?: Json | null
         }
         Update: {
@@ -2761,6 +2763,7 @@ export type Database = {
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string
           whatsapp_verify_token?: string | null
+          zone_detection_enabled?: boolean
           zone_notification_emails?: Json | null
         }
         Relationships: []
