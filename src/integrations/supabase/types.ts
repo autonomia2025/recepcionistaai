@@ -2937,6 +2937,14 @@ export type Database = {
           zone: string
         }[]
       }
+      get_public_bot_config: {
+        Args: { _workshop_id: string }
+        Returns: {
+          business_description: string
+          tone: string
+        }[]
+      }
+      get_public_bot_services: { Args: { _workshop_id: string }; Returns: Json }
       get_public_calendar_events: {
         Args: {
           _end: string
