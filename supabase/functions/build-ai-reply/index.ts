@@ -564,7 +564,8 @@ Analiza el mensaje y responde con este JSON exacto:
   "confidence": 0.95,
   "should_handoff": false,
   "should_send_booking_link": false,
-  "reasoning": "Breve explicación técnica de por qué se eligió esta respuesta y este intent"
+  "reasoning": "Breve explicación técnica de por qué se eligió esta respuesta y este intent"${zoneDetectionEnabled ? `,
+  "detected_zone": ${needsZone ? '"talca" | "puerto_montt" | "santiago" | null' : 'null'}` : ''}
 }
 
 REGLAS DE FORMATO:
