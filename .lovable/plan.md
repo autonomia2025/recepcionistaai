@@ -1,113 +1,135 @@
 
 
-## Plan aprobado: Opción C — Hardening mínimo sin tocar integraciones
+## Plan: Soporte real para archivos hasta 100MB en base de conocimiento
 
-Solo lo crítico que NO rompe funcionalidades existentes. Cero cirugía de tokens.
-
----
-
-### Cambio 1 — Cerrar `bot_settings` al público anónimo
-
-**Problema:** la política `Anyone can view bot_settings for active workshops` permite a cualquier visitante anónimo leer `system_prompt`, `services_json`, `faq_json`, `handoff_rules_json`, `urgency_rules_json` de TODOS los negocios activos. Riesgo: scrapers de competencia copian prompts y precios internos.
-
-**Solución:**
-1. Migración SQL:
-   - DROP de la política `Anyone can view bot_settings for active workshops`.
-   - Crear RPC `get_public_bot_config(_workshop_id uuid)` SECURITY DEFINER + `SET search_path = public` que retorna SOLO campos seguros: `tone`, `business_description`, `welcome_message` derivado (si existe en services). NO expone `system_prompt`, NO `services_json` con precios, NO `handoff_rules_json`, NO `urgency_rules_json`, NO `faq_json` interno.
-   - GRANT EXECUTE a anon, authenticated.
-2. Auditar uso público: las edge functions (`build-ai-reply`, `web-chat`, `web-chat-widget`) usan service_role → siguen funcionando sin cambios. La página `BookingPage` y el widget público no leen `bot_settings` directamente (usan `landing_config` y `landing_services`) → sin cambios de frontend esperados, pero se verificará con grep.
-
-**Riesgo de regresión:** Bajo. Si algún componente público lee `bot_settings` directo, lo migramos a la nueva RPC en el mismo ciclo.
+Sí se puede hacer 100MB sin perder efectividad. La clave es **cambiar el pipeline**, no solo subir el límite. Aquí están las soluciones a cada cuello de botella.
 
 ---
 
-### Cambio 2 — Bucket `quotations` con signed URLs
+### Solución 1 — Subir vía Storage, no en base64 por el body
 
-**Estado actual:** bucket ya es privado (`Is Public: No`). El riesgo es que `generate-manual-quote` esté retornando URLs públicas que no funcionan o, peor, que algún componente esté guardando paths y exponiéndolos.
+**Problema actual:** el archivo se convierte a base64 en el navegador y se manda en el body de la edge function. 100MB en base64 = 133MB en JSON = el navegador y la edge function colapsan.
 
-**Solución:**
-1. Auditar `supabase/functions/generate-manual-quote/index.ts`:
-   - Si retorna `getPublicUrl()` → cambiar a `createSignedUrl(path, 3600)` (1 hora).
-   - Si retorna el path directo → agregar paso de signed URL antes de devolver.
-2. Auditar componentes que muestran el PDF de cotización para que usen la signed URL retornada por la función (no construyan URL pública).
-3. No requiere migración SQL (bucket ya privado).
+**Solución:** subir el archivo directo a Supabase Storage (`bot-documents` bucket) usando upload chunked nativo, y pasar solo la URL/path a la edge function.
 
-**Riesgo de regresión:** Muy bajo. Solo afecta cotizaciones nuevas; las viejas con URL guardada siguen accesibles si el path se conserva (regenerable on-demand).
+- `DocumentUploader.tsx`: reemplazar el flujo base64 por `supabase.storage.from('bot-documents').upload(path, file)`. El SDK ya hace upload por chunks, soporta archivos grandes sin tocar memoria del browser de forma agresiva.
+- La edge function recibe `{ document_id, workshop_id, storage_path }` y descarga el archivo desde storage cuando lo necesita.
+
+**Resultado:** elimina el límite de body de edge function (que ronda los 6MB efectivos por la sobrecarga de base64).
 
 ---
 
-### Cambio 3 — Activar HIBP (Leaked Password Protection)
+### Solución 2 — Procesamiento por páginas/lotes en background
 
-**Solución:** llamar a `configure_auth` con `password_hibp_enabled: true`.
+**Problema actual:** Gemini procesa el PDF entero de una vez con `max_tokens: 16000`. Un PDF de 100 páginas devuelve solo las primeras ~25 páginas.
 
-**Efecto:** nuevos signups y cambios de contraseña son rechazados si la password está en la base de Have I Been Pwned. Usuarios existentes no se ven afectados.
+**Solución:** dividir el PDF en lotes de páginas y procesar cada lote por separado.
 
-**Riesgo de regresión:** Cero. Solo agrega validación.
+- Nueva función `process-rag-document-large` que:
+  1. Descarga el PDF desde Storage.
+  2. Usa `pdf-lib` (Deno-compatible) para dividir el PDF en lotes de **10 páginas**.
+  3. Procesa cada lote con Gemini en paralelo (máx 3 concurrentes para no saturar rate limits).
+  4. Concatena el texto extraído.
+  5. Hace chunking y guarda en `bot_knowledge`.
+- Subir `max_tokens` de 16.000 → **32.000** por lote (Gemini 2.5 Flash lo soporta).
+- Estado del documento se actualiza progresivamente: `processing` → `processing (45/100 páginas)` → `ready`. El usuario ve progreso real.
 
----
-
-### Cambio 4 — Reemplazar `USING(true)` permisivo en políticas de service_role
-
-**Problema:** 6 políticas tienen `USING(true)` / `WITH CHECK(true)`. Hoy funcionan bien porque solo edge functions con service_role las usan, pero si en el futuro se asigna esa policy al rol equivocado → fuga total.
-
-**Tablas afectadas:**
-- `appointment_actions` → `Service role can manage appointment_actions`
-- `internal_notification_logs` → `Service role can manage internal_notification_logs`
-- `message_batches` → `Service role can manage batches`
-- `email_reminder_logs` → `Service role can insert email_reminder_logs`
-- `health_logs` → `Service role can insert health_logs`
-- `monthly_reports` → `Service role can manage monthly_reports`
-
-**Solución (1 migración SQL):**
-- DROP cada política y recrear con `USING (current_setting('role', true) = 'service_role') WITH CHECK (current_setting('role', true) = 'service_role')`.
-
-**Riesgo de regresión:** Bajo. Las edge functions usan `SUPABASE_SERVICE_ROLE_KEY` → `current_setting('role')` retorna `'service_role'` → policies siguen permitiendo. Verificación post-deploy con un mensaje WhatsApp de prueba (genera registro en `message_batches` y `health_logs`).
+**Resultado:** un PDF de 100MB / 200 páginas se procesa completo, sin perder contenido.
 
 ---
 
-### Lo que NO se toca (cero riesgo)
+### Solución 3 — Procesamiento asíncrono con cola
 
-- Tokens de WhatsApp/Instagram/Twilio en `workshops` → SE QUEDAN donde están.
-- `google_refresh_token` en `profiles` → SE QUEDA donde está.
-- RLS de tablas de negocio (contacts, conversations, messages, appointments).
-- Lógica del bot, RAG, Firecrawl scraping.
-- Realtime, hooks, frontend en general.
+**Problema actual:** edge functions de Supabase tienen límite de ~150 segundos. Un PDF de 100MB tarda más.
 
----
+**Solución:** patrón async ya usado en el proyecto (igual que `scrape-website` según `mem://technical/web-scraping-architecture-async`).
 
-### Archivos / acciones
+- `DocumentUploader` invoca la función y retorna inmediato con `status: 'queued'`.
+- La edge function usa `EdgeRuntime.waitUntil()` para procesar en background sin bloquear la respuesta HTTP.
+- El frontend hace polling al estado del documento (o usa Realtime sobre `bot_documents`) para mostrar progreso.
 
-| Acción | Detalle |
-|---|---|
-| Migración SQL #1 | DROP política pública de `bot_settings` + crear RPC `get_public_bot_config` |
-| Migración SQL #2 | Reemplazar 6 políticas `USING(true)` por chequeo explícito de `service_role` |
-| Edit `supabase/functions/generate-manual-quote/index.ts` | Cambiar a signed URL si aplica |
-| Edit componentes que muestren cotizaciones | Usar signed URL retornada |
-| Plataforma | `configure_auth` con `password_hibp_enabled: true` |
-| Verificación grep | Confirmar que ningún componente público lee `bot_settings` directo |
+**Resultado:** sin timeouts. El usuario sube y sigue trabajando.
 
 ---
 
-### Auditoría post-implementación
+### Solución 4 — Chunking inteligente para mantener calidad RAG
 
-Tras aplicar todo, verifico:
+**Problema actual:** búsqueda por palabra clave (no embeddings reales) se diluye con documentos enormes.
 
-1. **Web chat widget público** sigue cargando y respondiendo (usa service_role, no afectado).
-2. **Booking page pública** sigue listando servicios y permitiendo reservar.
-3. **WhatsApp inbound** crea `message_batches` y `health_logs` correctamente con la nueva policy estricta.
-4. **Recordatorios email** registran en `email_reminder_logs`.
-5. **Cotización manual**: generar una nueva, descargar PDF vía signed URL, abrir y validar.
-6. **Signup nuevo** con password débil tipo "123456" es rechazado por HIBP.
+**Solución:** chunking más granular con metadata enriquecida.
 
-Reporto bugs encontrados con propuesta de fix antes de cerrar.
+- Reducir tamaño de chunk: de actual a **500-800 caracteres con overlap de 100**.
+- Añadir metadata por chunk: `{ source_file, page_number, section_title, chunk_index }`.
+- En `build-ai-reply`, cuando se recupere un chunk, incluir el nombre del archivo y página en el contexto que se pasa al modelo. Así el bot puede responder "según el manual X, página 12...".
+- Para PDFs >50MB, generar un **resumen ejecutivo** del documento completo (1-2 páginas) que se inyecta siempre al system prompt como contexto general, y los chunks específicos como detalle.
+
+**Resultado:** mejor recuperación, respuestas con citación de fuente, y el bot no se pierde en docs grandes.
 
 ---
+
+### Cambios concretos
+
+**Frontend — `src/components/bot/DocumentUploader.tsx`**
+- `MAX_FILE_SIZE`: 10MB → **100MB**.
+- Reemplazar lectura como base64 por `supabase.storage.from('bot-documents').upload()`.
+- Cambiar `maxDocuments` default a **50**.
+- Mostrar barra de progreso de upload (Storage SDK lo soporta).
+- Mostrar estado de procesamiento en tiempo real (suscripción Realtime a `bot_documents`).
+- Mensajes claros: "Subiendo... 45%", "Procesando página 12 de 80", "Listo".
+
+**Frontend — `src/components/bot/DocumentList.tsx`**
+- Mostrar progreso (`processing_progress` nuevo campo).
+- Indicador visual de tamaño del archivo.
+
+**Frontend — `src/pages/BotPage.tsx`**
+- Pasar `maxDocuments={50}`.
+- Activar Realtime subscription para refrescar la lista automáticamente.
+
+**Backend — Migración SQL**
+- Añadir columnas a `bot_documents`: `processing_progress INT DEFAULT 0`, `total_pages INT`, `processed_pages INT`, `storage_path TEXT`.
+- Configurar bucket `bot-documents` con `file_size_limit: 104857600` (100MB).
+- Activar Realtime sobre `bot_documents` para el frontend.
+
+**Backend — `supabase/functions/process-rag-document/index.ts`**
+- Aceptar `storage_path` en vez de `file_content` (mantener compatibilidad temporal con base64 para archivos pequeños <5MB).
+- Descargar desde Storage con `supabase.storage.from('bot-documents').download(path)`.
+- Para PDFs: usar `pdf-lib` para detectar número de páginas y dividir en lotes de 10.
+- Procesar lotes con concurrencia limitada (p-limit pattern, máx 3 paralelos).
+- Subir `max_tokens` de Gemini a 32.000.
+- Usar `EdgeRuntime.waitUntil()` para background processing.
+- Actualizar `processing_progress` después de cada lote.
+- Manejo robusto de errores: si falla un lote, reintentar 2 veces antes de marcar el documento parcial.
+
+**Backend — `supabase/functions/build-ai-reply/index.ts`**
+- Incluir `file_name` y `page_number` (si existe en metadata) en el contexto que se pasa al modelo.
+- Para workshops con muchos documentos grandes, recuperar más chunks (de 5 → 10) y dejar que el modelo filtre.
+
+---
+
+### Recomendaciones de uso para el cliente final
+
+Cuando entregues el bot, el sistema mostrará tooltips con:
+- **PDFs con texto nativo (no escaneados):** hasta 100MB OK, mejor calidad.
+- **PDFs escaneados (imágenes):** mejor mantener bajo 30MB (OCR es más lento).
+- **Word/Excel/PPT:** hasta 100MB OK, procesamiento muy rápido.
+- **Tip dorado:** dividir manuales muy largos por capítulos sigue dando mejor calidad de respuesta, aunque ya no sea obligatorio.
+
+---
+
+### Lo que NO cambia
+
+- Tipos de archivo aceptados (los mismos).
+- RLS policies (siguen igual, solo se ajusta tamaño en bucket).
+- Bots ya entrenados (cero impacto, los documentos viejos siguen funcionando).
+- Integraciones (WhatsApp, Instagram, Gmail, Calendar): cero impacto.
 
 ### Resultado esperado
 
-- Cierre de la fuga de prompts/configuración de bots a scrapers anónimos.
-- Cotizaciones blindadas con expiración temporal.
-- Defensa en profundidad en políticas de service_role.
-- Protección contra contraseñas filtradas para nuevos usuarios.
-- Cero impacto en integraciones vivas (WhatsApp, Instagram, Gmail, Calendar, Twilio).
+- Archivos hasta **100MB** (10x el límite actual).
+- Hasta **50 documentos** por bot (5x).
+- Capacidad total: **5 GB** por bot.
+- **Sin pérdida de contenido** en PDFs grandes (procesamiento por lotes).
+- **Sin timeouts** (procesamiento async en background).
+- **Mejor calidad RAG** con citación de fuente y chunking refinado.
+- Progreso en tiempo real visible para el usuario.
 
