@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 interface DocumentUploaderProps {
   workshopId: string;
@@ -13,7 +14,8 @@ interface DocumentUploaderProps {
   maxDocuments?: number;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for binary docs
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const SMALL_FILE_THRESHOLD = 4 * 1024 * 1024; // <4MB → still use base64 path (legacy fallback)
 const ACCEPTED_TYPES = {
   'text/plain': ['.txt'],
   'text/markdown': ['.md'],
@@ -32,28 +34,32 @@ export function DocumentUploader({
   workshopId, 
   onUploadComplete, 
   documentCount,
-  maxDocuments = 10 
+  maxDocuments = 50 
 }: DocumentUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentFile, setCurrentFile] = useState<string>('');
   const { toast } = useToast();
 
   const canUpload = documentCount < maxDocuments;
 
-  const processFile = async (file: File) => {
-    // Read file as ArrayBuffer for binary files
+  const fileToBase64 = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Convert to base64
     let binary = '';
     const chunkSize = 8192;
     for (let i = 0; i < uint8Array.length; i += chunkSize) {
       const chunk = uint8Array.subarray(i, i + chunkSize);
       binary += String.fromCharCode.apply(null, Array.from(chunk));
     }
-    const base64Content = btoa(binary);
+    return btoa(binary);
+  };
 
-    // Create document record
+  const processFile = async (file: File) => {
+    setCurrentFile(file.name);
+    setUploadProgress(0);
+
+    // Create document record first (status=processing, progress=0)
     const { data: doc, error: docError } = await supabase
       .from('bot_documents')
       .insert({
@@ -62,25 +68,67 @@ export function DocumentUploader({
         file_size: file.size,
         file_type: file.type || 'application/octet-stream',
         status: 'processing',
+        processing_progress: 0,
       })
       .select()
       .single();
 
     if (docError) throw docError;
 
-    // Call edge function to process
+    const useStorage = file.size > SMALL_FILE_THRESHOLD;
+    let storagePath: string | null = null;
+    let base64Content: string | null = null;
+
+    if (useStorage) {
+      // Upload to Supabase Storage (handles large files efficiently)
+      storagePath = `${workshopId}/${doc.id}-${file.name.replace(/[^\w.\-]/g, '_')}`;
+
+      setUploadProgress(10);
+      const { error: uploadError } = await supabase.storage
+        .from('bot-documents')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || 'application/octet-stream',
+        });
+
+      if (uploadError) {
+        await supabase
+          .from('bot_documents')
+          .update({ status: 'error', error_message: `Error subiendo archivo: ${uploadError.message}` })
+          .eq('id', doc.id);
+        throw uploadError;
+      }
+
+      setUploadProgress(60);
+
+      // Save storage path on the doc record
+      await supabase
+        .from('bot_documents')
+        .update({ storage_path: storagePath })
+        .eq('id', doc.id);
+    } else {
+      // Small file → keep base64 path (faster, fewer roundtrips)
+      setUploadProgress(30);
+      base64Content = await fileToBase64(file);
+      setUploadProgress(60);
+    }
+
+    // Invoke edge function (it handles processing async via background tasks)
     const { error: processError } = await supabase.functions.invoke('process-rag-document', {
       body: {
         document_id: doc.id,
         workshop_id: workshopId,
         file_name: file.name,
-        file_content: base64Content,
         file_type: file.type || 'application/octet-stream',
+        ...(storagePath ? { storage_path: storagePath } : {}),
+        ...(base64Content ? { file_content: base64Content } : {}),
       },
     });
 
+    setUploadProgress(100);
+
     if (processError) {
-      // Update document status to error
       await supabase
         .from('bot_documents')
         .update({ status: 'error', error_message: processError.message })
@@ -105,7 +153,7 @@ export function DocumentUploader({
       if (file.size > MAX_FILE_SIZE) {
         toast({
           title: 'Archivo muy grande',
-          description: `${file.name} excede el límite de 10MB`,
+          description: `${file.name} excede el límite de 100MB`,
           variant: 'destructive',
         });
         return false;
@@ -136,7 +184,7 @@ export function DocumentUploader({
 
       toast({
         title: '¡Documento(s) subido(s)!',
-        description: 'El procesamiento puede tomar unos segundos.',
+        description: 'El procesamiento continúa en segundo plano. Verás el progreso en tiempo real.',
       });
 
       onUploadComplete();
@@ -149,6 +197,8 @@ export function DocumentUploader({
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setCurrentFile('');
     }
   }, [workshopId, canUpload, documentCount, maxDocuments, toast, onUploadComplete]);
 
@@ -174,7 +224,15 @@ export function DocumentUploader({
         {isUploading ? (
           <>
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm text-muted-foreground">Procesando documento...</p>
+            <p className="text-sm text-muted-foreground truncate max-w-full px-4">
+              Subiendo {currentFile}...
+            </p>
+            {uploadProgress > 0 && (
+              <div className="w-full max-w-xs mt-2">
+                <Progress value={uploadProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">{uploadProgress}%</p>
+              </div>
+            )}
           </>
         ) : !canUpload ? (
           <>
@@ -195,7 +253,10 @@ export function DocumentUploader({
               Arrastra archivos aquí o haz clic para seleccionar
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, Word, Excel, PowerPoint, TXT • Máximo 10MB
+              PDF, Word, Excel, PowerPoint, TXT • Máximo 100MB · {maxDocuments} archivos
+            </p>
+            <p className="text-[10px] text-muted-foreground/70 mt-1">
+              💡 Para mejor calidad, divide manuales muy largos por capítulos
             </p>
           </>
         )}
