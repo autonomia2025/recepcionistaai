@@ -45,6 +45,9 @@ interface BotDocument {
   chunk_count: number | null;
   error_message: string | null;
   created_at: string;
+  processing_progress?: number | null;
+  total_pages?: number | null;
+  processed_pages?: number | null;
 }
 
 const TONE_OPTIONS = [
@@ -100,12 +103,36 @@ export default function BotSettingsPage() {
     },
     enabled: !!profile?.workshop_id,
     refetchInterval: (query) => {
-      // Auto-refetch if any document is processing
       const docs = query.state.data as BotDocument[] | undefined;
       const hasProcessing = docs?.some(d => d.status === 'processing');
-      return hasProcessing ? 3000 : false;
+      // Realtime handles updates; this is a fallback
+      return hasProcessing ? 5000 : false;
     },
   });
+
+  // Realtime subscription for live progress updates
+  useEffect(() => {
+    if (!profile?.workshop_id) return;
+    const channel = supabase
+      .channel(`bot-documents-${profile.workshop_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bot_documents',
+          filter: `workshop_id=eq.${profile.workshop_id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['bot-documents', profile.workshop_id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.workshop_id, queryClient]);
 
   // Initialize form when data loads
   useEffect(() => {
