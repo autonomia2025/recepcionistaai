@@ -299,14 +299,20 @@ async function extractTextFromPowerPoint(buffer: Uint8Array): Promise<string> {
 }
 
 // Extract text based on file type
-async function extractText(buffer: Uint8Array, fileType: string, fileName: string, apiKey: string): Promise<string> {
+async function extractText(
+  buffer: Uint8Array,
+  fileType: string,
+  fileName: string,
+  apiKey: string,
+  onProgress?: (processed: number, total: number) => Promise<void>
+): Promise<string> {
   const extension = fileName.toLowerCase().split('.').pop() || '';
 
   console.log('Extracting text from:', { fileType, extension, bufferSize: buffer.length });
 
   // PDF - use Gemini Vision
   if (fileType === 'application/pdf' || extension === 'pdf') {
-    return await extractTextFromPDF(buffer, apiKey);
+    return await extractTextFromPDF(buffer, apiKey, onProgress);
   }
 
   // Word documents (DOCX)
