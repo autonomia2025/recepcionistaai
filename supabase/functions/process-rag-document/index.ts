@@ -6,57 +6,127 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Extract text from PDF using Gemini Vision API
-async function extractTextFromPDF(buffer: Uint8Array, apiKey: string): Promise<string> {
-  try {
-    // Convert buffer to base64
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
+// ===== PDF helpers =====
 
-    // Use Gemini to extract text from PDF
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extrae TODO el texto de este documento PDF. Solo devuelve el texto extraído, sin comentarios ni explicaciones. Si hay tablas, conviértelas a texto plano. Mantén la estructura y los párrafos.'
-              },
-              {
-                type: 'file',
-                file: {
-                  filename: 'document.pdf',
-                  file_data: `data:application/pdf;base64,${base64}`
-                }
+// Convert Uint8Array to base64 in chunks (avoids stack overflow on large buffers)
+function bufferToBase64(buffer: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 32768;
+  for (let i = 0; i < buffer.length; i += chunkSize) {
+    const chunk = buffer.subarray(i, Math.min(i + chunkSize, buffer.length));
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+}
+
+// Extract text from a single PDF batch using Gemini
+async function extractPDFBatch(buffer: Uint8Array, apiKey: string, label: string): Promise<string> {
+  const base64 = bufferToBase64(buffer);
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extrae TODO el texto de este PDF. Solo devuelve el texto extraído, sin comentarios. Si hay tablas, conviértelas a texto plano. Mantén la estructura y los párrafos.'
+            },
+            {
+              type: 'file',
+              file: {
+                filename: 'document.pdf',
+                file_data: `data:application/pdf;base64,${base64}`
               }
-            ]
-          }
-        ],
-        max_tokens: 16000,
-        temperature: 0.1,
-      }),
-    });
+            }
+          ]
+        }
+      ],
+      max_tokens: 32000,
+      temperature: 0.1,
+    }),
+  });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('PDF extraction API error:', response.status, error);
-      throw new Error('Error al procesar el PDF con IA');
+  if (!response.ok) {
+    const err = await response.text();
+    console.error(`PDF batch ${label} extraction failed:`, response.status, err);
+    throw new Error(`Error procesando ${label}`);
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content || '';
+}
+
+// Extract text from PDF — splits into batches of N pages for large files
+async function extractTextFromPDF(
+  buffer: Uint8Array,
+  apiKey: string,
+  onProgress?: (processed: number, total: number) => Promise<void>
+): Promise<string> {
+  try {
+    const PDFLib = await import("https://esm.sh/pdf-lib@1.17.1");
+    const srcDoc = await PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+
+    console.log(`PDF has ${totalPages} pages`);
+
+    const BATCH_SIZE = 10;
+
+    // Small PDFs (≤ 10 pages): single call
+    if (totalPages <= BATCH_SIZE) {
+      if (onProgress) await onProgress(0, totalPages);
+      const text = await extractPDFBatch(buffer, apiKey, `PDF (${totalPages} págs)`);
+      if (onProgress) await onProgress(totalPages, totalPages);
+      return text;
     }
 
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || '';
+    // Large PDFs: split into batches and process sequentially (avoids rate limits)
+    const allTexts: string[] = [];
+    let processed = 0;
+    if (onProgress) await onProgress(0, totalPages);
+
+    for (let start = 0; start < totalPages; start += BATCH_SIZE) {
+      const end = Math.min(start + BATCH_SIZE, totalPages);
+      const batchDoc = await PDFLib.PDFDocument.create();
+      const indices = Array.from({ length: end - start }, (_, i) => start + i);
+      const copied = await batchDoc.copyPages(srcDoc, indices);
+      copied.forEach((p) => batchDoc.addPage(p));
+      const batchBytes = await batchDoc.save();
+
+      const label = `págs ${start + 1}-${end}`;
+      let batchText = '';
+      let attempts = 0;
+      while (attempts < 2) {
+        try {
+          batchText = await extractPDFBatch(batchBytes, apiKey, label);
+          break;
+        } catch (e) {
+          attempts++;
+          if (attempts >= 2) {
+            console.error(`Batch ${label} failed after retries, skipping`);
+            batchText = `[No se pudo extraer ${label}]`;
+          } else {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
+      }
+
+      if (batchText) allTexts.push(`=== PÁGINAS ${start + 1}-${end} ===\n${batchText}`);
+      processed = end;
+      if (onProgress) await onProgress(processed, totalPages);
+
+      // Small delay between batches to respect rate limits
+      if (end < totalPages) await new Promise(r => setTimeout(r, 500));
+    }
+
+    return allTexts.join('\n\n');
   } catch (error) {
     console.error('PDF extraction error:', error);
     throw new Error('Error al extraer texto del PDF. Asegúrate de que el PDF contenga texto legible.');
@@ -229,14 +299,20 @@ async function extractTextFromPowerPoint(buffer: Uint8Array): Promise<string> {
 }
 
 // Extract text based on file type
-async function extractText(buffer: Uint8Array, fileType: string, fileName: string, apiKey: string): Promise<string> {
+async function extractText(
+  buffer: Uint8Array,
+  fileType: string,
+  fileName: string,
+  apiKey: string,
+  onProgress?: (processed: number, total: number) => Promise<void>
+): Promise<string> {
   const extension = fileName.toLowerCase().split('.').pop() || '';
 
   console.log('Extracting text from:', { fileType, extension, bufferSize: buffer.length });
 
   // PDF - use Gemini Vision
   if (fileType === 'application/pdf' || extension === 'pdf') {
-    return await extractTextFromPDF(buffer, apiKey);
+    return await extractTextFromPDF(buffer, apiKey, onProgress);
   }
 
   // Word documents (DOCX)
@@ -342,6 +418,165 @@ async function generateEmbedding(supabaseUrl: string, supabaseServiceKey: string
   }
 }
 
+// Background processing — runs after the HTTP response is returned
+async function processDocumentBackground(params: {
+  supabase: ReturnType<typeof createClient>;
+  supabaseUrl: string;
+  supabaseServiceKey: string;
+  lovableApiKey: string;
+  document_id: string;
+  workshop_id: string;
+  file_name: string;
+  file_type: string;
+  file_content?: string;
+  storage_path?: string;
+  plain_text?: string;
+}) {
+  const {
+    supabase, supabaseUrl, supabaseServiceKey, lovableApiKey,
+    document_id, workshop_id, file_name, file_type,
+    file_content, storage_path, plain_text,
+  } = params;
+
+  const updateProgress = async (progress: number, extra: Record<string, unknown> = {}) => {
+    await supabase
+      .from('bot_documents')
+      .update({ processing_progress: progress, ...extra })
+      .eq('id', document_id);
+  };
+
+  try {
+    let textContent: string;
+
+    if (plain_text) {
+      console.log('Using plain text input, length:', plain_text.length);
+      textContent = plain_text;
+      await updateProgress(40);
+    } else {
+      let buffer: Uint8Array;
+
+      if (storage_path) {
+        // Download from Storage (preferred for large files)
+        console.log('Downloading from storage:', storage_path);
+        await updateProgress(10);
+        const { data: blob, error: dlError } = await supabase.storage
+          .from('bot-documents')
+          .download(storage_path);
+
+        if (dlError || !blob) {
+          throw new Error(`No se pudo descargar el archivo: ${dlError?.message || 'desconocido'}`);
+        }
+        const ab = await blob.arrayBuffer();
+        buffer = new Uint8Array(ab);
+        console.log('Downloaded buffer size:', buffer.length);
+        await updateProgress(20);
+      } else if (file_content) {
+        // Legacy base64 path (small files only)
+        const binaryString = atob(file_content);
+        buffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          buffer[i] = binaryString.charCodeAt(i);
+        }
+        console.log('Decoded base64 buffer size:', buffer.length);
+        await updateProgress(20);
+      } else {
+        throw new Error('No file_content or storage_path provided');
+      }
+
+      // Extract text with progress callback (for PDFs with batches)
+      textContent = await extractText(
+        buffer,
+        file_type,
+        file_name,
+        lovableApiKey,
+        async (processed, total) => {
+          // Map page progress to 20-70% range
+          const pct = total > 0 ? 20 + Math.round((processed / total) * 50) : 20;
+          await updateProgress(pct, {
+            total_pages: total,
+            processed_pages: processed,
+          });
+        }
+      );
+    }
+
+    if (!textContent || textContent.trim().length < 10) {
+      throw new Error('No se pudo extraer texto del documento. Verifica que el archivo contenga texto legible.');
+    }
+
+    console.log('Extracted text length:', textContent.length);
+    await updateProgress(70);
+
+    const chunks = splitIntoChunks(textContent, 400, 50);
+    console.log('Created chunks:', chunks.length);
+
+    if (chunks.length === 0) {
+      throw new Error('El documento no contiene suficiente texto para procesar');
+    }
+
+    let successCount = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      try {
+        const embedding = await generateEmbedding(supabaseUrl, supabaseServiceKey, chunk);
+
+        const insertPayload: Record<string, unknown> = {
+          workshop_id,
+          document_id,
+          file_name,
+          content: chunk,
+          chunk_index: i,
+          metadata: { char_count: chunk.length, word_count: chunk.split(/\s+/).length },
+        };
+        if (embedding) insertPayload.embedding = `[${embedding.join(',')}]`;
+
+        const { error: insertError } = await supabase.from('bot_knowledge').insert(insertPayload);
+        if (insertError) {
+          console.error('Error inserting chunk:', insertError);
+        } else {
+          successCount++;
+        }
+
+        // Update progress every 10 chunks (70 → 99%)
+        if (i % 10 === 0 || i === chunks.length - 1) {
+          const pct = 70 + Math.round(((i + 1) / chunks.length) * 29);
+          await updateProgress(pct);
+        }
+
+        if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 150));
+      } catch (chunkError) {
+        console.error(`Error processing chunk ${i}:`, chunkError);
+      }
+    }
+
+    if (successCount > 0) {
+      await supabase
+        .from('bot_documents')
+        .update({
+          status: 'ready',
+          chunk_count: successCount,
+          processing_progress: 100,
+          error_message: null,
+        })
+        .eq('id', document_id);
+      console.log('Document processed successfully:', { document_id, chunks: successCount });
+    } else {
+      throw new Error('No se pudieron procesar los fragmentos del documento');
+    }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+    console.error('Background processing error:', errorMessage);
+    await supabase
+      .from('bot_documents')
+      .update({
+        status: 'error',
+        error_message: errorMessage,
+        processing_progress: 0,
+      })
+      .eq('id', document_id);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -353,156 +588,48 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { document_id, workshop_id, file_name, file_content, file_type, plain_text } = await req.json();
+    const {
+      document_id, workshop_id, file_name,
+      file_content, file_type, plain_text, storage_path,
+    } = await req.json();
 
-    if (!document_id || !workshop_id || !file_name || (!file_content && !plain_text)) {
-      return new Response(JSON.stringify({ 
-        error: 'Missing required fields: document_id, workshop_id, file_name, and either file_content or plain_text' 
+    if (!document_id || !workshop_id || !file_name || (!file_content && !plain_text && !storage_path)) {
+      return new Response(JSON.stringify({
+        error: 'Missing required fields: document_id, workshop_id, file_name, and one of file_content/plain_text/storage_path',
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Processing document:', { document_id, file_name, file_type });
+    console.log('Queued document processing:', { document_id, file_name, file_type, has_storage: !!storage_path });
 
-    // Update document status to processing
+    // Mark as processing immediately
     await supabase
       .from('bot_documents')
-      .update({ status: 'processing' })
+      .update({ status: 'processing', processing_progress: 5 })
       .eq('id', document_id);
 
-    try {
-      let textContent: string;
+    // Run heavy work in background — returns response immediately to avoid timeouts
+    // @ts-ignore - EdgeRuntime is provided by Supabase Edge Functions runtime
+    EdgeRuntime.waitUntil(
+      processDocumentBackground({
+        supabase, supabaseUrl, supabaseServiceKey, lovableApiKey,
+        document_id, workshop_id, file_name,
+        file_type: file_type || 'application/octet-stream',
+        file_content, storage_path, plain_text,
+      })
+    );
 
-      if (plain_text) {
-        // Plain text provided directly (e.g. from web scraping)
-        console.log('Using plain text input, length:', plain_text.length);
-        textContent = plain_text;
-      } else {
-        // Decode base64 content to Uint8Array
-        const binaryString = atob(file_content);
-        const buffer = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          buffer[i] = binaryString.charCodeAt(i);
-        }
-
-        console.log('Decoded buffer size:', buffer.length);
-
-        // Extract text based on file type
-        textContent = await extractText(buffer, file_type, file_name, lovableApiKey);
-      }
-
-      if (!textContent || textContent.trim().length < 10) {
-        throw new Error('No se pudo extraer texto del documento. Verifica que el archivo contenga texto legible.');
-      }
-
-      console.log('Extracted text length:', textContent.length);
-
-      // Split into chunks
-      const chunks = splitIntoChunks(textContent, 400, 50);
-      console.log('Created chunks:', chunks.length);
-
-      if (chunks.length === 0) {
-        throw new Error('El documento no contiene suficiente texto para procesar');
-      }
-
-      // Process each chunk - generate embeddings and save
-      let successCount = 0;
-
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-
-        try {
-          console.log(`Processing chunk ${i + 1}/${chunks.length}`);
-
-          // Generate embedding for this chunk
-          const embedding = await generateEmbedding(supabaseUrl, supabaseServiceKey, chunk);
-
-          if (!embedding) {
-            console.warn(`Chunk ${i}: embedding failed, saving without embedding`);
-          }
-
-          // Build the insert payload; format embedding as pgvector literal when present
-          const insertPayload: Record<string, unknown> = {
-            workshop_id,
-            document_id,
-            file_name,
-            content: chunk,
-            chunk_index: i,
-            metadata: { char_count: chunk.length, word_count: chunk.split(/\s+/).length },
-          };
-
-          if (embedding) {
-            // pgvector expects a string like "[0.1,0.2,...]"
-            insertPayload.embedding = `[${embedding.join(',')}]`;
-          }
-
-          const { error: insertError } = await supabase
-            .from('bot_knowledge')
-            .insert(insertPayload);
-
-          if (insertError) {
-            console.error('Error inserting chunk:', insertError);
-          } else {
-            successCount++;
-          }
-
-          // Small delay to avoid rate limits on embedding API
-          if (i < chunks.length - 1) {
-            await new Promise(r => setTimeout(r, 200));
-          }
-        } catch (chunkError) {
-          console.error(`Error processing chunk ${i}:`, chunkError);
-        }
-      }
-
-      // Update document status
-      if (successCount > 0) {
-        await supabase
-          .from('bot_documents')
-          .update({
-            status: 'ready',
-            chunk_count: successCount,
-            error_message: null
-          })
-          .eq('id', document_id);
-
-        console.log('Document processed successfully:', { document_id, chunks: successCount });
-
-        return new Response(JSON.stringify({
-          success: true,
-          document_id,
-          chunks_created: successCount,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        throw new Error('No se pudieron procesar los fragmentos del documento');
-      }
-
-    } catch (processingError: unknown) {
-      const errorMessage = processingError instanceof Error ? processingError.message : 'Error desconocido';
-      console.error('Document processing error:', errorMessage);
-
-      // Update document with error
-      await supabase
-        .from('bot_documents')
-        .update({
-          status: 'error',
-          error_message: errorMessage
-        })
-        .eq('id', document_id);
-
-      return new Response(JSON.stringify({
-        success: false,
-        error: errorMessage,
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    return new Response(JSON.stringify({
+      success: true,
+      document_id,
+      status: 'queued',
+      message: 'Procesamiento iniciado en segundo plano',
+    }), {
+      status: 202,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error: unknown) {
     console.error('Process RAG document error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';

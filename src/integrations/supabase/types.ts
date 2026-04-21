@@ -436,7 +436,11 @@ export type Database = {
           file_size: number | null
           file_type: string | null
           id: string
+          processed_pages: number | null
+          processing_progress: number | null
           status: string | null
+          storage_path: string | null
+          total_pages: number | null
           workshop_id: string
         }
         Insert: {
@@ -447,7 +451,11 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          processed_pages?: number | null
+          processing_progress?: number | null
           status?: string | null
+          storage_path?: string | null
+          total_pages?: number | null
           workshop_id: string
         }
         Update: {
@@ -458,7 +466,11 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          processed_pages?: number | null
+          processing_progress?: number | null
           status?: string | null
+          storage_path?: string | null
+          total_pages?: number | null
           workshop_id?: string
         }
         Relationships: [
