@@ -6,57 +6,127 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Extract text from PDF using Gemini Vision API
-async function extractTextFromPDF(buffer: Uint8Array, apiKey: string): Promise<string> {
-  try {
-    // Convert buffer to base64
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
+// ===== PDF helpers =====
 
-    // Use Gemini to extract text from PDF
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Extrae TODO el texto de este documento PDF. Solo devuelve el texto extraído, sin comentarios ni explicaciones. Si hay tablas, conviértelas a texto plano. Mantén la estructura y los párrafos.'
-              },
-              {
-                type: 'file',
-                file: {
-                  filename: 'document.pdf',
-                  file_data: `data:application/pdf;base64,${base64}`
-                }
+// Convert Uint8Array to base64 in chunks (avoids stack overflow on large buffers)
+function bufferToBase64(buffer: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 32768;
+  for (let i = 0; i < buffer.length; i += chunkSize) {
+    const chunk = buffer.subarray(i, Math.min(i + chunkSize, buffer.length));
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+}
+
+// Extract text from a single PDF batch using Gemini
+async function extractPDFBatch(buffer: Uint8Array, apiKey: string, label: string): Promise<string> {
+  const base64 = bufferToBase64(buffer);
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Extrae TODO el texto de este PDF. Solo devuelve el texto extraído, sin comentarios. Si hay tablas, conviértelas a texto plano. Mantén la estructura y los párrafos.'
+            },
+            {
+              type: 'file',
+              file: {
+                filename: 'document.pdf',
+                file_data: `data:application/pdf;base64,${base64}`
               }
-            ]
-          }
-        ],
-        max_tokens: 16000,
-        temperature: 0.1,
-      }),
-    });
+            }
+          ]
+        }
+      ],
+      max_tokens: 32000,
+      temperature: 0.1,
+    }),
+  });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('PDF extraction API error:', response.status, error);
-      throw new Error('Error al procesar el PDF con IA');
+  if (!response.ok) {
+    const err = await response.text();
+    console.error(`PDF batch ${label} extraction failed:`, response.status, err);
+    throw new Error(`Error procesando ${label}`);
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content || '';
+}
+
+// Extract text from PDF — splits into batches of N pages for large files
+async function extractTextFromPDF(
+  buffer: Uint8Array,
+  apiKey: string,
+  onProgress?: (processed: number, total: number) => Promise<void>
+): Promise<string> {
+  try {
+    const PDFLib = await import("https://esm.sh/pdf-lib@1.17.1");
+    const srcDoc = await PDFLib.PDFDocument.load(buffer, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+
+    console.log(`PDF has ${totalPages} pages`);
+
+    const BATCH_SIZE = 10;
+
+    // Small PDFs (≤ 10 pages): single call
+    if (totalPages <= BATCH_SIZE) {
+      if (onProgress) await onProgress(0, totalPages);
+      const text = await extractPDFBatch(buffer, apiKey, `PDF (${totalPages} págs)`);
+      if (onProgress) await onProgress(totalPages, totalPages);
+      return text;
     }
 
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || '';
+    // Large PDFs: split into batches and process sequentially (avoids rate limits)
+    const allTexts: string[] = [];
+    let processed = 0;
+    if (onProgress) await onProgress(0, totalPages);
+
+    for (let start = 0; start < totalPages; start += BATCH_SIZE) {
+      const end = Math.min(start + BATCH_SIZE, totalPages);
+      const batchDoc = await PDFLib.PDFDocument.create();
+      const indices = Array.from({ length: end - start }, (_, i) => start + i);
+      const copied = await batchDoc.copyPages(srcDoc, indices);
+      copied.forEach((p) => batchDoc.addPage(p));
+      const batchBytes = await batchDoc.save();
+
+      const label = `págs ${start + 1}-${end}`;
+      let batchText = '';
+      let attempts = 0;
+      while (attempts < 2) {
+        try {
+          batchText = await extractPDFBatch(batchBytes, apiKey, label);
+          break;
+        } catch (e) {
+          attempts++;
+          if (attempts >= 2) {
+            console.error(`Batch ${label} failed after retries, skipping`);
+            batchText = `[No se pudo extraer ${label}]`;
+          } else {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
+      }
+
+      if (batchText) allTexts.push(`=== PÁGINAS ${start + 1}-${end} ===\n${batchText}`);
+      processed = end;
+      if (onProgress) await onProgress(processed, totalPages);
+
+      // Small delay between batches to respect rate limits
+      if (end < totalPages) await new Promise(r => setTimeout(r, 500));
+    }
+
+    return allTexts.join('\n\n');
   } catch (error) {
     console.error('PDF extraction error:', error);
     throw new Error('Error al extraer texto del PDF. Asegúrate de que el PDF contenga texto legible.');
