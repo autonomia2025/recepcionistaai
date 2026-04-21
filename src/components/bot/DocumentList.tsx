@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 
 interface Document {
   id: string;
@@ -21,6 +22,9 @@ interface Document {
   chunk_count: number | null;
   error_message: string | null;
   created_at: string;
+  processing_progress?: number | null;
+  total_pages?: number | null;
+  processed_pages?: number | null;
 }
 
 interface DocumentListProps {
@@ -274,6 +278,16 @@ export function DocumentList({ documents, onDelete, isLoading }: DocumentListPro
                   </>
                 )}
               </div>
+              {doc.status === 'processing' && (
+                <div className="mt-2">
+                  <Progress value={doc.processing_progress ?? 0} className="h-1.5" />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {doc.total_pages && doc.total_pages > 0
+                      ? `Procesando página ${doc.processed_pages ?? 0} de ${doc.total_pages} · ${doc.processing_progress ?? 0}%`
+                      : `${doc.processing_progress ?? 0}%`}
+                  </p>
+                </div>
+              )}
             </div>
 
             <StatusBadge status={doc.status} errorMessage={doc.error_message} />
