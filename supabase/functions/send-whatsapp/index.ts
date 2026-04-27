@@ -248,6 +248,56 @@ serve(async (req) => {
       }
 
       messageId = twilioResult.sid;
+    } else if (workshop.whatsapp_provider === 'kapso') {
+      // Send via Kapso (Meta Business Partner wrapper - uses Meta API format)
+      console.log('Sending via Kapso...');
+
+      const kapsoApiKey = Deno.env.get('KAPSO_API_KEY');
+      if (!kapsoApiKey) {
+        return new Response(JSON.stringify({ error: 'KAPSO_API_KEY not configured' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!workshop.whatsapp_phone_number_id) {
+        return new Response(JSON.stringify({ error: 'Kapso phone_number_id not configured for this workshop' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const kapsoUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${workshop.whatsapp_phone_number_id}/messages`;
+
+      const kapsoResponse = await fetch(kapsoUrl, {
+        method: 'POST',
+        headers: {
+          'X-API-Key': kapsoApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: recipientPhone,
+          type: 'text',
+          text: { body: text },
+        }),
+      });
+
+      const kapsoResult = await kapsoResponse.json();
+      console.log('Kapso API response:', kapsoResult);
+
+      if (!kapsoResponse.ok) {
+        console.error('Kapso API error:', kapsoResult);
+        return new Response(JSON.stringify({
+          error: 'Failed to send WhatsApp message via Kapso',
+          details: kapsoResult
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      messageId = kapsoResult.messages?.[0]?.id;
     } else {
       // Send via Meta Cloud API (default)
       console.log('Sending via Meta Cloud API...');
