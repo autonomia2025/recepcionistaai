@@ -88,10 +88,11 @@ serve(async (req) => {
       let messageText = '';
       let senderName: string | undefined;
       let messageTimestamp = Date.now();
+      let webhookEvent = req.headers.get('x-webhook-event') || '';
+      const providerName = isKapso ? 'kapso' : 'meta';
 
       if (isKapso) {
-        const kapsoEvent = req.headers.get('x-webhook-event') || '';
-        console.log('Kapso event detected:', kapsoEvent);
+        console.log('Kapso event detected:', webhookEvent);
 
         const km = body.message;
 
@@ -160,7 +161,7 @@ serve(async (req) => {
       // Find workshop by phone_number_id (multi-tenant routing)
       const { data: workshop, error: workshopError } = await supabase
         .from('workshops')
-        .select('id, name, whatsapp_access_token, bot_enabled, booking_url, slug')
+        .select('id, name, whatsapp_access_token, whatsapp_provider, bot_enabled, booking_url, slug')
         .eq('whatsapp_phone_number_id', phoneNumberId)
         .eq('whatsapp_connected', true)
         .eq('is_active', true)
@@ -175,6 +176,22 @@ serve(async (req) => {
       }
 
       console.log('Found workshop:', workshop.name, 'bot_enabled:', workshop.bot_enabled);
+
+      // Deduplicate webhook retries by provider message id before creating inbox rows or batches
+      const { data: duplicateInbound } = await supabase
+        .from('messages')
+        .select('id, conversation_id')
+        .eq('workshop_id', workshop.id)
+        .eq('direction', 'inbound')
+        .contains('metadata', { provider_message_id: messageId })
+        .maybeSingle();
+
+      if (duplicateInbound) {
+        console.log('Duplicate inbound webhook ignored:', { messageId, existingMessageId: duplicateInbound.id });
+        return new Response(JSON.stringify({ success: true, duplicate: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       // Check if number is blocked
       const { data: isBlocked } = await supabase.rpc('is_number_blocked', {
