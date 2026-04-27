@@ -61,7 +61,7 @@ interface Workshop {
   whatsapp_verify_token: string | null;
   whatsapp_connected: boolean;
   whatsapp_connected_at: string | null;
-  whatsapp_provider: 'meta' | 'twilio';
+  whatsapp_provider: 'meta' | 'twilio' | 'ycloud' | 'kapso';
   twilio_phone_number: string | null;
   twilio_phone_sid: string | null;
   bot_enabled: boolean | null;
@@ -88,7 +88,7 @@ interface CreateWorkshopForm {
   booking_mode: 'with_scheduling' | 'chatbot_only';
   category: string;
   initial_channel: 'whatsapp' | 'instagram' | 'web' | 'none';
-  whatsapp_provider: 'meta' | 'twilio';
+  whatsapp_provider: 'meta' | 'twilio' | 'ycloud' | 'kapso';
 }
 
 interface Subscription {
@@ -1202,7 +1202,7 @@ export default function AdminWorkshopsPage() {
                 <Label>Proveedor WhatsApp</Label>
                 <Select
                   value={createForm.whatsapp_provider}
-                  onValueChange={(value: 'meta' | 'twilio') =>
+                  onValueChange={(value: 'meta' | 'twilio' | 'ycloud' | 'kapso') =>
                     setCreateForm({ ...createForm, whatsapp_provider: value })
                   }
                 >
@@ -1210,6 +1210,12 @@ export default function AdminWorkshopsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="kapso">
+                      <div className="flex flex-col">
+                        <span>⚡ Kapso</span>
+                        <span className="text-xs text-muted-foreground">Onboarding simple vía Meta Business Partner</span>
+                      </div>
+                    </SelectItem>
                     <SelectItem value="twilio">
                       <div className="flex flex-col">
                         <span>📱 Twilio</span>
