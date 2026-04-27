@@ -371,6 +371,14 @@ serve(async (req) => {
           text: messageText,
           direction: 'inbound',
           channel: 'whatsapp',
+          metadata: {
+            provider: providerName,
+            provider_message_id: messageId,
+            phone_number_id: phoneNumberId,
+            webhook_event: webhookEvent,
+            sender_phone: senderPhone,
+            message_timestamp: new Date(messageTimestamp).toISOString(),
+          },
         });
 
       if (messageError) {
