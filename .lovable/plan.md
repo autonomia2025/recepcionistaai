@@ -1,95 +1,59 @@
-## Plan: Conectar Soc Ingeniería con Kapso vía Webhook
+## Diagnóstico
 
-**Buenas noticias:** Kapso replica el formato de Meta Cloud API (webhook entrante idéntico, endpoint de envío `/{phone_number_id}/messages` idéntico). Esto significa que el webhook actual (`whatsapp-webhook`) funciona **sin cambios** para recibir mensajes de Kapso. Solo hay que ajustar el envío saliente y guardar la API key + phone_number_id.
+**Sí, el webhook está recibiendo los mensajes** (lo confirmé en los logs: el body con `"text": {"body": "Hola que tal?"}` llega correctamente). Pero el bot no responde por una sola razón: **el formato del payload de Kapso es distinto al de Meta Cloud API**, y nuestro webhook está hardcodeado para el formato Meta.
 
----
+### Comparación de payloads
 
-### Lo que tú necesitas tener listo en Kapso
-
-1. **API Key de Kapso** (panel de Kapso → API Keys). La guardamos como secret `KAPSO_API_KEY`.
-2. **El `phone_number_id` de tu número conectado** (lo ves en Kapso al lado del número). Es un número largo tipo `647015955153740`.
-3. **Verify token para el webhook**: usaremos el que ya tienes: `autonomia2026`.
-
----
-
-### Lo que configuras en Kapso (UI Kapso)
-
-En el dashboard de Kapso, configura el webhook con estos datos:
-
-- **Webhook URL:** `https://hblwddfcfiblesjcosjt.supabase.co/functions/v1/whatsapp-webhook`
-- **Verify Token:** `autonomia2026`
-- **Eventos suscritos:** `messages`
-
-Kapso reenviará los mensajes en formato Meta exacto, así que el webhook actual los procesará sin tocar nada.
-
----
-
-### Cambios técnicos en el código
-
-**1. Migración de DB**
-- Agregar `'kapso'` al CHECK constraint de `workshops.whatsapp_provider`.
-- Actualizar la fila de Soc Ingeniería:
-  - `whatsapp_provider = 'kapso'`
-  - `whatsapp_phone_number_id = <tu phone_number_id>`
-  - `whatsapp_connected = true`
-
-**2. Secret nuevo**
-- `KAPSO_API_KEY` (te la pediré con el formulario seguro de secrets).
-
-**3. Edge function `send-whatsapp/index.ts`**
-Agregar una rama `else if (provider === 'kapso')`:
-
-```ts
-// Kapso usa mismo formato que Meta, solo cambia URL y header de auth
-const kapsoUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${workshop.whatsapp_phone_number_id}/messages`;
-const response = await fetch(kapsoUrl, {
-  method: 'POST',
-  headers: {
-    'X-API-Key': Deno.env.get('KAPSO_API_KEY')!,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    messaging_product: 'whatsapp',
-    to: recipientPhone,
-    type: 'text',
-    text: { body: text },
-  }),
-});
+**Meta Cloud API (lo que el código espera):**
+```
+{ entry: [{ changes: [{ value: { messages: [...], metadata: { phone_number_id }, contacts: [...] } }] }] }
 ```
 
-**4. Edge function `whatsapp-webhook/index.ts`**
-**Sin cambios.** El payload de Kapso es idéntico al de Meta — el lookup por `phone_number_id` ya funciona.
+**Kapso (lo que llega realmente):**
+```
+{
+  message: { from: "56984385819", text: { body: "Hola que tal?" }, id: "wamid...", type: "text", timestamp: "1777325393" },
+  conversation: { contact_name: "Felipiño", phone_number: "56984385819", phone_number_id: "1016639578210295" },
+  phone_number_id: "1016639578210295",
+  is_new_conversation: false
+}
+```
 
-**5. UI Superadmin (`WorkshopsPage.tsx`)**
-- Agregar `"Kapso"` al selector de proveedor de WhatsApp.
-- Mostrar campo `whatsapp_phone_number_id` cuando provider = kapso.
+Por eso en los logs ves `"No messages in webhook payload"` y el flujo termina ahí — nunca llega a buscar el workshop, ni a procesar el mensaje, ni a llamar al bot.
+
+Nota adicional: Kapso manda **dos eventos** por cada mensaje nuevo (`whatsapp.conversation.created` + `whatsapp.message.received`). Tenemos que procesar solo el de mensaje y deduplicar por `message.id` (la lógica de idempotencia ya existe en el webhook).
 
 ---
 
-### Flujo final
+## Cambios
 
-```
-Cliente envía WhatsApp al número de Soc Ingeniería
-        ↓
-Kapso recibe (es Meta Business Partner oficial)
-        ↓
-Kapso reenvía a tu webhook en formato Meta
-        ↓
-whatsapp-webhook lo rutea por phone_number_id → Soc Ingeniería
-        ↓
-Bot procesa y responde via send-whatsapp
-        ↓
-send-whatsapp detecta provider='kapso' → POST a api.kapso.ai
-        ↓
-Kapso envía el mensaje al cliente
-```
+### 1. `supabase/functions/whatsapp-webhook/index.ts`
+Detectar el formato al inicio del POST y normalizarlo a una estructura común antes de continuar:
+
+- Si `body.message` y `body.phone_number_id` existen en el root → es Kapso. Mapear:
+  - `phoneNumberId` ← `body.phone_number_id`
+  - `message` ← `body.message`
+  - `senderPhone` ← `body.message.from`
+  - `messageText` ← `body.message.text?.body` (también soportar `body.message.kapso?.content` como fallback)
+  - `senderName` ← `body.conversation?.contact_name || senderPhone`
+  - `messageId` ← `body.message.id`
+  - `messageTimestamp` ← `parseInt(body.message.timestamp) * 1000`
+- Ignorar el evento `whatsapp.conversation.created` (header `x-webhook-event`) o cuando viene sin `body.message` → responder 200 OK sin procesar.
+- Ignorar mensajes outbound de Kapso: si `body.message.kapso?.direction === 'outbound'` → responder 200 OK.
+- Si no es Kapso, mantener la lógica Meta actual intacta.
+
+El resto del flujo (búsqueda de workshop por `phone_number_id`, contacto, conversación, batching, llamada al bot) **no cambia** — ya funciona perfecto, solo necesita los datos normalizados.
+
+### 2. Sin cambios en `send-whatsapp`
+El envío saliente vía `api.kapso.ai` ya quedó implementado en el paso anterior y está listo para responder cuando el bot procese el mensaje.
 
 ---
 
-### Lo que necesito de ti para empezar
+## Resultado esperado tras el deploy
 
-1. Confirmas el plan.
-2. Me das tu **`phone_number_id` de Kapso** (lo copias del dashboard de Kapso).
-3. Yo te abro el formulario seguro para que pegues la **`KAPSO_API_KEY`**.
+1. Mandas "Hola" al WhatsApp de Soc Ingeniería.
+2. Kapso → webhook → se detecta formato Kapso → se rutea a Soc Ingeniería por `phone_number_id`.
+3. Se crea el contacto "Felipiño" + conversación, se guarda el mensaje inbound.
+4. Tras 8s de batching, se llama a `build-ai-reply` y la respuesta sale por `send-whatsapp` → `api.kapso.ai` → tu WhatsApp.
 
-Después de eso ejecuto migración + cambios en código + deploy en una sola pasada y queda listo para probar.
+¿Lo ejecuto?
