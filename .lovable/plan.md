@@ -1,89 +1,95 @@
-## Plan: Migrar SOC Ingeniería de Twilio a Meta WhatsApp Cloud API
+## Plan: Conectar Soc Ingeniería con Kapso vía Webhook
 
-### Estado actual
-
-```text
-Workshop: Soc Ingenieria
-ID: 610fb257-a649-4115-b944-21f31e7952db
-whatsapp_provider: twilio
-whatsapp_connected: false
-whatsapp_phone_number_id: (vacío)
-twilio_phone_number: (vacío)
-```
-
-Está marcado como Twilio pero ni siquiera tiene número Twilio asignado, así que el cambio es limpio: no se rompe nada en producción.
+**Buenas noticias:** Kapso replica el formato de Meta Cloud API (webhook entrante idéntico, endpoint de envío `/{phone_number_id}/messages` idéntico). Esto significa que el webhook actual (`whatsapp-webhook`) funciona **sin cambios** para recibir mensajes de Kapso. Solo hay que ajustar el envío saliente y guardar la API key + phone_number_id.
 
 ---
 
-### Qué se va a hacer
+### Lo que tú necesitas tener listo en Kapso
 
-**1. Migración de DB (un solo UPDATE)**
-Cambiar el provider del workshop a `meta` y limpiar campos de Twilio:
-
-```sql
-UPDATE workshops
-SET whatsapp_provider = 'meta',
-    twilio_phone_number = NULL,
-    twilio_phone_sid = NULL,
-    whatsapp_connected = false,
-    whatsapp_connected_at = NULL
-WHERE id = '610fb257-a649-4115-b944-21f31e7952db';
-```
-
-No se toca nada más: los mensajes históricos, contactos, conversaciones y bot quedan intactos.
-
-**2. UI: abrir el diálogo correcto**
-En el panel Superadmin → Talleres → SOC Ingeniería, después de la migración aparecerá el botón de configurar **WhatsApp (Meta)** en vez de Twilio. Ahí se ingresan:
-- **Phone Number ID** (de Meta, lo da developers.facebook.com)
-- **Business Account ID** (WABA ID)
-- Access Token (opcional — si no se pone, usa el `WHATSAPP_ACCESS_TOKEN` global que ya está configurado como secret)
-
-Y luego **Verificar Conexión** para marcar `whatsapp_connected = true`.
-
-**3. Webhook que vas a poner en Meta**
-
-```text
-Callback URL:
-https://hblwddfcfiblesjcosjt.supabase.co/functions/v1/whatsapp-webhook
-
-Verify Token:
-autonomia2026
-
-Webhook Fields a suscribir:
-messages
-```
-
-El mismo webhook sirve para todos los talleres con provider `meta`. El ruteo multi-tenant lo hace internamente buscando el `phone_number_id` que Meta envía en el payload contra `workshops.whatsapp_phone_number_id`. Por eso es **crítico** guardar bien el Phone Number ID en el paso 2 — sin eso, los mensajes entran al webhook pero no encuentran a qué taller pertenecen y se descartan.
+1. **API Key de Kapso** (panel de Kapso → API Keys). La guardamos como secret `KAPSO_API_KEY`.
+2. **El `phone_number_id` de tu número conectado** (lo ves en Kapso al lado del número). Es un número largo tipo `647015955153740`.
+3. **Verify token para el webhook**: usaremos el que ya tienes: `autonomia2026`.
 
 ---
 
-### Pasos en orden (lo que tú vas a hacer en Meta)
+### Lo que configuras en Kapso (UI Kapso)
 
-1. Yo ejecuto la migración (cambia provider a meta).
-2. Tú entras a `developers.facebook.com` → tu App → WhatsApp → Configuration:
-   - **Webhook**: pegas la Callback URL y el Verify Token de arriba → "Verify and Save"
-   - **Webhook fields**: suscribes `messages`
-3. En la sección **Phone Numbers** copias el **Phone Number ID** y el **WhatsApp Business Account ID**.
-4. En el panel Superadmin de AutonomIA → Talleres → SOC Ingeniería → botón WhatsApp → pegas ambos IDs → **Guardar** → **Verificar Conexión**.
-5. Listo: el badge pasa a "Conectado" y los mensajes entrantes empiezan a fluir al Inbox.
+En el dashboard de Kapso, configura el webhook con estos datos:
+
+- **Webhook URL:** `https://hblwddfcfiblesjcosjt.supabase.co/functions/v1/whatsapp-webhook`
+- **Verify Token:** `autonomia2026`
+- **Eventos suscritos:** `messages`
+
+Kapso reenviará los mensajes en formato Meta exacto, así que el webhook actual los procesará sin tocar nada.
 
 ---
 
-### Detalles técnicos
+### Cambios técnicos en el código
 
-- Edge function `whatsapp-webhook` ya está desplegada y enruta por `phone_number_id` (línea 116 de `supabase/functions/whatsapp-webhook/index.ts`). No requiere cambios.
-- Edge function `verify-whatsapp` ya existe y la usa el `WhatsAppConfigDialog` para validar credenciales contra la Graph API.
-- `WEBHOOK_VERIFY_TOKEN` ya está configurado como secret (`autonomia2026` según memoria del proyecto).
-- `WHATSAPP_ACCESS_TOKEN` global también está configurado, así que no hace falta token por taller a menos que quieras usar uno dedicado.
-- Provider check: `workshops_whatsapp_provider_check` permite los valores `meta`, `twilio` y `ycloud`, así que el UPDATE no viola constraints.
+**1. Migración de DB**
+- Agregar `'kapso'` al CHECK constraint de `workshops.whatsapp_provider`.
+- Actualizar la fila de Soc Ingeniería:
+  - `whatsapp_provider = 'kapso'`
+  - `whatsapp_phone_number_id = <tu phone_number_id>`
+  - `whatsapp_connected = true`
 
-### Lo que NO cambia
+**2. Secret nuevo**
+- `KAPSO_API_KEY` (te la pediré con el formulario seguro de secrets).
 
-- Bot, prompts, base de conocimiento, contactos, conversaciones históricas, citas: todo intacto.
-- Otros talleres en Twilio o YCloud: cero impacto.
-- El número de Twilio nunca se llegó a usar, así que no hay mensajes que migrar.
+**3. Edge function `send-whatsapp/index.ts`**
+Agregar una rama `else if (provider === 'kapso')`:
 
-### Riesgos
+```ts
+// Kapso usa mismo formato que Meta, solo cambia URL y header de auth
+const kapsoUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${workshop.whatsapp_phone_number_id}/messages`;
+const response = await fetch(kapsoUrl, {
+  method: 'POST',
+  headers: {
+    'X-API-Key': Deno.env.get('KAPSO_API_KEY')!,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    messaging_product: 'whatsapp',
+    to: recipientPhone,
+    type: 'text',
+    text: { body: text },
+  }),
+});
+```
 
-- Ninguno funcional. El único "punto de no-retorno" es que mientras no pegues el Phone Number ID en el paso 4, el webhook descartará los mensajes entrantes (los loggea y responde 200 OK a Meta). Apenas pegues el ID, todo fluye.
+**4. Edge function `whatsapp-webhook/index.ts`**
+**Sin cambios.** El payload de Kapso es idéntico al de Meta — el lookup por `phone_number_id` ya funciona.
 
+**5. UI Superadmin (`WorkshopsPage.tsx`)**
+- Agregar `"Kapso"` al selector de proveedor de WhatsApp.
+- Mostrar campo `whatsapp_phone_number_id` cuando provider = kapso.
+
+---
+
+### Flujo final
+
+```
+Cliente envía WhatsApp al número de Soc Ingeniería
+        ↓
+Kapso recibe (es Meta Business Partner oficial)
+        ↓
+Kapso reenvía a tu webhook en formato Meta
+        ↓
+whatsapp-webhook lo rutea por phone_number_id → Soc Ingeniería
+        ↓
+Bot procesa y responde via send-whatsapp
+        ↓
+send-whatsapp detecta provider='kapso' → POST a api.kapso.ai
+        ↓
+Kapso envía el mensaje al cliente
+```
+
+---
+
+### Lo que necesito de ti para empezar
+
+1. Confirmas el plan.
+2. Me das tu **`phone_number_id` de Kapso** (lo copias del dashboard de Kapso).
+3. Yo te abro el formulario seguro para que pegues la **`KAPSO_API_KEY`**.
+
+Después de eso ejecuto migración + cambios en código + deploy en una sola pasada y queda listo para probar.
