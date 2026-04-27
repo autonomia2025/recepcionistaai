@@ -79,33 +79,81 @@ serve(async (req) => {
       const body = await req.json();
       console.log('Received webhook:', JSON.stringify(body, null, 2));
 
-      // Extract message data from Meta webhook format
-      const entry = body.entry?.[0];
-      const changes = entry?.changes?.[0];
-      const value = changes?.value;
+      // Detect provider format: Kapso vs Meta Cloud API
+      const isKapso = !!(body?.message && body?.phone_number_id && !body?.entry);
 
-      // Handle status updates (delivery receipts, read receipts)
-      if (value?.statuses) {
-        console.log('Status update received, ignoring');
+      let phoneNumberId: string | undefined;
+      let messageId: string | undefined;
+      let senderPhone: string | undefined;
+      let messageText = '';
+      let senderName: string | undefined;
+      let messageTimestamp = Date.now();
+
+      if (isKapso) {
+        const kapsoEvent = req.headers.get('x-webhook-event') || '';
+        console.log('Kapso event detected:', kapsoEvent);
+
+        const km = body.message;
+
+        // Ignore outbound echoes from Kapso
+        if (km?.kapso?.direction && km.kapso.direction !== 'inbound') {
+          console.log('Kapso outbound message, ignoring');
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Only process messages with actual content
+        const kapsoText = km?.text?.body || km?.kapso?.content || '';
+        if (!km || !kapsoText) {
+          console.log('Kapso event without text message, ignoring');
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        phoneNumberId = body.phone_number_id || body.conversation?.phone_number_id;
+        messageId = km.id;
+        senderPhone = km.from || body.conversation?.phone_number;
+        messageText = kapsoText;
+        senderName = body.conversation?.contact_name || senderPhone;
+        messageTimestamp = km.timestamp ? parseInt(km.timestamp) * 1000 : Date.now();
+      } else {
+        // Meta Cloud API format
+        const entry = body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const value = changes?.value;
+
+        // Handle status updates (delivery receipts, read receipts)
+        if (value?.statuses) {
+          console.log('Status update received, ignoring');
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!value?.messages?.[0]) {
+          console.log('No messages in webhook payload');
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        phoneNumberId = value.metadata?.phone_number_id;
+        const message = value.messages[0];
+        messageId = message.id;
+        senderPhone = message.from;
+        messageText = message.text?.body || '';
+        senderName = value.contacts?.[0]?.profile?.name || senderPhone;
+        messageTimestamp = message.timestamp ? parseInt(message.timestamp) * 1000 : Date.now();
+      }
+
+      if (!phoneNumberId || !senderPhone || !messageId) {
+        console.log('Missing required fields after normalization', { phoneNumberId, senderPhone, messageId });
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-
-      if (!value?.messages?.[0]) {
-        console.log('No messages in webhook payload');
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const phoneNumberId = value.metadata?.phone_number_id;
-      const message = value.messages[0];
-      const messageId = message.id; // WhatsApp message ID for deduplication
-      const senderPhone = message.from;
-      const messageText = message.text?.body || '';
-      const senderName = value.contacts?.[0]?.profile?.name || senderPhone;
-      const messageTimestamp = message.timestamp ? parseInt(message.timestamp) * 1000 : Date.now();
 
       console.log('Processing message:', { messageId, phoneNumberId, senderPhone, messageText: messageText.substring(0, 50) });
 
