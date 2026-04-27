@@ -672,7 +672,7 @@ serve(async (req) => {
                     await new Promise(resolve => setTimeout(resolve, 500));
                   }
 
-                  const sendResponse = await fetch(metaApiUrl, {
+                  const sendResponse = await fetch(sendUrl, {
                     method: 'POST',
                     headers: useKapso
                       ? { 'X-API-Key': kapsoApiKey!, 'Content-Type': 'application/json' }
