@@ -102,15 +102,15 @@ export function useConversations() {
         .eq('workshop_id', profile.workshop_id)
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
-      // Staff only sees conversations assigned to them
-      if (!isAdmin && profile?.id) {
-        queryBuilder = queryBuilder.eq('assigned_to_user_id', profile.id);
-      }
-
-      // Staff with zone: filter by contact zone (SOC Ingenieria only)
+      // Staff filtering: if has zone, filter by zone only (sees all conversations in their zone).
+      // Otherwise filter by assignment.
       const staffZone = profile?.role === 'STAFF' ? (profile as any).zone : null;
-      if (staffZone) {
-        queryBuilder = queryBuilder.eq('contacts.zone', staffZone);
+      if (!isAdmin && profile?.id) {
+        if (staffZone) {
+          queryBuilder = queryBuilder.eq('contacts.zone', staffZone);
+        } else {
+          queryBuilder = queryBuilder.eq('assigned_to_user_id', profile.id);
+        }
       }
 
       const { data, error } = await queryBuilder;
