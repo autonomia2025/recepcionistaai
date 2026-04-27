@@ -652,14 +652,16 @@ serve(async (req) => {
             const replies: string[] = aiResult.replies || (aiResult.reply ? [aiResult.reply] : []);
 
             if (replies.length > 0) {
-              // Send WhatsApp replies
-              // Use workshop-specific token first (multi-tenant), fallback to global
+              const kapsoApiKey = Deno.env.get('KAPSO_API_KEY');
+              const useKapso = workshop.whatsapp_provider === 'kapso';
               const accessToken = (workshop.whatsapp_access_token || globalWhatsAppToken || '').trim();
 
-              if (accessToken && accessToken.length > 10) {
-                const metaApiUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+              if ((useKapso && kapsoApiKey) || (!useKapso && accessToken && accessToken.length > 10)) {
+                const sendUrl = useKapso
+                  ? `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+                  : `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
 
-                console.log('Sending WhatsApp replies to:', senderPhone, 'count:', replies.length);
+                console.log('Sending WhatsApp replies to:', senderPhone, 'count:', replies.length, 'provider:', useKapso ? 'kapso' : 'meta');
 
                 // Send each message with a small delay between them
                 for (let i = 0; i < replies.length; i++) {
@@ -672,10 +674,9 @@ serve(async (req) => {
 
                   const sendResponse = await fetch(metaApiUrl, {
                     method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${accessToken}`,
-                      'Content-Type': 'application/json',
-                    },
+                    headers: useKapso
+                      ? { 'X-API-Key': kapsoApiKey!, 'Content-Type': 'application/json' }
+                      : { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       messaging_product: 'whatsapp',
                       to: senderPhone,
@@ -701,6 +702,8 @@ serve(async (req) => {
                           intent: aiResult.intent,
                           confidence: aiResult.confidence,
                           reasoning: aiResult.reasoning,
+                          provider: useKapso ? 'kapso' : 'meta',
+                          provider_message_id: sendResult.messages?.[0]?.id || null,
                           is_last_in_batch: i === replies.length - 1
                         }
                       });
