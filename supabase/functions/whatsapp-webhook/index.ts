@@ -772,13 +772,23 @@ serve(async (req) => {
           console.error('Error generating AI reply:', aiError);
           // Don't fail the webhook, just log the error
         } finally {
-          // Step 5: Mark batch as completed (always, even on error)
-          await supabase
+          // Step 5: Delete batch on completion (cleaner than marking completed;
+          // avoids unique-index edge cases and keeps the table small).
+          const { error: deleteBatchError } = await supabase
             .from('message_batches')
-            .update({ is_completed: true, is_processing: false })
+            .delete()
             .eq('id', batchId!);
 
-          console.log('Batch completed:', batchId);
+          if (deleteBatchError) {
+            console.error('Failed to delete batch on completion:', batchId, deleteBatchError);
+            // Fallback: mark as completed so it doesn't block future messages
+            await supabase
+              .from('message_batches')
+              .update({ is_completed: true, is_processing: false })
+              .eq('id', batchId!);
+          } else {
+            console.log('Batch completed and deleted:', batchId);
+          }
         }
       } else if (isBotPaused) {
         console.log('Bot paused for this conversation (human handoff), skipping AI reply');
