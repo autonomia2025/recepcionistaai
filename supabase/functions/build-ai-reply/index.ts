@@ -40,6 +40,8 @@ interface KnowledgeMatch {
   content: string;
   file_name: string;
   similarity?: number;
+  score?: number;
+  codeHit?: boolean;
 }
 
 // Sanitize a keyword for safe use in PostgREST ilike filters
@@ -143,6 +145,56 @@ REGLAS ESTRICTAS:
 // Remove accents from text for accent-insensitive matching
 function removeAccents(str: string): string {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function compactText(str: string): string {
+  return (str || '').replace(/\s+/g, ' ').trim();
+}
+
+function firstMatch(text: string, patterns: RegExp[]): string | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const value = match?.[1]?.trim();
+    if (value) return compactText(value).replace(/[|#]+$/g, '').trim();
+  }
+  return null;
+}
+
+function buildDocumentedProductReply(match: KnowledgeMatch): string {
+  const text = compactText(match.content || '');
+  const code = firstMatch(text, [
+    /(?:SKU|C[ÓO]DIGO)\s*[:|]?\s*([A-Z0-9][A-Z0-9\/\-.]{3,40})/i,
+    /\b(SOC\d+[A-Z0-9\/-]*)\b/i,
+  ]);
+  const name = firstMatch(text, [
+    /Nombre del Producto:\s*([^|]{8,140})/i,
+    /(Hidrolavadora[^|.]{8,140})/i,
+    /\*?SKU:\s*[A-Z0-9\/\-.]+\s+([^|.]{8,120})/i,
+  ]);
+
+  const bullets: string[] = [];
+  const tableSpecs = text.match(/\b(SOC\d+[A-Z0-9\/-]*)\s*-\s*(\d+\/\d+)\s+(\d+)\s+-\s+(\d+)/i);
+  if (tableSpecs) {
+    if (!code) bullets.push(`Código: ${tableSpecs[1]}`);
+    bullets.push(`Presión: ${tableSpecs[2]} bar/PSI`);
+    bullets.push(`Caudal: ${tableSpecs[3]} L/min`);
+    bullets.push(`Potencia: ${tableSpecs[4]} HP`);
+  }
+
+  const model = firstMatch(text, [/MODELO:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const power = firstMatch(text, [/ALIMENTACI[ÓO]N:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const description = firstMatch(text, [/Descripci[óo]n:\s*([^|]{40,280})/i]);
+
+  if (model) bullets.unshift(`Modelo: ${model}`);
+  if (power) bullets.push(`Alimentación: ${power}`);
+  if (fuel) bullets.push(`Consumo combustible: ${fuel}`);
+  if (description && bullets.length < 5) bullets.push(description);
+
+  const uniqueBullets = [...new Set(bullets)].slice(0, 5);
+  const header = code || name ? `Encontré información para *${code || name}*:` : `Encontré información documentada en *${match.file_name}*:`;
+
+  return `*Sí, ese modelo está documentado ✅*\n\n${header}\n${name && code ? `• Producto: ${name}\n` : ''}${uniqueBullets.map(b => `• ${b}`).join('\n')}\n\n¿Quieres que te ayude con la cotización o disponibilidad según tu zona?`;
 }
 
 // AI-enhanced keyword search: expand query with AI then use ILIKE
@@ -264,11 +316,12 @@ async function searchKnowledge(
     const final = (filtered.length > 0 ? filtered : scored)
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
-      .map(s => s.match);
+      .map(s => ({ ...s.match, score: s.score, codeHit: s.codeHit }));
 
     console.log(
       `AI-enhanced search: ${rawMatches.length} raw → ${final.length} ranked (codes:${codeSet.size}, kws:${kwSet.size})`
     );
+    console.log('Top RAG matches:', final.map(m => ({ file: m.file_name, score: m.score, codeHit: m.codeHit, preview: (m.content || '').slice(0, 140) })));
     return final;
   } catch (searchErr) {
     console.error('Search execution error:', searchErr);
@@ -391,14 +444,17 @@ serve(async (req) => {
     // ===== RAG: AI-enhanced keyword search =====
     let ragContext = '';
     let ragMatchCount = 0;
+    let directCodeMatch: KnowledgeMatch | null = null;
     try {
       const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
         ragMatchCount = knowledgeMatches.length;
-        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${knowledgeMatches
-          .map((k, i) => `[${i + 1}] ${k.content}`)
+        const hasExactCodeMatch = knowledgeMatches.some(k => k.codeHit);
+        directCodeMatch = knowledgeMatches.find(k => k.codeHit) || null;
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
+          .map((k, i) => `[${i + 1}] Archivo: ${k.file_name}${k.codeHit ? ' | COINCIDENCIA DIRECTA DE CÓDIGO' : ''}\n${k.content}`)
           .join('\n---\n')
           }\n`;
       }
@@ -739,6 +795,28 @@ Criterios:${isChatbotOnly ? '' : `
         confidence: 0.5,
         should_handoff: true,
         should_send_booking_link: false,
+      };
+    }
+
+    const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
+    const falseNegativeRag = directCodeMatch && (
+      result.should_handoff ||
+      /no tengo (esa )?informaci[oó]n|no tengo.*documentad|no aparece en la documentaci[oó]n|no est[aá] documentad/.test(replyText)
+    );
+
+    if (falseNegativeRag) {
+      console.log('Correcting AI false-negative handoff because an exact RAG code match exists:', {
+        file: directCodeMatch.file_name,
+        score: directCodeMatch.score,
+      });
+      result = {
+        replies: [buildDocumentedProductReply(directCodeMatch)],
+        intent: 'consulta',
+        confidence: 0.93,
+        should_handoff: false,
+        should_send_booking_link: false,
+        reasoning: 'La IA intentó derivar, pero el RAG encontró coincidencia directa del código/modelo consultado. Se corrigió la respuesta usando solo información documentada.',
+        detected_zone: result.detected_zone,
       };
     }
 
