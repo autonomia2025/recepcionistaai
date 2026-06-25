@@ -40,6 +40,8 @@ interface KnowledgeMatch {
   content: string;
   file_name: string;
   similarity?: number;
+  score?: number;
+  codeHit?: boolean;
 }
 
 // Sanitize a keyword for safe use in PostgREST ilike filters
@@ -264,11 +266,12 @@ async function searchKnowledge(
     const final = (filtered.length > 0 ? filtered : scored)
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
-      .map(s => s.match);
+      .map(s => ({ ...s.match, score: s.score, codeHit: s.codeHit }));
 
     console.log(
       `AI-enhanced search: ${rawMatches.length} raw → ${final.length} ranked (codes:${codeSet.size}, kws:${kwSet.size})`
     );
+    console.log('Top RAG matches:', final.map(m => ({ file: m.file_name, score: m.score, codeHit: m.codeHit, preview: (m.content || '').slice(0, 140) })));
     return final;
   } catch (searchErr) {
     console.error('Search execution error:', searchErr);
@@ -397,8 +400,9 @@ serve(async (req) => {
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
         ragMatchCount = knowledgeMatches.length;
-        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${knowledgeMatches
-          .map((k, i) => `[${i + 1}] ${k.content}`)
+        const hasExactCodeMatch = knowledgeMatches.some(k => k.codeHit);
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
+          .map((k, i) => `[${i + 1}] Archivo: ${k.file_name}${k.codeHit ? ' | COINCIDENCIA DIRECTA DE CÓDIGO' : ''}\n${k.content}`)
           .join('\n---\n')
           }\n`;
       }
