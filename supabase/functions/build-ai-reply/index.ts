@@ -153,6 +153,16 @@ async function searchKnowledge(
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
+  // 0a. Skip RAG entirely on low-signal messages (greetings, thanks, "ok", etc.)
+  //     RAG on "hola" only pollutes the prompt with random product chunks and
+  //     pushes the AI to a generic answer.
+  const GREETING_RE = /^(hola+|holi|buenas?(\s+(dias|tardes|noches))?|buen\s+dia|hey+|que\s+tal|qtal|saludos|gracias|muchas\s+gracias|ok|okay|listo|si+|no+|👍|👋|🙏)[\s!¡?¿.,]*$/i;
+  const normalizedQuery = (query || '').trim();
+  if (!normalizedQuery || normalizedQuery.length < 4 || GREETING_RE.test(normalizedQuery)) {
+    console.log('RAG skipped: low-signal/greeting message');
+    return [];
+  }
+
   // 0. Detect product codes in query (e.g. W186, NPM-GR, HHP4150, SOC200/41EC)
   const productCodes = query.match(/\b[A-Z]{1,5}[-\/]?[A-Z0-9]{2,10}[-\/]?[A-Z0-9]{0,8}\b/gi) || [];
   const cleanCodes = productCodes
@@ -199,7 +209,7 @@ async function searchKnowledge(
       .select('id, content, file_name')
       .eq('workshop_id', workshopId)
       .or(orFilter)
-      .limit(15);
+      .limit(40);
 
     if (error) {
       console.error('Knowledge search error:', error);
@@ -222,8 +232,41 @@ async function searchKnowledge(
       return [];
     }
 
-    console.log('AI-enhanced search returned', (data || []).length, 'matches');
-    return (data || []) as KnowledgeMatch[];
+    const rawMatches = (data || []) as KnowledgeMatch[];
+    if (rawMatches.length === 0) return [];
+
+    // Score each chunk by how many distinct keywords/codes it contains.
+    // Product codes count 3x because they are the strongest relevance signal.
+    const codeSet = new Set(cleanCodes.map(c => c.toLowerCase()));
+    const kwSet = new Set(allKeywords.map(k => k.toLowerCase()).filter(k => !codeSet.has(k)));
+
+    const scored = rawMatches.map(m => {
+      const lower = removeAccents((m.content || '').toLowerCase());
+      let score = 0;
+      let codeHit = false;
+      for (const code of codeSet) {
+        if (lower.includes(code)) { score += 3; codeHit = true; }
+      }
+      for (const kw of kwSet) {
+        if (lower.includes(kw)) score += 1;
+      }
+      return { match: m, score, codeHit };
+    });
+
+    // If query had product codes, keep only chunks that mention at least one code.
+    const filtered = codeSet.size > 0 && scored.some(s => s.codeHit)
+      ? scored.filter(s => s.codeHit)
+      : scored.filter(s => s.score >= 2); // need ≥2 keyword hits to be considered relevant
+
+    const final = (filtered.length > 0 ? filtered : scored)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map(s => s.match);
+
+    console.log(
+      `AI-enhanced search: ${rawMatches.length} raw → ${final.length} ranked (codes:${codeSet.size}, kws:${kwSet.size})`
+    );
+    return final;
   } catch (searchErr) {
     console.error('Search execution error:', searchErr);
     return [];
