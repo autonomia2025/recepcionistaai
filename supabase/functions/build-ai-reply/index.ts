@@ -164,10 +164,13 @@ async function searchKnowledge(
   }
 
   // 0. Detect product codes in query (e.g. W186, NPM-GR, HHP4150, SOC200/41EC)
-  const productCodes = query.match(/\b[A-Z]{1,5}[-\/]?[A-Z0-9]{2,10}[-\/]?[A-Z0-9]{0,8}\b/gi) || [];
-  const cleanCodes = productCodes
+  // Must mix letters AND digits to avoid matching common Spanish words like "necesito".
+  const productCodeRe = /\b[A-Za-z][A-Za-z0-9\-\/]{2,20}\b/g;
+  const rawCodes = query.match(productCodeRe) || [];
+  const cleanCodes = rawCodes
+    .filter(c => /[A-Za-z]/.test(c) && /[0-9]/.test(c)) // must contain at least one letter AND one digit
     .map(c => sanitizeKeyword(c))
-    .filter(c => c.length >= 2);
+    .filter(c => c.length >= 3);
   if (cleanCodes.length > 0) {
     console.log('Product codes detected:', cleanCodes);
   }
