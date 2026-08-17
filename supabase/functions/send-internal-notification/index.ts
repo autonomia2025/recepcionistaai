@@ -107,6 +107,54 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ========================================
+    // DEDUPLICATION: avoid sending the same alert multiple times
+    // for the same conversation/contact within a cooldown window.
+    // hot_lead / human_handoff are re-evaluated on every incoming
+    // message, which previously produced 2-3 duplicate emails.
+    // ========================================
+    const DEDUPE_WINDOW_HOURS: Record<NotificationType, number> = {
+      human_handoff: 12,
+      hot_lead: 24,
+      quotation: 1,
+      appointment: 1,
+    };
+    const dedupeHours = DEDUPE_WINDOW_HOURS[notification_type] ?? 1;
+    const since = new Date(Date.now() - dedupeHours * 60 * 60 * 1000).toISOString();
+
+    if (conversation_id || contact_id) {
+      let dedupeQuery = supabase
+        .from('internal_notification_logs')
+        .select('id, created_at')
+        .eq('workshop_id', workshop_id)
+        .eq('notification_type', notification_type)
+        .eq('status', 'sent')
+        .gte('created_at', since)
+        .limit(1);
+
+      if (conversation_id) {
+        dedupeQuery = dedupeQuery.eq('conversation_id', conversation_id);
+      } else if (contact_id) {
+        dedupeQuery = dedupeQuery.eq('contact_id', contact_id);
+      }
+
+      // Appointment/quotation alerts are unique per entity, not per conversation
+      if (notification_type === 'appointment' && appointment_id) {
+        dedupeQuery = dedupeQuery.eq('appointment_id', appointment_id);
+      }
+      if (notification_type === 'quotation' && service_request_id) {
+        dedupeQuery = dedupeQuery.eq('service_request_id', service_request_id);
+      }
+
+      const { data: recent } = await dedupeQuery;
+      if (recent && recent.length > 0) {
+        console.log(`Duplicate ${notification_type} notification skipped (sent at ${recent[0].created_at})`);
+        return new Response(JSON.stringify({ success: false, reason: 'Duplicate notification skipped' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Validate notification type against booking_mode
     // - quotation: only for chatbot_only
     // - appointment: only for with_scheduling
