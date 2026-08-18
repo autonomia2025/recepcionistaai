@@ -712,6 +712,74 @@ serve(async (req) => {
                   }
                 }
 
+                // ===== Optional PDF datasheet attachment =====
+                const attachment = aiResult.attachment as
+                  | { document_id: string; file_name: string; url: string }
+                  | null
+                  | undefined;
+
+                if (attachment?.url) {
+                  try {
+                    // Don't resend the same document in the same conversation within 24h
+                    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+                    const { data: alreadySent } = await supabase
+                      .from('messages')
+                      .select('id')
+                      .eq('conversation_id', conversation.id)
+                      .eq('direction', 'outbound')
+                      .gte('created_at', since)
+                      .contains('metadata', { attachment_document_id: attachment.document_id })
+                      .limit(1);
+
+                    if (alreadySent && alreadySent.length > 0) {
+                      console.log('Datasheet already sent recently, skipping:', attachment.file_name);
+                    } else {
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                      const docResponse = await fetch(sendUrl, {
+                        method: 'POST',
+                        headers: useKapso
+                          ? { 'X-API-Key': kapsoApiKey!, 'Content-Type': 'application/json' }
+                          : { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          messaging_product: 'whatsapp',
+                          to: senderPhone,
+                          type: 'document',
+                          document: {
+                            link: attachment.url,
+                            filename: attachment.file_name.toLowerCase().endsWith('.pdf')
+                              ? attachment.file_name
+                              : `${attachment.file_name}.pdf`,
+                            caption: '📄 Ficha técnica',
+                          },
+                        }),
+                      });
+
+                      const docResult = await docResponse.json();
+                      console.log('WhatsApp document send result:', docResult);
+
+                      if (docResponse.ok) {
+                        await supabase.from('messages').insert({
+                          workshop_id: workshop.id,
+                          conversation_id: conversation.id,
+                          text: `📄 Ficha técnica enviada: ${attachment.file_name}`,
+                          direction: 'outbound',
+                          channel: 'whatsapp',
+                          metadata: {
+                            provider: useKapso ? 'kapso' : 'meta',
+                            provider_message_id: docResult.messages?.[0]?.id || null,
+                            attachment_document_id: attachment.document_id,
+                            attachment_file_name: attachment.file_name,
+                          },
+                        });
+                      } else {
+                        console.error('Failed to send datasheet document:', docResult);
+                      }
+                    }
+                  } catch (docErr) {
+                    console.error('Datasheet send error:', docErr);
+                  }
+                }
+
                 // Update conversation status after all messages sent
                 // If handoff requested, pause the bot for this conversation
                 const newStatus = aiResult.should_handoff ? 'in_progress' : 'new';

@@ -1,0 +1,2 @@
+ALTER TABLE public.bot_settings ADD COLUMN IF NOT EXISTS send_pdf_datasheets boolean NOT NULL DEFAULT false;
+UPDATE public.bot_settings SET send_pdf_datasheets = true WHERE workshop_id IN (SELECT id FROM public.workshops WHERE name ILIKE '%SOC%');

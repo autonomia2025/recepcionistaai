@@ -39,6 +39,7 @@ interface KnowledgeMatch {
   id: string;
   content: string;
   file_name: string;
+  document_id?: string | null;
   similarity?: number;
   score?: number;
   codeHit?: boolean;
@@ -261,7 +262,7 @@ async function searchKnowledge(
   try {
     const { data, error } = await supabase
       .from('bot_knowledge')
-      .select('id, content, file_name')
+      .select('id, content, file_name, document_id')
       .eq('workshop_id', workshopId)
       .or(orFilter)
       .limit(40);
@@ -274,7 +275,7 @@ async function searchKnowledge(
         const fallbackFilter = basicKeywords.slice(0, 3).map(k => `content.ilike.%${sanitizeKeyword(k)}%`).join(',');
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('bot_knowledge')
-          .select('id, content, file_name')
+          .select('id, content, file_name, document_id')
           .eq('workshop_id', workshopId)
           .or(fallbackFilter)
           .limit(15);
@@ -425,7 +426,7 @@ serve(async (req) => {
     // Get bot settings for this workshop
     const { data: botSettings, error: botError } = await supabase
       .from('bot_settings')
-      .select('business_description, services_json, faq_json, tone, system_prompt')
+      .select('business_description, services_json, faq_json, tone, system_prompt, send_pdf_datasheets')
       .eq('workshop_id', workshop_id)
       .single();
 
@@ -915,10 +916,51 @@ Criterios:${isChatbotOnly ? '' : `
       }
     }
 
+    // ===== PDF datasheet attachment (opt-in per business) =====
+    // When the RAG found an exact product-code match and that chunk came from a
+    // PDF document, expose a signed URL so the channel can attach the original file.
+    let attachment: { document_id: string; file_name: string; url: string } | null = null;
+    if (botSettings?.send_pdf_datasheets && directCodeMatch?.document_id) {
+      try {
+        const { data: doc } = await supabase
+          .from('bot_documents')
+          .select('id, file_name, file_type, storage_path')
+          .eq('id', directCodeMatch.document_id)
+          .eq('workshop_id', workshop_id)
+          .maybeSingle();
+
+        const isPdf = doc && (
+          (doc.file_type || '').toLowerCase().includes('pdf') ||
+          (doc.file_name || '').toLowerCase().endsWith('.pdf')
+        );
+
+        if (isPdf && doc.storage_path) {
+          const { data: signed, error: signErr } = await supabase
+            .storage
+            .from('bot-documents')
+            .createSignedUrl(doc.storage_path, 60 * 60 * 24);
+
+          if (signErr) {
+            console.error('Failed to sign datasheet URL:', signErr);
+          } else if (signed?.signedUrl) {
+            attachment = {
+              document_id: doc.id,
+              file_name: doc.file_name,
+              url: signed.signedUrl,
+            };
+            console.log('Datasheet attachment ready:', doc.file_name);
+          }
+        }
+      } catch (attachErr) {
+        console.error('Datasheet attachment error:', attachErr);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       ...result,
       booking_url: fullBookingUrl,
+      attachment,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
