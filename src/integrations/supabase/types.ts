@@ -567,6 +567,7 @@ export type Database = {
           business_description: string | null
           faq_json: Json | null
           handoff_rules_json: Json | null
+          send_pdf_datasheets: boolean
           services_json: Json | null
           system_prompt: string | null
           tone: string | null
@@ -578,6 +579,7 @@ export type Database = {
           business_description?: string | null
           faq_json?: Json | null
           handoff_rules_json?: Json | null
+          send_pdf_datasheets?: boolean
           services_json?: Json | null
           system_prompt?: string | null
           tone?: string | null
@@ -589,6 +591,7 @@ export type Database = {
           business_description?: string | null
           faq_json?: Json | null
           handoff_rules_json?: Json | null
+          send_pdf_datasheets?: boolean
           services_json?: Json | null
           system_prompt?: string | null
           tone?: string | null
