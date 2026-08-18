@@ -39,6 +39,7 @@ interface KnowledgeMatch {
   id: string;
   content: string;
   file_name: string;
+  document_id?: string | null;
   similarity?: number;
   score?: number;
   codeHit?: boolean;
@@ -261,7 +262,7 @@ async function searchKnowledge(
   try {
     const { data, error } = await supabase
       .from('bot_knowledge')
-      .select('id, content, file_name')
+      .select('id, content, file_name, document_id')
       .eq('workshop_id', workshopId)
       .or(orFilter)
       .limit(40);
@@ -274,7 +275,7 @@ async function searchKnowledge(
         const fallbackFilter = basicKeywords.slice(0, 3).map(k => `content.ilike.%${sanitizeKeyword(k)}%`).join(',');
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('bot_knowledge')
-          .select('id, content, file_name')
+          .select('id, content, file_name, document_id')
           .eq('workshop_id', workshopId)
           .or(fallbackFilter)
           .limit(15);
