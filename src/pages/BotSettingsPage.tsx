@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -66,6 +67,7 @@ export default function BotSettingsPage() {
   const [businessDescription, setBusinessDescription] = useState('');
   const [tone, setTone] = useState('professional');
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [sendPdfDatasheets, setSendPdfDatasheets] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +142,7 @@ export default function BotSettingsPage() {
       setBusinessDescription(botSettings.business_description || '');
       setTone(botSettings.tone || 'professional');
       setSystemPrompt(botSettings.system_prompt || '');
+      setSendPdfDatasheets(Boolean(botSettings.send_pdf_datasheets));
       setServices((botSettings.services_json as unknown as Service[]) || []);
       setFaqs((botSettings.faq_json as unknown as FAQ[]) || []);
     }
@@ -162,6 +165,7 @@ export default function BotSettingsPage() {
             system_prompt: systemPrompt || null,
             services_json: servicesData,
             faq_json: faqsData,
+            send_pdf_datasheets: sendPdfDatasheets,
             updated_at: new Date().toISOString(),
           })
           .eq('workshop_id', profile.workshop_id);
@@ -176,6 +180,7 @@ export default function BotSettingsPage() {
             system_prompt: systemPrompt || null,
             services_json: servicesData,
             faq_json: faqsData,
+            send_pdf_datasheets: sendPdfDatasheets,
           });
         if (error) throw error;
       }
@@ -433,6 +438,20 @@ export default function BotSettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   Opcional. Si lo completas, sobrescribirá el comportamiento automático del bot.
                 </p>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+                <div className="space-y-1">
+                  <Label htmlFor="send_pdf_datasheets">Enviar fichas técnicas en PDF</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cuando el cliente consulte por un código de producto, el bot adjuntará por WhatsApp el PDF original de la base de conocimiento.
+                  </p>
+                </div>
+                <Switch
+                  id="send_pdf_datasheets"
+                  checked={sendPdfDatasheets}
+                  onCheckedChange={setSendPdfDatasheets}
+                />
               </div>
             </CardContent>
           </Card>
