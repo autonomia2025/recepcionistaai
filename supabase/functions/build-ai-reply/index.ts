@@ -924,12 +924,75 @@ Criterios:${isChatbotOnly ? '' : `
     // When the RAG found an exact product-code match and that chunk came from a
     // PDF document, expose a signed URL so the channel can attach the original file.
     let attachment: { document_id: string; file_name: string; url: string } | null = null;
-    if (botSettings?.send_pdf_datasheets && directCodeMatch?.document_id) {
+
+    // Resolve which document to attach:
+    //  a) exact product-code match in the current message, or
+    //  b) the client is asking for the PDF/ficha and we can recover the product
+    //     code from the recent conversation history (sticky product context).
+    let attachDocumentId: string | null = directCodeMatch?.document_id || null;
+
+    if (botSettings?.send_pdf_datasheets && !attachDocumentId) {
+      try {
+        const lowerCurrent = removeAccents((message_text || '').toLowerCase());
+        const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviamelo|mandamelo|enviame|mandame)\b/;
+        const shortConfirmRe = /^(si+|sí+|dale|ok|okay|listo|claro|por favor|porfa|obvio|ya|correcto|exacto|asi es|👍)[\s!¡.?¿,]*$/i;
+
+        const historyRows = (messages || []) as Array<{ text: string; direction: string }>;
+        const lastBotText = removeAccents(
+          (historyRows.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '').toLowerCase()
+        );
+        const botOfferedFile = /\b(pdf|ficha|archivo|adjunto|documento|catalogo)\b/.test(lastBotText);
+
+        const pdfRequested =
+          pdfRequestRe.test(lowerCurrent) ||
+          (shortConfirmRe.test((message_text || '').trim()) && botOfferedFile);
+
+        if (pdfRequested) {
+          // Recover product codes from the recent conversation (newest first)
+          const productCodeRe = /\b[A-Za-z][A-Za-z0-9\-\/]{2,20}\b/g;
+          const recentTexts = [message_text, ...historyRows.map(m => m.text).reverse()];
+          const codes: string[] = [];
+          for (const t of recentTexts) {
+            for (const raw of (t || '').match(productCodeRe) || []) {
+              if (/[A-Za-z]/.test(raw) && /[0-9]/.test(raw)) {
+                const clean = sanitizeKeyword(raw);
+                if (clean.length >= 3 && !codes.includes(clean)) codes.push(clean);
+              }
+            }
+            if (codes.length >= 5) break;
+          }
+
+          for (const code of codes) {
+            const { data: chunk } = await supabase
+              .from('bot_knowledge')
+              .select('document_id')
+              .eq('workshop_id', workshop_id)
+              .ilike('content', `%${code}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (chunk?.document_id) {
+              attachDocumentId = chunk.document_id;
+              console.log('Datasheet resolved from conversation context, code:', code);
+              break;
+            }
+          }
+
+          if (!attachDocumentId) {
+            console.log('PDF requested but no product code found in conversation context');
+          }
+        }
+      } catch (ctxErr) {
+        console.error('Datasheet context resolution error:', ctxErr);
+      }
+    }
+
+    if (botSettings?.send_pdf_datasheets && attachDocumentId) {
       try {
         const { data: doc } = await supabase
           .from('bot_documents')
           .select('id, file_name, file_type, storage_path')
-          .eq('id', directCodeMatch.document_id)
+          .eq('id', attachDocumentId)
           .eq('workshop_id', workshop_id)
           .maybeSingle();
 
