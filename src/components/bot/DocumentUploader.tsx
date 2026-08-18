@@ -124,8 +124,12 @@ export function DocumentUploader({
         workshop_id: workshopId,
         file_name: file.name,
         file_type: file.type || 'application/octet-stream',
-        ...(storagePath ? { storage_path: storagePath } : {}),
-        ...(base64Content ? { file_content: base64Content } : {}),
+        // Small files keep the proven base64 path; large ones are read from storage
+        ...(base64Content
+          ? { file_content: base64Content }
+          : storagePath
+            ? { storage_path: storagePath }
+            : {}),
       },
     });
 
