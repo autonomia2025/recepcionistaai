@@ -75,44 +75,47 @@ export function DocumentUploader({
 
     if (docError) throw docError;
 
-    const useStorage = file.size > SMALL_FILE_THRESHOLD;
-    let storagePath: string | null = null;
+    const isSmallFile = file.size <= SMALL_FILE_THRESHOLD;
+    let storagePath: string | null = `${workshopId}/${doc.id}-${file.name.replace(/[^\w.\-]/g, '_')}`;
     let base64Content: string | null = null;
 
-    if (useStorage) {
-      // Upload to Supabase Storage (handles large files efficiently)
-      storagePath = `${workshopId}/${doc.id}-${file.name.replace(/[^\w.\-]/g, '_')}`;
+    // Always keep the original file in private storage so it can be re-sent later
+    // (e.g. attaching the original PDF datasheet over WhatsApp).
+    setUploadProgress(10);
+    const { error: uploadError } = await supabase.storage
+      .from('bot-documents')
+      .upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type || 'application/octet-stream',
+      });
 
-      setUploadProgress(10);
-      const { error: uploadError } = await supabase.storage
-        .from('bot-documents')
-        .upload(storagePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type || 'application/octet-stream',
-        });
-
-      if (uploadError) {
+    if (uploadError) {
+      if (!isSmallFile) {
         await supabase
           .from('bot_documents')
           .update({ status: 'error', error_message: `Error subiendo archivo: ${uploadError.message}` })
           .eq('id', doc.id);
         throw uploadError;
       }
-
-      setUploadProgress(60);
-
-      // Save storage path on the doc record
+      // Small file: keep going with the base64 path, only the attachment feature is lost
+      console.warn('Storage upload failed, continuing with base64 processing:', uploadError.message);
+      storagePath = null;
+    } else {
       await supabase
         .from('bot_documents')
         .update({ storage_path: storagePath })
         .eq('id', doc.id);
-    } else {
-      // Small file → keep base64 path (faster, fewer roundtrips)
-      setUploadProgress(30);
-      base64Content = await fileToBase64(file);
-      setUploadProgress(60);
     }
+
+    setUploadProgress(40);
+
+    if (isSmallFile) {
+      // Small file → keep the proven base64 processing path
+      base64Content = await fileToBase64(file);
+    }
+
+    setUploadProgress(60);
 
     // Invoke edge function (it handles processing async via background tasks)
     const { error: processError } = await supabase.functions.invoke('process-rag-document', {
@@ -121,8 +124,12 @@ export function DocumentUploader({
         workshop_id: workshopId,
         file_name: file.name,
         file_type: file.type || 'application/octet-stream',
-        ...(storagePath ? { storage_path: storagePath } : {}),
-        ...(base64Content ? { file_content: base64Content } : {}),
+        // Small files keep the proven base64 path; large ones are read from storage
+        ...(base64Content
+          ? { file_content: base64Content }
+          : storagePath
+            ? { storage_path: storagePath }
+            : {}),
       },
     });
 
