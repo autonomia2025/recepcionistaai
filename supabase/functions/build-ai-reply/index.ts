@@ -570,6 +570,10 @@ REGLA CRÍTICA ANTI-INVENCIÓN (PRIORIDAD MÁXIMA):
 - Es 100x mejor decir "no tengo esa información, te derivo con un ejecutivo" que inventar un dato falso. La honestidad construye confianza, la invención destruye la marca.
 - Si el contexto SÍ tiene la información, úsala literalmente (no la "embellezcas" con datos extra que no aparecen).
 
+REGLA SOBRE ARCHIVOS ADJUNTOS:
+- NO afirmes que estás enviando un PDF, ficha, catálogo o archivo. El sistema es quien adjunta los archivos automáticamente cuando corresponde.
+- Si el cliente pide un PDF o ficha, entrega el resumen técnico con la información documentada y di que si el archivo está disponible se enviará en este mismo chat. Nunca digas "te envié el PDF" ni "ya te lo mandé".
+
 ${zoneDetectionEnabled ? `ZONA DEL CLIENTE (REGLA CRÍTICA):
 ${needsZone
   ? `- El contacto AÚN NO tiene zona asignada. ANTES de cotizar, agendar o derivar al equipo, DEBES preguntar de forma natural desde qué ciudad o comuna escribe.
