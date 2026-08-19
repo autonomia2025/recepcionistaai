@@ -117,6 +117,22 @@ export default function BotSettingsPage() {
   // Realtime subscription for live progress updates
   useEffect(() => {
     if (!profile?.workshop_id) return;
+
+  // Storage quota for the knowledge base
+  const { data: workshopQuota } = useQuery({
+    queryKey: ['workshop-storage-quota', profile?.workshop_id],
+    queryFn: async () => {
+      if (!profile?.workshop_id) return null;
+      const { data, error } = await supabase
+        .from('workshops')
+        .select('max_storage_bytes')
+        .eq('id', profile.workshop_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.workshop_id,
+  });
     const channel = supabase
       .channel(`bot-documents-${profile.workshop_id}`)
       .on(
