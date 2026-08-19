@@ -234,8 +234,13 @@ async function searchKnowledge(
     console.log('Product codes detected:', cleanCodes);
   }
 
-  // 1. Get AI-expanded keywords
-  const aiKeywords = await expandQueryWithAI(lovableApiKey, query);
+  // 1. Get AI-expanded keywords.
+  //    Skip the expansion call when the query already carries product codes or is
+  //    long enough to have its own keywords: it saves ~1-2s of latency per reply.
+  const t0 = Date.now();
+  const skipExpansion = cleanCodes.length > 0 || query.trim().split(/\s+/).length >= 6;
+  const aiKeywords = skipExpansion ? [] : await expandQueryWithAI(lovableApiKey, query);
+  if (!skipExpansion) console.log('Query expansion took', Date.now() - t0, 'ms');
 
   // 2. Also extract basic keywords from original query as fallback
   const stopWords = ['el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'que', 'es', 'y', 'a', 'para', 'por', 'me', 'mi', 'te', 'se', 'lo', 'le', 'su', 'nos', 'al', 'hola', 'buenos', 'dias', 'buenas', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'necesito', 'busco', 'tienen', 'hay'];
