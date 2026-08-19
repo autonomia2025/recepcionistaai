@@ -2655,6 +2655,7 @@ export type Database = {
           instagram_connected_at: string | null
           instagram_page_id: string | null
           is_active: boolean
+          max_storage_bytes: number
           name: string
           phone: string | null
           slug: string | null
@@ -2707,6 +2708,7 @@ export type Database = {
           instagram_connected_at?: string | null
           instagram_page_id?: string | null
           is_active?: boolean
+          max_storage_bytes?: number
           name: string
           phone?: string | null
           slug?: string | null
@@ -2759,6 +2761,7 @@ export type Database = {
           instagram_connected_at?: string | null
           instagram_page_id?: string | null
           is_active?: boolean
+          max_storage_bytes?: number
           name?: string
           phone?: string | null
           slug?: string | null
