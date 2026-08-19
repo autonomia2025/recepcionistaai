@@ -1045,6 +1045,21 @@ Criterios:${isChatbotOnly ? '' : `
         : 'El cliente solicitó un PDF, pero no se pudo resolver un archivo PDF válido; se evita prometer un envío inexistente.';
     }
 
+    // The language model must never claim a delivery that the attachment
+    // pipeline did not prepare. This also covers a bare SKU: direct SKU queries
+    // attempt attachment resolution even when the customer did not type "PDF".
+    const claimsFileDelivery = (result.replies || []).some(reply =>
+      /\b(te\s+(dejo|adjunto|envio|mando)|adjunto|enviad[oa]|ficha\s+t[eé]cnica\s+(de|en)|procede\s+a\s+enviar)\b/i.test(removeAccents(reply))
+    );
+    if (!attachment && claimsFileDelivery) {
+      result.replies = [
+        resolvedDatasheet
+          ? 'Encontré la ficha técnica, pero no pude preparar el archivo para adjuntarlo en este momento. Te puedo compartir la información técnica disponible mientras lo revisamos.'
+          : 'Tengo información técnica de ese modelo, pero su ficha PDF no está cargada para adjuntarla. Te puedo compartir el resumen disponible o derivarte con un especialista.',
+      ];
+      result.reasoning = 'Se bloqueó una promesa de envío porque el sistema no preparó ningún adjunto PDF.';
+    }
+
     return new Response(JSON.stringify({
       success: true,
       ...result,

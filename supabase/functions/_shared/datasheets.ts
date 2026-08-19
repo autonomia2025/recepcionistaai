@@ -49,6 +49,32 @@ export async function resolvePdfDatasheet(
     const normalizedCode = normalizeProductCode(requestedCode);
     if (normalizedCode.length < 3) continue;
 
+    // Prefer the original PDF inventory itself. Extracted/OCR text may format a
+    // SKU differently (spaces, missing separators), while uploaded filenames
+    // consistently carry the canonical product code.
+    const { data: inventoryDocuments, error: inventoryError } = await supabase
+      .from('bot_documents')
+      .select('id, file_name, file_type, storage_path, created_at')
+      .eq('workshop_id', workshopId)
+      .not('storage_path', 'is', null)
+      .limit(1000);
+
+    if (inventoryError) {
+      console.error('Datasheet inventory lookup failed:', { requestedCode, error: inventoryError });
+    } else {
+      const filenameCandidates = ((inventoryDocuments || []) as DatasheetDocument[])
+        .filter(doc => Boolean(doc.storage_path) && isPdfDocument(doc))
+        .filter(doc => normalizeProductCode(doc.file_name.replace(/\.pdf$/i, '')).endsWith(normalizedCode));
+
+      if (filenameCandidates.length === 1) {
+        return { document: filenameCandidates[0], matchedCode: requestedCode, ambiguous: false };
+      }
+      if (filenameCandidates.length > 1) {
+        foundAmbiguousCode = true;
+        continue;
+      }
+    }
+
     const { data: chunks, error: chunkError } = await supabase
       .from('bot_knowledge')
       .select('document_id, content')
