@@ -395,7 +395,7 @@ serve(async (req) => {
       // If bot is enabled AND not paused for this conversation, use batching system
       const isBotPaused = (conversation as { bot_paused?: boolean }).bot_paused;
       if (workshop.bot_enabled && !isBotPaused) {
-        const BATCH_WINDOW_MS = 8000; // 8 second window
+        const BATCH_WINDOW_MS = 3000; // 3 second window (fast replies, still groups split messages)
         const conversationId = conversation.id;
 
         const STALE_BATCH_TIMEOUT_MS = 60000; // 1 minute - batch is orphaned if processing takes longer
@@ -530,10 +530,10 @@ serve(async (req) => {
         // Step 2: Wait for the full 8-second window
         // But check periodically if new messages arrived (window reset)
         const waitForBatchWindow = async (): Promise<boolean> => {
-          const checkInterval = 1000; // Check every 1 second
+          const checkInterval = 400; // Check every 400ms for a tighter window
           let totalWaited = 0;
 
-          while (totalWaited < BATCH_WINDOW_MS * 2) { // Max 16 seconds total
+          while (totalWaited < BATCH_WINDOW_MS * 3) { // Max 9 seconds total
             await new Promise(resolve => setTimeout(resolve, checkInterval));
             totalWaited += checkInterval;
 
