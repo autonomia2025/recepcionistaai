@@ -367,7 +367,9 @@ export default function BotSettingsPage() {
                     workshopId={profile.workshop_id}
                     onUploadComplete={() => refetchDocs()}
                     documentCount={documents.length}
-                    maxDocuments={50}
+                    usedBytes={usedBytes}
+                    maxStorageBytes={maxStorageBytes}
+                    existingDocs={documents.map((d) => ({ file_name: d.file_name, file_size: d.file_size }))}
                   />
                   <WebImporter
                     workshopId={profile.workshop_id}
