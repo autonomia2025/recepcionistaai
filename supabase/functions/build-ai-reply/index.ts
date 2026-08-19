@@ -152,6 +152,105 @@ function compactText(str: string): string {
   return (str || '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeProductCode(str: string): string {
+  return removeAccents(str || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function extractProductCodes(text: string): string[] {
+  const matches = (text || '').match(/\b[A-Za-z][A-Za-z0-9\-\/]{2,40}\b/g) || [];
+  const codes: string[] = [];
+
+  for (const raw of matches) {
+    if (!/[A-Za-z]/.test(raw) || !/[0-9]/.test(raw)) continue;
+    const normalized = normalizeProductCode(raw);
+    if (normalized.length >= 3 && !codes.includes(raw)) codes.push(raw);
+  }
+
+  return codes;
+}
+
+interface DatasheetDocument {
+  id: string;
+  file_name: string;
+  file_type: string | null;
+  storage_path: string;
+  created_at?: string | null;
+}
+
+// Resolve attachments independently from RAG ranking. A SKU can be present in
+// catalogs/Excel guides as well as its original PDF, so the first knowledge
+// match is not necessarily an attachable datasheet.
+// deno-lint-ignore no-explicit-any
+async function resolvePdfDatasheet(
+  supabase: any,
+  workshopId: string,
+  requestedCodes: string[],
+): Promise<{ document: DatasheetDocument | null; matchedCode: string | null; ambiguous: boolean }> {
+  for (const requestedCode of requestedCodes) {
+    const normalizedCode = normalizeProductCode(requestedCode);
+    if (normalizedCode.length < 3) continue;
+
+    const { data: chunks, error: chunkError } = await supabase
+      .from('bot_knowledge')
+      .select('document_id, content')
+      .eq('workshop_id', workshopId)
+      .ilike('content', `%${requestedCode}%`)
+      .limit(100);
+
+    if (chunkError) {
+      console.error('Datasheet candidate search failed:', { requestedCode, error: chunkError });
+      continue;
+    }
+
+    const documentIds = [...new Set((chunks || []).map((chunk: { document_id?: string | null }) => chunk.document_id).filter(Boolean))];
+    if (documentIds.length === 0) continue;
+
+    const { data: documents, error: documentsError } = await supabase
+      .from('bot_documents')
+      .select('id, file_name, file_type, storage_path, created_at')
+      .eq('workshop_id', workshopId)
+      .in('id', documentIds)
+      .not('storage_path', 'is', null);
+
+    if (documentsError) {
+      console.error('Datasheet document lookup failed:', { requestedCode, error: documentsError });
+      continue;
+    }
+
+    const pdfCandidates = ((documents || []) as DatasheetDocument[])
+      .filter(doc => Boolean(doc.storage_path) && (
+        (doc.file_type || '').toLowerCase().includes('pdf') || doc.file_name.toLowerCase().endsWith('.pdf')
+      ))
+      .map(doc => {
+        const normalizedFile = normalizeProductCode(doc.file_name.replace(/\.pdf$/i, ''));
+        const exactFileCode = normalizedFile.endsWith(normalizedCode);
+        return { doc, exactFileCode };
+      });
+
+    const exactCandidates = pdfCandidates.filter(candidate => candidate.exactFileCode);
+    const candidates = exactCandidates.length > 0 ? exactCandidates : pdfCandidates;
+
+    console.log('Datasheet candidates evaluated:', {
+      requestedCode,
+      totalKnowledgeDocuments: documentIds.length,
+      pdfCandidates: pdfCandidates.map(candidate => candidate.doc.file_name),
+      exactCandidates: exactCandidates.map(candidate => candidate.doc.file_name),
+    });
+
+    // A broad family code such as SOC250 may match several PDFs. Never choose
+    // one arbitrarily; wait for the client to identify the complete model.
+    if (candidates.length > 1) {
+      return { document: null, matchedCode: requestedCode, ambiguous: true };
+    }
+
+    if (candidates.length === 1) {
+      return { document: candidates[0].doc, matchedCode: requestedCode, ambiguous: false };
+    }
+  }
+
+  return { document: null, matchedCode: null, ambiguous: false };
+}
+
 function firstMatch(text: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -925,13 +1024,11 @@ Criterios:${isChatbotOnly ? '' : `
     // PDF document, expose a signed URL so the channel can attach the original file.
     let attachment: { document_id: string; file_name: string; url: string } | null = null;
 
-    // Resolve which document to attach:
-    //  a) exact product-code match in the current message, or
-    //  b) the client is asking for the PDF/ficha and we can recover the product
-    //     code from the recent conversation history (sticky product context).
-    let attachDocumentId: string | null = directCodeMatch?.document_id || null;
+    let resolvedDatasheet: DatasheetDocument | null = null;
+    let pdfRequested = false;
+    let datasheetAmbiguous = false;
 
-    if (botSettings?.send_pdf_datasheets && !attachDocumentId) {
+    if (botSettings?.send_pdf_datasheets) {
       try {
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
         const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviamelo|mandamelo|enviame|mandame)\b/;
@@ -943,43 +1040,43 @@ Criterios:${isChatbotOnly ? '' : `
         );
         const botOfferedFile = /\b(pdf|ficha|archivo|adjunto|documento|catalogo)\b/.test(lastBotText);
 
-        const pdfRequested =
+        pdfRequested =
           pdfRequestRe.test(lowerCurrent) ||
           (shortConfirmRe.test((message_text || '').trim()) && botOfferedFile);
 
-        if (pdfRequested) {
-          // Recover product codes from the recent conversation (newest first)
-          const productCodeRe = /\b[A-Za-z][A-Za-z0-9\-\/]{2,20}\b/g;
-          const recentTexts = [message_text, ...historyRows.map(m => m.text).reverse()];
-          const codes: string[] = [];
-          for (const t of recentTexts) {
-            for (const raw of (t || '').match(productCodeRe) || []) {
-              if (/[A-Za-z]/.test(raw) && /[0-9]/.test(raw)) {
-                const clean = sanitizeKeyword(raw);
-                if (clean.length >= 3 && !codes.includes(clean)) codes.push(clean);
+        // Direct SKU queries should attach immediately. For follow-up requests,
+        // recover product context newest-first from the conversation.
+        const currentCodes = extractProductCodes(message_text);
+        const shouldResolve = currentCodes.length > 0 || pdfRequested;
+        if (shouldResolve) {
+          const codes = [...currentCodes];
+          if (pdfRequested) {
+            for (const historyMessage of [...historyRows].reverse()) {
+              for (const code of extractProductCodes(historyMessage.text)) {
+                if (!codes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
+                  codes.push(code);
+                }
               }
-            }
-            if (codes.length >= 5) break;
-          }
-
-          for (const code of codes) {
-            const { data: chunk } = await supabase
-              .from('bot_knowledge')
-              .select('document_id')
-              .eq('workshop_id', workshop_id)
-              .ilike('content', `%${code}%`)
-              .limit(1)
-              .maybeSingle();
-
-            if (chunk?.document_id) {
-              attachDocumentId = chunk.document_id;
-              console.log('Datasheet resolved from conversation context, code:', code);
-              break;
+              if (codes.length >= 10) break;
             }
           }
 
-          if (!attachDocumentId) {
-            console.log('PDF requested but no product code found in conversation context');
+          const resolution = await resolvePdfDatasheet(supabase, workshop_id, codes);
+          resolvedDatasheet = resolution.document;
+          datasheetAmbiguous = resolution.ambiguous;
+
+          if (resolvedDatasheet) {
+            console.log('Datasheet PDF selected:', {
+              requestedCode: resolution.matchedCode,
+              documentId: resolvedDatasheet.id,
+              fileName: resolvedDatasheet.file_name,
+            });
+          } else {
+            console.log('Datasheet PDF not resolved:', {
+              codes,
+              ambiguous: datasheetAmbiguous,
+              pdfRequested,
+            });
           }
         }
       } catch (ctxErr) {
@@ -987,40 +1084,38 @@ Criterios:${isChatbotOnly ? '' : `
       }
     }
 
-    if (botSettings?.send_pdf_datasheets && attachDocumentId) {
+    if (botSettings?.send_pdf_datasheets && resolvedDatasheet) {
       try {
-        const { data: doc } = await supabase
-          .from('bot_documents')
-          .select('id, file_name, file_type, storage_path')
-          .eq('id', attachDocumentId)
-          .eq('workshop_id', workshop_id)
-          .maybeSingle();
+        const { data: signed, error: signErr } = await supabase
+          .storage
+          .from('bot-documents')
+          .createSignedUrl(resolvedDatasheet.storage_path, 60 * 60 * 24);
 
-        const isPdf = doc && (
-          (doc.file_type || '').toLowerCase().includes('pdf') ||
-          (doc.file_name || '').toLowerCase().endsWith('.pdf')
-        );
-
-        if (isPdf && doc.storage_path) {
-          const { data: signed, error: signErr } = await supabase
-            .storage
-            .from('bot-documents')
-            .createSignedUrl(doc.storage_path, 60 * 60 * 24);
-
-          if (signErr) {
-            console.error('Failed to sign datasheet URL:', signErr);
-          } else if (signed?.signedUrl) {
-            attachment = {
-              document_id: doc.id,
-              file_name: doc.file_name,
-              url: signed.signedUrl,
-            };
-            console.log('Datasheet attachment ready:', doc.file_name);
-          }
+        if (signErr) {
+          console.error('Failed to sign datasheet URL:', signErr);
+        } else if (signed?.signedUrl) {
+          attachment = {
+            document_id: resolvedDatasheet.id,
+            file_name: resolvedDatasheet.file_name,
+            url: signed.signedUrl,
+          };
+          console.log('Datasheet attachment ready:', resolvedDatasheet.file_name);
         }
       } catch (attachErr) {
         console.error('Datasheet attachment error:', attachErr);
       }
+    }
+
+    // Do not claim a file was sent when no attachment was prepared. When a
+    // family code is ambiguous, ask for the exact model instead of guessing.
+    if (pdfRequested && !attachment) {
+      result.replies = [datasheetAmbiguous
+        ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
+        : 'Tengo la información técnica, pero no pude preparar un PDF para adjuntar en este momento. Si me indicas el *modelo completo*, reviso la ficha exacta sin enviarte un archivo incorrecto.'];
+      result.should_handoff = false;
+      result.reasoning = datasheetAmbiguous
+        ? 'Hay más de una ficha PDF compatible con el código parcial; se solicita el modelo completo para evitar enviar un documento incorrecto.'
+        : 'El cliente solicitó un PDF, pero no se pudo resolver un archivo PDF válido; se evita prometer un envío inexistente.';
     }
 
     return new Response(JSON.stringify({
