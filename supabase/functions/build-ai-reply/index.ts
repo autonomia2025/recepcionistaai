@@ -764,7 +764,7 @@ Criterios:${isChatbotOnly ? '' : `
       }),
     });
 
-    console.log('AI response status:', aiResponse.status);
+    console.log('AI response status:', aiResponse.status, 'latency:', Date.now() - aiStartedAt, 'ms');
 
     if (!aiResponse.ok) {
       if (aiResponse.status === 429) {
