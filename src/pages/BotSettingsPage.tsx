@@ -23,6 +23,7 @@ import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
+import { DatasheetCoverage } from '@/components/bot/DatasheetCoverage';
 import { WebImporter } from '@/components/bot/WebImporter';
 import { ZoneEmailSettings } from '@/components/admin/ZoneEmailSettings';
 
