@@ -1,0 +1,4 @@
+DELETE FROM public.messages m USING public.conversations c WHERE m.conversation_id = c.id AND c.workshop_id = '610fb257-a649-4115-b944-21f31e7952db';
+DELETE FROM public.message_batches WHERE workshop_id = '610fb257-a649-4115-b944-21f31e7952db';
+DELETE FROM public.conversations WHERE workshop_id = '610fb257-a649-4115-b944-21f31e7952db';
+UPDATE public.contacts SET detected_intent = NULL, intent_confidence = NULL, lead_score = 0, lead_score_reasoning = NULL, last_analyzed_at = NULL, should_recontact = false, recontact_at = NULL, recontact_reason = NULL, did_schedule = NULL, schedule_confidence = NULL WHERE workshop_id = '610fb257-a649-4115-b944-21f31e7952db';
