@@ -1113,6 +1113,13 @@ Criterios:${isChatbotOnly ? '' : `
       }
     }
 
+    if (pdfRequested && attachment) {
+      const displayName = attachment.file_name.replace(/\.pdf$/i, '');
+      result.replies = [`Listo, adjunto la ficha técnica *${displayName}* en PDF. 📄`];
+      result.should_handoff = false;
+      result.reasoning = `Se resolvió y preparó el PDF exacto ${attachment.file_name} para enviarlo como documento.`;
+    }
+
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
     if (pdfRequested && !attachment) {
