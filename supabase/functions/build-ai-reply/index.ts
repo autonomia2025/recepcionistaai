@@ -186,6 +186,8 @@ async function resolvePdfDatasheet(
   workshopId: string,
   requestedCodes: string[],
 ): Promise<{ document: DatasheetDocument | null; matchedCode: string | null; ambiguous: boolean }> {
+  let foundAmbiguousCode = false;
+
   for (const requestedCode of requestedCodes) {
     const normalizedCode = normalizeProductCode(requestedCode);
     if (normalizedCode.length < 3) continue;
@@ -238,9 +240,10 @@ async function resolvePdfDatasheet(
     });
 
     // A broad family code such as SOC250 may match several PDFs. Never choose
-    // one arbitrarily; wait for the client to identify the complete model.
+    // one arbitrarily, but keep checking later context for a complete model.
     if (candidates.length > 1) {
-      return { document: null, matchedCode: requestedCode, ambiguous: true };
+      foundAmbiguousCode = true;
+      continue;
     }
 
     if (candidates.length === 1) {
@@ -248,7 +251,7 @@ async function resolvePdfDatasheet(
     }
   }
 
-  return { document: null, matchedCode: null, ambiguous: false };
+  return { document: null, matchedCode: null, ambiguous: foundAmbiguousCode };
 }
 
 function firstMatch(text: string, patterns: RegExp[]): string | null {
@@ -1052,7 +1055,11 @@ Criterios:${isChatbotOnly ? '' : `
           const codes = [...currentCodes];
           if (pdfRequested) {
             for (const historyMessage of [...historyRows].reverse()) {
-              for (const code of extractProductCodes(historyMessage.text)) {
+              const historyCodes = extractProductCodes(historyMessage.text);
+              // Lists of alternatives do not establish sticky product context.
+              // Only a message centered on one model can identify the requested PDF.
+              if (historyCodes.length !== 1) continue;
+              for (const code of historyCodes) {
                 if (!codes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
                   codes.push(code);
                 }
