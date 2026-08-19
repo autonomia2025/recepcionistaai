@@ -23,6 +23,7 @@ import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
+import { DatasheetCoverage } from '@/components/bot/DatasheetCoverage';
 import { WebImporter } from '@/components/bot/WebImporter';
 import { ZoneEmailSettings } from '@/components/admin/ZoneEmailSettings';
 
@@ -382,6 +383,23 @@ export default function BotSettingsPage() {
           </Card>
 
           {/* Personalidad */}
+          {profile?.workshop_id && sendPdfDatasheets && (
+            <Card className="bg-background/80">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5" />
+                  Cobertura de fichas
+                </CardTitle>
+                <CardDescription>
+                  Revisa qué modelos de tu catálogo aún no tienen una ficha técnica en PDF que el bot pueda enviar por WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DatasheetCoverage workshopId={profile.workshop_id} />
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-background/80">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
