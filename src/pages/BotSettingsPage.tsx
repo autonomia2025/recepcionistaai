@@ -50,6 +50,7 @@ interface BotDocument {
   processing_progress?: number | null;
   total_pages?: number | null;
   processed_pages?: number | null;
+  storage_path?: string | null;
 }
 
 const TONE_OPTIONS = [
