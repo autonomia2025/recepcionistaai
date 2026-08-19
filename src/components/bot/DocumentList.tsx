@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Document {
   id: string;
@@ -25,6 +26,7 @@ interface Document {
   processing_progress?: number | null;
   total_pages?: number | null;
   processed_pages?: number | null;
+  storage_path?: string | null;
 }
 
 interface DocumentListProps {
@@ -185,6 +187,51 @@ export function DocumentList({ documents, onDelete, isLoading }: DocumentListPro
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const removeDocs = async (docs: Document[]) => {
+    const ids = docs.map((d) => d.id);
+    const paths = docs.map((d) => d.storage_path).filter((p): p is string => !!p);
+
+    if (paths.length > 0) {
+      await supabase.storage.from('bot-documents').remove(paths);
+    }
+
+    await supabase.from('bot_knowledge').delete().in('document_id', ids);
+
+    const { error } = await supabase.from('bot_documents').delete().in('id', ids);
+    if (error) throw error;
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const allSelected = documents.length > 0 && selected.length === documents.length;
+
+  const handleBulkDelete = async () => {
+    const docs = documents.filter((d) => selected.includes(d.id));
+    if (docs.length === 0) return;
+    if (!confirm(`¿Eliminar ${docs.length} documento(s)? También se elimina su contenido del conocimiento del bot.`)) return;
+
+    setBulkDeleting(true);
+    try {
+      await removeDocs(docs);
+      toast({ title: 'Documentos eliminados', description: `${docs.length} documento(s) eliminados correctamente.` });
+      setSelected([]);
+      onDelete();
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast({
+        title: 'Error al eliminar',
+        description: error instanceof Error ? error.message : 'Error desconocido',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const handleDelete = async (doc: Document) => {
     if (!confirm(`¿Eliminar "${doc.file_name}"? Esto también eliminará su contenido del conocimiento del bot.`)) {
@@ -194,23 +241,14 @@ export function DocumentList({ documents, onDelete, isLoading }: DocumentListPro
     setDeletingId(doc.id);
 
     try {
-      await supabase
-        .from('bot_knowledge')
-        .delete()
-        .eq('document_id', doc.id);
-
-      const { error } = await supabase
-        .from('bot_documents')
-        .delete()
-        .eq('id', doc.id);
-
-      if (error) throw error;
+      await removeDocs([doc]);
 
       toast({
         title: 'Documento eliminado',
         description: `"${doc.file_name}" fue eliminado correctamente.`,
       });
 
+      setSelected((prev) => prev.filter((id) => id !== doc.id));
       onDelete();
     } catch (error) {
       console.error('Delete error:', error);
@@ -245,8 +283,29 @@ export function DocumentList({ documents, onDelete, isLoading }: DocumentListPro
   return (
     <>
       <div className="space-y-2">
-        <div className="text-sm text-muted-foreground mb-3">
-          {documents.length} documento{documents.length !== 1 ? 's' : ''} subido{documents.length !== 1 ? 's' : ''}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={(checked) => setSelected(checked ? documents.map((d) => d.id) : [])}
+              aria-label="Seleccionar todos"
+            />
+            <span className="text-sm text-muted-foreground">
+              {selected.length > 0
+                ? `${selected.length} seleccionado${selected.length !== 1 ? 's' : ''}`
+                : `${documents.length} documento${documents.length !== 1 ? 's' : ''} subido${documents.length !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+          {selected.length > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Eliminar
+            </Button>
+          )}
         </div>
         
         {documents.map((doc) => (
@@ -255,6 +314,13 @@ export function DocumentList({ documents, onDelete, isLoading }: DocumentListPro
             className="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-muted/30 transition-colors cursor-pointer"
             onClick={() => doc.status === 'ready' && setPreviewDoc(doc)}
           >
+            <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+              <Checkbox
+                checked={selected.includes(doc.id)}
+                onCheckedChange={() => toggleSelected(doc.id)}
+                aria-label={`Seleccionar ${doc.file_name}`}
+              />
+            </div>
             {getFileIcon(doc.file_type, doc.file_name)}
             
             <div className="flex-1 min-w-0">

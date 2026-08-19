@@ -50,6 +50,7 @@ interface BotDocument {
   processing_progress?: number | null;
   total_pages?: number | null;
   processed_pages?: number | null;
+  storage_path?: string | null;
 }
 
 const TONE_OPTIONS = [
@@ -112,6 +113,25 @@ export default function BotSettingsPage() {
       return hasProcessing ? 5000 : false;
     },
   });
+
+  // Storage quota for the knowledge base
+  const { data: workshopQuota } = useQuery({
+    queryKey: ['workshop-storage-quota', profile?.workshop_id],
+    queryFn: async () => {
+      if (!profile?.workshop_id) return null;
+      const { data, error } = await supabase
+        .from('workshops')
+        .select('max_storage_bytes')
+        .eq('id', profile.workshop_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.workshop_id,
+  });
+
+  const maxStorageBytes = (workshopQuota as { max_storage_bytes?: number } | null)?.max_storage_bytes ?? 1024 * 1024 * 1024;
+  const usedBytes = documents.reduce((sum, d) => sum + (d.file_size ?? 0), 0);
 
   // Realtime subscription for live progress updates
   useEffect(() => {
@@ -366,7 +386,9 @@ export default function BotSettingsPage() {
                     workshopId={profile.workshop_id}
                     onUploadComplete={() => refetchDocs()}
                     documentCount={documents.length}
-                    maxDocuments={50}
+                    usedBytes={usedBytes}
+                    maxStorageBytes={maxStorageBytes}
+                    existingDocs={documents.map((d) => ({ file_name: d.file_name, file_size: d.file_size }))}
                   />
                   <WebImporter
                     workshopId={profile.workshop_id}
