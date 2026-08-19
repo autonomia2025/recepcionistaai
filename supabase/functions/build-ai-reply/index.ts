@@ -711,6 +711,7 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
 
     // Call Lovable AI
     console.log('Calling Lovable AI gateway...');
+    const aiStartedAt = Date.now();
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -718,7 +719,10 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5-mini',
+        // Fast non-reasoning model: same quality for this task, ~5-8s faster than gpt-5-mini
+        model: 'google/gemini-3-flash-preview',
+        max_tokens: 900,
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
           {
