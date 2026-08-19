@@ -114,10 +114,6 @@ export default function BotSettingsPage() {
     },
   });
 
-  // Realtime subscription for live progress updates
-  useEffect(() => {
-    if (!profile?.workshop_id) return;
-
   // Storage quota for the knowledge base
   const { data: workshopQuota } = useQuery({
     queryKey: ['workshop-storage-quota', profile?.workshop_id],
@@ -133,6 +129,13 @@ export default function BotSettingsPage() {
     },
     enabled: !!profile?.workshop_id,
   });
+
+  const maxStorageBytes = (workshopQuota as { max_storage_bytes?: number } | null)?.max_storage_bytes ?? 1024 * 1024 * 1024;
+  const usedBytes = documents.reduce((sum, d) => sum + (d.file_size ?? 0), 0);
+
+  // Realtime subscription for live progress updates
+  useEffect(() => {
+    if (!profile?.workshop_id) return;
     const channel = supabase
       .channel(`bot-documents-${profile.workshop_id}`)
       .on(
