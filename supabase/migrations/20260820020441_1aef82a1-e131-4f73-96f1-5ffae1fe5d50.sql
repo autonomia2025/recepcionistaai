@@ -1,0 +1,1 @@
+UPDATE public.bot_settings SET send_pdf_datasheets = true, updated_at = now() WHERE workshop_id = '610fb257-a649-4115-b944-21f31e7952db';
