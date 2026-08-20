@@ -802,18 +802,30 @@ Criterios:${isChatbotOnly ? '' : `
       if (jsonContent.startsWith('```')) {
         jsonContent = jsonContent.replace(/```json?\n?/g, '').replace(/```\n?$/g, '').trim();
       }
+      // Some responses wrap the JSON in prose; keep only the JSON object.
+      if (!jsonContent.startsWith('{')) {
+        const first = jsonContent.indexOf('{');
+        const last = jsonContent.lastIndexOf('}');
+        if (first !== -1 && last > first) jsonContent = jsonContent.slice(first, last + 1);
+      }
       const parsed = JSON.parse(jsonContent);
       if (parsed.reply && !parsed.replies) {
         parsed.replies = [parsed.reply];
       }
+      if (!Array.isArray(parsed.replies) || parsed.replies.length === 0) {
+        throw new Error('Missing replies array');
+      }
       result = parsed;
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiContent);
+      // Prefer the model's own prose over a generic handoff message.
+      const prose = compactText(String(aiContent || '').replace(/```[a-z]*|```/g, '')).trim();
+      const usableProse = prose && !prose.startsWith('{') && prose.length > 8 ? prose.slice(0, 900) : null;
       result = {
-        replies: ['Gracias por tu mensaje. Un asesor te contactará pronto.'],
+        replies: [usableProse || 'Gracias por tu mensaje. Un asesor te contactará pronto.'],
         intent: 'otro',
         confidence: 0.5,
-        should_handoff: true,
+        should_handoff: !usableProse,
         should_send_booking_link: false,
       };
     }
