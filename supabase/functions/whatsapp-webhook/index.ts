@@ -713,12 +713,13 @@ serve(async (req) => {
                 }
 
                 // ===== Optional PDF datasheet attachment =====
-                const attachment = aiResult.attachment as
-                  | { document_id: string; file_name: string; url: string }
-                  | null
-                  | undefined;
+                type DatasheetAttachment = { document_id: string; file_name: string; url: string };
+                const attachmentList: DatasheetAttachment[] = Array.isArray(aiResult.attachments) && aiResult.attachments.length > 0
+                  ? (aiResult.attachments as DatasheetAttachment[])
+                  : (aiResult.attachment ? [aiResult.attachment as DatasheetAttachment] : []);
 
-                if (attachment?.url) {
+                for (const attachment of attachmentList) {
+                  if (!attachment?.url) continue;
                   try {
                     // Don't resend the same document in the same conversation within 24h
                     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
