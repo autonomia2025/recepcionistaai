@@ -1,52 +1,49 @@
-# Panel de Diagnóstico RAG
+# Corregir las invenciones del bot (SOC Ingeniería)
 
-Nueva página de solo lectura para entender por qué el bot no encuentra información o inventa datos.
+Tres frentes, en orden de impacto: activar búsqueda semántica real, afinar el ranking y corregir el prompt.
 
-## Alcance
+## 1. Embeddings y búsqueda semántica
 
-- Nueva página `/rag-diagnostics`, visible solo para ADMIN y SUPERADMIN.
-- Nueva edge function `test-rag-search` (única pieza de backend nueva).
-- No se toca `build-ai-reply` ni `process-rag-document` en su comportamiento.
+Hoy los 257 fragmentos de SOC están sin embedding, porque la función `generate-embedding` es un stub que devuelve `null` (se escribió cuando la pasarela de IA no ofrecía embeddings; hoy sí los ofrece). Resultado: la búsqueda es solo literal.
 
-## Sección 1 — Salud general
+- Reescribir `generate-embedding` para llamar al endpoint de embeddings de Lovable AI con `google/gemini-embedding-2`, manejando 429/402/403 según corresponde.
+- Migración: la columna `bot_knowledge.embedding` es `vector(768)` y está 100% vacía, así que se redimensiona a `vector(3072)` y se crea el índice HNSW sobre `embedding::halfvec(3072)`. Se actualiza `match_bot_knowledge` a la nueva dimensión (manteniendo su control de acceso y `search_path`).
+- Ejecutar `backfill-embeddings` por lotes hasta cubrir los 257 fragmentos actuales (y los de Ecosan y AulaCDP).
+- `process-rag-document` ya llama a `generate-embedding` al indexar, así que los documentos nuevos quedan cubiertos automáticamente sin tocar esa función.
 
-Cuatro tarjetas del negocio actual (respeta la suplantación de Superadmin):
+## 2. Búsqueda híbrida y ranking
 
-- Total de documentos cargados.
-- Documentos con error (rojo si > 0).
-- Documentos colgados en "processing" hace más de 15 minutos (ámbar si > 0).
-- Total de fragmentos en la base de conocimiento.
+En `build-ai-reply`, la búsqueda pasa a combinar dos señales en vez de una:
 
-## Sección 2 — Tabla de documentos
+- Semántica: `match_bot_knowledge` con el embedding de la consulta (resuelve el caso "máquina para lavar a presión" contra un documento que dice "hidrolavadora").
+- Literal: la búsqueda por palabras actual, que sigue siendo la mejor para códigos exactos tipo SOC250/15ACD.
 
-Columnas: nombre, tipo (pdf / xlsx / web / texto, derivado de `file_type` y extensión), estado con badge (ready verde, processing ámbar, error rojo), fragmentos declarados, fragmentos reales, indicador ⚠️ cuando no cuadran, fecha de carga y mensaje de error completo en un bloque expandible.
+Se fusionan resultados sin duplicados, los códigos exactos mantienen su prioridad y se conserva el tope de 6 fragmentos. Además:
 
-Botón "Ver fragmentos" abre un modal con todos los chunks del documento: número, cantidad de caracteres y el texto completo extraído, con scroll. Los fragmentos con menos de 100 caracteres se marcan en rojo (extracción fallida).
+- Se baja el umbral actual de "mínimo 2 coincidencias de palabras" cuando la consulta tiene una sola palabra útil, que hoy puede devolver cero resultados aunque el dato exista.
+- Se penalizan los fragmentos del Excel guía (`Col2 / Col3 / Col26…`) frente a las fichas PDF cuando ambos empatan, para que gane la ficha del producto.
 
-## Sección 3 — Probador de búsqueda
+No se cambia el comportamiento de derivación ni la lógica de adjuntar PDF.
 
-Campo de texto + botón "Probar búsqueda". Ejecuta exactamente la misma búsqueda que usa el bot y muestra:
+## 3. Prompt de SOC Ingeniería
 
-1. Las keywords generadas (códigos de producto detectados, expansión con IA, keywords básicas, versiones sin acento).
-2. Cuántos fragmentos se encontraron.
-3. Cada fragmento con su contenido y documento de origen.
-4. Si no hay resultados: "❌ No se encontraron fragmentos. El bot va a responder sin información de contexto y puede inventar datos."
+El prompt personalizado (28.087 caracteres) abre definiendo al bot como "un vendedor técnico senior que se sabe los productos de memoria", y su menú de apertura ofrece 12 líneas de producto de las cuales solo hidrolavadoras está documentada (0 fragmentos de abrillantadoras, por ejemplo). Esa combinación es la invitación directa a improvisar.
 
-También se avisa cuando la consulta es un saludo o mensaje corto, porque en ese caso el bot omite la búsqueda a propósito.
+- Quitar la frase de "se sabe los productos de memoria" y reemplazarla por una definición equivalente que ancle las respuestas a la documentación.
+- Poner la regla anti-invención al inicio del prompt, no enterrada después de miles de líneas de instrucciones de venta.
+- Ajustar el menú de apertura: hidrolavadoras como línea asesorable en línea y el resto marcadas explícitamente como "te derivo con un especialista", para que el bot no se sienta obligado a responder por líneas sin respaldo.
 
-## Sección 4 — Últimas respuestas del bot
+Los cambios de prompt se aplican sobre el registro de configuración del bot de SOC Ingeniería, no en el código.
 
-Los últimos 20 mensajes salientes del negocio, emparejados con el último mensaje entrante previo de la misma conversación: mensaje del cliente, respuesta del bot, fecha/hora y el razonamiento guardado en los metadatos del mensaje cuando exista.
+## Verificación
 
-## Navegación
-
-Ítem "Diagnóstico IA" en el menú lateral con ícono Stethoscope, junto a las opciones de configuración, visible solo para ADMIN y SUPERADMIN.
+- Confirmar que los 257 fragmentos quedan con embedding.
+- Probar consultas reales contra la búsqueda: un código exacto (`SOC250/15ACD`), un sinónimo ("máquina para lavar a presión") y una línea no documentada ("abrillantadoras"), verificando que las dos primeras devuelvan fragmentos correctos y la tercera derive a un ejecutivo sin inventar.
+- Revisar los logs de `build-ai-reply` para ver cuántos fragmentos entrega cada consulta.
 
 ## Detalles técnicos
 
-- Ruta en `src/App.tsx`: `/rag-diagnostics` dentro de `AppLayout`, envuelta en `ProtectedRoute` + `AdminOnlyRoute` (ya existe y cubre ADMIN y SUPERADMIN).
-- Página `src/pages/RagDiagnosticsPage.tsx` con hooks de React Query; el `workshop_id` sale de `useAuth()` (`impersonatedWorkshopId ?? profile.workshop_id`).
-- Consultas de lectura vía cliente de Supabase sobre `bot_documents` y `bot_knowledge` (agregado de chunks reales por `document_id` en el cliente), y sobre `messages` para la sección 4.
-- Compartido: se extrae la lógica de búsqueda actual de `build-ai-reply` (`sanitizeKeyword`, `removeAccents`, `expandQueryWithAI`, `searchKnowledge` y su scoring) a `supabase/functions/_shared/rag-search.ts`. `build-ai-reply` pasa a importarla sin cambios de comportamiento, y `test-rag-search` usa la misma función, para que el resultado sea idéntico al del bot real.
-- `supabase/functions/test-rag-search/index.ts`: recibe `{ workshop_id, query }`, valida el JWT y que el usuario sea ADMIN del negocio o SUPERADMIN, y devuelve `{ keywords_generated, results_count, results: [{ content, document_name, chunk_index }] }`. La versión compartida de `searchKnowledge` retorna además las keywords usadas para poder mostrarlas.
-- La tabla `messages` no tiene columna `reasoning`; el razonamiento se lee de `metadata` si el campo está presente.
+- Archivos: `supabase/functions/generate-embedding/index.ts` (reescritura), `supabase/functions/build-ai-reply/index.ts` (búsqueda híbrida y ranking), migración SQL para la columna, el índice y `match_bot_knowledge`.
+- `process-rag-document` queda intacto.
+- Modelo de embeddings: `google/gemini-embedding-2` (3072 dims), llamado solo desde el backend con `LOVABLE_API_KEY`.
+- El backfill corre en lotes para respetar el límite de 100 entradas por solicitud del proveedor.
