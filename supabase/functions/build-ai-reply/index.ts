@@ -1151,23 +1151,31 @@ Criterios:${isChatbotOnly ? '' : `
     }
 
 
-    if (pdfRequested && attachment) {
-      const displayName = attachment.file_name.replace(/\.pdf$/i, '');
-      result.replies = [`Listo, adjunto la ficha técnica *${displayName}* en PDF. 📄`];
+    const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
+
+    // Whenever files are actually prepared, the reply must confirm the delivery
+    // and never ask again for a code the customer already provided.
+    if (attachments.length > 0) {
+      result.replies = [
+        attachments.length === 1
+          ? `Listo, te adjunto la ficha técnica ${datasheetNames[0]} en PDF. 📄`
+          : `Listo, te adjunto ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`,
+      ];
       result.should_handoff = false;
-      result.reasoning = `Se resolvió y preparó el PDF exacto ${attachment.file_name} para enviarlo como documento.`;
+      result.intent = 'consulta';
+      result.reasoning = `Se prepararon ${attachments.length} PDF(s): ${attachments.map(a => a.file_name).join(', ')}.`;
     }
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
-    if (pdfRequested && !attachment) {
+    if (pdfRequested && attachments.length === 0) {
       result.replies = [datasheetAmbiguous
         ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
-        : 'Tengo la información técnica, pero no pude preparar un PDF para adjuntar en este momento. Si me indicas el *modelo completo*, reviso la ficha exacta sin enviarte un archivo incorrecto.'];
-      result.should_handoff = false;
+        : 'No tengo la ficha técnica de ese modelo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para que te confirme la información. 🙌'];
+      result.should_handoff = !datasheetAmbiguous;
       result.reasoning = datasheetAmbiguous
         ? 'Hay más de una ficha PDF compatible con el código parcial; se solicita el modelo completo para evitar enviar un documento incorrecto.'
-        : 'El cliente solicitó un PDF, pero no se pudo resolver un archivo PDF válido; se evita prometer un envío inexistente.';
+        : 'El cliente solicitó un PDF inexistente en la documentación; se deriva a un humano en vez de prometer información.';
     }
 
     // The language model must never claim a delivery that the attachment
@@ -1176,14 +1184,14 @@ Criterios:${isChatbotOnly ? '' : `
     const claimsFileDelivery = (result.replies || []).some(reply =>
       /\b(te\s+(dejo|adjunto|envio|mando)|adjunto|enviad[oa]|ficha\s+t[eé]cnica\s+(de|en)|procede\s+a\s+enviar)\b/i.test(removeAccents(reply))
     );
-    if (!attachment && claimsFileDelivery) {
+    if (attachments.length === 0 && claimsFileDelivery) {
       result.replies = [
-        resolvedDatasheet
-          ? 'Encontré la ficha técnica, pero no pude preparar el archivo para adjuntarlo en este momento. Te puedo compartir la información técnica disponible mientras lo revisamos.'
-          : 'Tengo información técnica de ese modelo, pero su ficha PDF no está cargada para adjuntarla. Te puedo compartir el resumen disponible o derivarte con un especialista.',
+        'No tengo la ficha PDF de ese modelo disponible para adjuntarla, y no quiero darte datos sin respaldo. Te derivo con un especialista para confirmarlo. 🙌',
       ];
+      result.should_handoff = true;
       result.reasoning = 'Se bloqueó una promesa de envío porque el sistema no preparó ningún adjunto PDF.';
     }
+
 
     return new Response(JSON.stringify({
       success: true,
