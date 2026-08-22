@@ -715,6 +715,8 @@ ${ragContext}`;
 
     // Guardrails that always win over any business-authored prompt: they fix
     // menu-before-answer behaviour, redundant code requests and invented data.
+    const conversationAlreadyStarted = (messages || []).length > 0;
+
     const replyGuardrails = `
 REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción anterior):
 1. Si el cliente ya escribió un código, modelo o consulta concreta (aunque sea su PRIMER mensaje), RESPONDE ESA CONSULTA. NO muestres el menú de opciones antes de responder.
@@ -723,7 +725,11 @@ REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción an
 4. NUNCA digas "escríbeme el código para enviarte la ficha" si el cliente ya especificó el producto.
 5. Si el producto/modelo NO aparece en la DOCUMENTACIÓN DE REFERENCIA: dilo explícitamente ("no lo tengo en mi documentación"), NO inventes datos, y deriva con un especialista (should_handoff: true). Nunca digas "tengo la información" si no está documentada.
 6. Si el cliente pide varias fichas o modelos en un mismo mensaje, respóndelos todos, no solo el primero.
-7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.`;
+7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.
+8. Si el cliente hace una pregunta puntual (presión, caudal, potencia, precio, horario, disponibilidad), RESPÓNDELA en texto con el dato documentado. El PDF es un complemento, nunca reemplaza la respuesta.
+${conversationAlreadyStarted ? '9. Esta conversación YA ESTÁ INICIADA: NO repitas el saludo de bienvenida ni el menú de opciones. Ve directo a la respuesta.' : '9. Puedes saludar brevemente una sola vez al inicio.'}
+10. PRECIOS: cuando la documentación traiga "Rango mínimo (CLP neto)" y "Rango máximo (CLP neto)", entrega SIEMPRE un *rango referencial* (ej: "entre $3.116.000 y $3.666.000 neto"), nunca un precio único cerrado. Si solo existe "Precio (CLP)", preséntalo como "valor referencial aprox. $X neto" e indica que el precio final se confirma con un ejecutivo. Si no hay ningún precio documentado, dilo y deriva; no inventes cifras.`;
+
 
     if (settings.system_prompt) {
       systemPrompt = `${settings.system_prompt}
