@@ -5,6 +5,7 @@ import {
   extractProductCodes,
   normalizeProductCode,
   resolvePdfDatasheet,
+  resolvePdfDatasheets,
 } from "../_shared/datasheets.ts";
 
 const corsHeaders = {
@@ -1198,6 +1199,7 @@ Criterios:${isChatbotOnly ? '' : `
       ...result,
       booking_url: fullBookingUrl,
       attachment,
+      attachments,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
