@@ -587,7 +587,33 @@ serve(async (req) => {
         ragMatchCount = knowledgeMatches.length;
         const hasExactCodeMatch = knowledgeMatches.some(k => k.codeHit);
         directCodeMatch = knowledgeMatches.find(k => k.codeHit) || null;
-        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
+        // Authoritative price facts: parsed straight from the documented block
+        // of each requested code so the model cannot borrow another model's price.
+        const priceFacts: string[] = [];
+        for (const requested of extractProductCodes(message_text)) {
+          const normalized = normalizeProductCode(requested);
+          for (const k of knowledgeMatches) {
+            const blockRe = new RegExp(`C[óo]digo(?: exacto)?:\\s*([A-Z0-9][A-Z0-9./\\- ]{2,40})([\\s\\S]{0,900})`, 'gi');
+            let m: RegExpExecArray | null;
+            while ((m = blockRe.exec(k.content)) !== null) {
+              if (normalizeProductCode(m[1]) !== normalized) continue;
+              const min = m[2].match(/Rango m[íi]nimo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
+              const max = m[2].match(/Rango m[áa]ximo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
+              const single = m[2].match(/Precio \(CLP\):\s*([\d.,]{4,15})/i)?.[1];
+              const fmt = (v: string) => Number(v.replace(/\D/g, '')).toLocaleString('es-CL');
+              if (min && max) priceFacts.push(`${m[1].trim()} → rango referencial $${fmt(min)} a $${fmt(max)} neto`);
+              else if (single) priceFacts.push(`${m[1].trim()} → valor referencial aprox. $${fmt(single)} neto`);
+              break;
+            }
+            if (priceFacts.length > 0) break;
+          }
+        }
+
+        const priceBlock = priceFacts.length > 0
+          ? `PRECIOS OFICIALES (ÚNICA fuente válida, no uses otras cifras):\n${[...new Set(priceFacts)].join('\n')}\n\n`
+          : '';
+
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
           .map((k, i) => `[${i + 1}] Archivo: ${k.file_name}${k.codeHit ? ' | COINCIDENCIA DIRECTA DE CÓDIGO' : ''}\n${k.content}`)
           .join('\n---\n')
           }\n`;
