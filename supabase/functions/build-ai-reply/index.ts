@@ -713,10 +713,23 @@ ${ragContext}`;
     // Build system prompt
     let systemPrompt: string;
 
+    // Guardrails that always win over any business-authored prompt: they fix
+    // menu-before-answer behaviour, redundant code requests and invented data.
+    const replyGuardrails = `
+REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción anterior):
+1. Si el cliente ya escribió un código, modelo o consulta concreta (aunque sea su PRIMER mensaje), RESPONDE ESA CONSULTA. NO muestres el menú de opciones antes de responder.
+2. El menú de opciones solo se usa cuando el mensaje es un saludo genérico o el cliente no indica qué necesita.
+3. NUNCA pidas un código que el cliente ya entregó en este mensaje o en el historial reciente.
+4. NUNCA digas "escríbeme el código para enviarte la ficha" si el cliente ya especificó el producto.
+5. Si el producto/modelo NO aparece en la DOCUMENTACIÓN DE REFERENCIA: dilo explícitamente ("no lo tengo en mi documentación"), NO inventes datos, y deriva con un especialista (should_handoff: true). Nunca digas "tengo la información" si no está documentada.
+6. Si el cliente pide varias fichas o modelos en un mismo mensaje, respóndelos todos, no solo el primero.
+7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.`;
+
     if (settings.system_prompt) {
       systemPrompt = `${settings.system_prompt}
 
 ${contextInfo}
+${replyGuardrails}
 
 FORMATO WHATSAPP - USA ESTO:
 - *texto* para negritas (títulos, destacados)
@@ -725,6 +738,7 @@ FORMATO WHATSAPP - USA ESTO:
 - Separa ideas con saltos de línea
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional ni markdown.${isChatbotOnly ? '\nNO menciones agendamiento, citas ni links de booking.' : ''}`;
+
     } else if (isChatbotOnly) {
       systemPrompt = `Eres el asistente virtual profesional de ${workshop.name}.
 
