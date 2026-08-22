@@ -1334,29 +1334,48 @@ Criterios:${isChatbotOnly ? '' : `
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
-    if (pdfRequested && attachments.length === 0) {
-      result.replies = [datasheetAmbiguous
+    // The useful part of the answer is preserved: only the delivery promise is
+    // removed and a clarifying line is appended.
+    if (pdfRequested && attachments.length === 0 && !menuSelection) {
+      const notice = datasheetAmbiguous
         ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
-        : 'No tengo la ficha técnica de ese modelo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para que te confirme la información. 🙌'];
+        : 'Sobre la ficha en PDF: no la tengo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para confirmarla. 🙌';
+
+      const kept = (result.replies || [])
+        .map(stripDeliveryClaims)
+        .filter(reply => compactText(reply).length > 0);
+
+      result.replies = [...kept.slice(0, 2), notice];
       result.should_handoff = !datasheetAmbiguous;
       result.reasoning = datasheetAmbiguous
-        ? 'Hay más de una ficha PDF compatible con el código parcial; se solicita el modelo completo para evitar enviar un documento incorrecto.'
-        : 'El cliente solicitó un PDF inexistente en la documentación; se deriva a un humano en vez de prometer información.';
+        ? 'Hay más de una ficha PDF compatible con el código parcial; se conserva la respuesta y se solicita el modelo completo.'
+        : 'No existe la ficha solicitada: se conserva la información útil y se aclara que el PDF no está disponible.';
     }
 
     // The language model must never claim a delivery that the attachment
-    // pipeline did not prepare. This also covers a bare SKU: direct SKU queries
-    // attempt attachment resolution even when the customer did not type "PDF".
-    const claimsFileDelivery = (result.replies || []).some(reply =>
-      /\b(te\s+(dejo|adjunto|envio|mando)|adjunto|enviad[oa]|ficha\s+t[eé]cnica\s+(de|en)|procede\s+a\s+enviar)\b/i.test(removeAccents(reply))
-    );
-    if (attachments.length === 0 && claimsFileDelivery) {
-      result.replies = [
-        'No tengo la ficha PDF de ese modelo disponible para adjuntarla, y no quiero darte datos sin respaldo. Te derivo con un especialista para confirmarlo. 🙌',
-      ];
+    // pipeline did not prepare. Only a present-tense delivery claim counts:
+    // inviting the customer to request the datasheet ("copia y pega el código y
+    // te llega su ficha") is legitimate and must be preserved verbatim.
+    const claimsFileDelivery =
+      !menuSelection &&
+      attachments.length === 0 &&
+      (result.replies || []).some(reply => {
+        const plain = removeAccents(reply);
+        return DELIVERY_CLAIM_RE.test(plain) && !DELIVERY_INVITATION_RE.test(plain);
+      });
+
+    if (claimsFileDelivery) {
+      const kept = (result.replies || [])
+        .map(stripDeliveryClaims)
+        .filter(reply => compactText(reply).length > 0);
+
+      const notice = 'Sobre la ficha en PDF: no la tengo disponible para adjuntarla en este momento, así que te derivo con un especialista para confirmarla. 🙌';
+
+      result.replies = [...kept.slice(0, 2), notice];
       result.should_handoff = true;
-      result.reasoning = 'Se bloqueó una promesa de envío porque el sistema no preparó ningún adjunto PDF.';
+      result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
+
 
 
     return new Response(JSON.stringify({
