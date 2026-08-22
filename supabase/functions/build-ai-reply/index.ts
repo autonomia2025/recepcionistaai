@@ -1172,18 +1172,31 @@ Criterios:${isChatbotOnly ? '' : `
 
     const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
 
-    // Whenever files are actually prepared, the reply must confirm the delivery
-    // and never ask again for a code the customer already provided.
+    // The PDF is a COMPLEMENT, never a replacement: the customer's actual
+    // question (pressure, price, availability…) must still be answered in text
+    // and the attachment confirmation is appended as an extra message.
     if (attachments.length > 0) {
-      result.replies = [
-        attachments.length === 1
-          ? `Listo, te adjunto la ficha técnica ${datasheetNames[0]} en PDF. 📄`
-          : `Listo, te adjunto ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`,
-      ];
+      const deliveryLine = attachments.length === 1
+        ? `Te adjunto además la ficha técnica ${datasheetNames[0]} en PDF. 📄`
+        : `Te adjunto además ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`;
+
+      // Drop only the sentences that contradict the delivery (asking again for
+      // a code, or claiming the datasheet does not exist).
+      const contradictionRe = /(no tengo (la )?ficha|no puedo envi|ind[ií]came el (c[oó]digo|modelo)|escr[ií]beme el c[oó]digo|nec
+
+esito el c[oó]digo)/i;
+      const keptReplies = (result.replies || [])
+        .filter(reply => compactText(reply).length > 0)
+        .filter(reply => !contradictionRe.test(removeAccents(reply)));
+
+      result.replies = keptReplies.length > 0
+        ? [...keptReplies.slice(0, 2), deliveryLine]
+        : [deliveryLine];
       result.should_handoff = false;
       result.intent = 'consulta';
-      result.reasoning = `Se prepararon ${attachments.length} PDF(s): ${attachments.map(a => a.file_name).join(', ')}.`;
+      result.reasoning = `Respuesta en texto + ${attachments.length} PDF(s) adjunto(s): ${attachments.map(a => a.file_name).join(', ')}.`;
     }
+
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
