@@ -819,50 +819,11 @@ serve(async (req) => {
     const isProductQuery = productQueryRe.test(lowerMsg);
     const ragEmpty = ragMatchCount === 0;
 
-    // Validate conversation belongs to workshop if it exists
-    const { data: conversation } = await supabase
-      .from('conversations')
-      .select('workshop_id, contact_id, assigned_to_user_id')
-      .eq('id', conversation_id)
-      .maybeSingle();
-
-    if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Load contact zone (for zone-detection feature)
-    let contactRecord: { id: string; zone: string | null } | null = null;
-    if (conversation?.contact_id) {
-      const { data: c } = await supabase
-        .from('contacts')
-        .select('id, zone')
-        .eq('id', conversation.contact_id)
-        .maybeSingle();
-      if (c) contactRecord = c as { id: string; zone: string | null };
-    }
-    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
-    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
-
-    // Get conversation history (last 10 messages)
-    const { data: messages, error: messagesError } = await supabase
-      .from('messages')
-      .select('text, direction, created_at')
-      .eq('conversation_id', conversation_id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (messagesError) {
-      console.error('Error fetching messages:', messagesError);
-    }
-
-    // Format conversation history (newest first, then reverse for context)
-    const conversationHistory = (messages || [])
-      .reverse()
+    // Conversation history for the prompt (oldest first)
+    const conversationHistory = messages
       .map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Negocio'}: ${m.text}`)
       .join('\n');
+
 
     // Build booking URL
     let fullBookingUrl: string | null = null;
