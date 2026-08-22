@@ -208,7 +208,7 @@ function buildDocumentedProductReply(match: KnowledgeMatch): string {
   if (description && bullets.length < 6) bullets.push(description);
 
 
-  const uniqueBullets = [...new Set(bullets)].slice(0, 5);
+  const uniqueBullets = [...new Set(bullets)].slice(0, 6);
   const header = code || name ? `Encontré información para *${code || name}*:` : `Encontré información documentada en *${match.file_name}*:`;
 
   return `*Sí, ese modelo está documentado ✅*\n\n${header}\n${name && code ? `• Producto: ${name}\n` : ''}${uniqueBullets.map(b => `• ${b}`).join('\n')}\n\n¿Quieres que te ayude con la cotización o disponibilidad según tu zona?`;
