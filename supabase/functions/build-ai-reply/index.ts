@@ -4,7 +4,7 @@ import {
   type DatasheetDocument,
   extractProductCodes,
   normalizeProductCode,
-  resolvePdfDatasheet,
+  resolvePdfDatasheets,
   resolvePdfDatasheets,
 } from "../_shared/datasheets.ts";
 
