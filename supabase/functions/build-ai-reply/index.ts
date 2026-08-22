@@ -760,71 +760,75 @@ serve(async (req) => {
     const retrievalQuery = buildRetrievalQuery(conversationState, message_text);
     console.log('Conversation state:', conversationState, '→ retrieval query:', retrievalQuery);
 
+    // ===== Deterministic catalog (single source of truth for prices) =====
+    // Prices NEVER come from semantic retrieval: they are read straight from
+    // public.product_catalog by exact SKU, so the same model always quotes the
+    // same range regardless of which chunk the RAG happens to return.
+    let catalogBlockText = '';
+    let priceBlock = '';
+    let catalogSkus: Set<string> = new Set();
+    try {
+      catalogSkus = await fetchCatalogSkuSet(supabase, workshop_id);
+
+      if (catalogSkus.size > 0) {
+        const requestedCodes = [
+          ...extractProductCodes(message_text),
+          ...conversationState.codes.slice(-3),
+        ];
+        const priceRows: CatalogRow[] = await fetchCatalogBySkus(supabase, workshop_id, requestedCodes);
+        if (priceRows.length > 0) {
+          priceBlock =
+            `PRECIOS OFICIALES (fuente única: catálogo interno; es la ÚNICA cifra válida, ignora cualquier otro número del contexto):\n` +
+            `${priceRows.map(formatCatalogLine).join('\n')}\n\n`;
+        }
+
+        const waterType = mapWaterType(conversationState.agua);
+        const motorType = mapMotorType(conversationState.motor);
+        if (waterType && motorType) {
+          const blockRows = await fetchCatalogBlock(supabase, workshop_id, waterType, motorType);
+          if (blockRows.length > 0) {
+            catalogBlockText =
+              `CATÁLOGO OFICIAL — BLOQUE ${waterType} + ${motorType} (${blockRows.length} equipos).\n` +
+              `Para este cliente ofrece ÚNICAMENTE códigos de esta lista, con estos precios exactos:\n` +
+              `${blockRows.map(formatCatalogLine).join('\n')}\n\n`;
+          }
+        }
+        console.log('Catalog layer:', {
+          skus: catalogSkus.size,
+          priceRows: priceRows.map(r => r.sku),
+          block: catalogBlockText ? `${waterType} + ${motorType}` : null,
+        });
+      }
+    } catch (catalogError) {
+      console.error('Catalog layer error (continuing):', catalogError);
+    }
+
     let ragContext = '';
     let ragMatchCount = 0;
     let directCodeMatch: KnowledgeMatch | null = null;
     try {
       const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, retrievalQuery);
 
-
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
         ragMatchCount = knowledgeMatches.length;
         const hasExactCodeMatch = knowledgeMatches.some(k => k.codeHit);
         directCodeMatch = knowledgeMatches.find(k => k.codeHit) || null;
-        // Authoritative price facts: parsed straight from the documented block
-        // of each requested code so the model cannot borrow another model's price.
-        const priceFacts: string[] = [];
-        const fmt = (v: string) => Number(v.replace(/\D/g, '')).toLocaleString('es-CL');
-        const factFromBlock = (content: string, normalized: string): string | null => {
-          const blockRe = /C[óo]digo(?: exacto)?:\s*([A-Z0-9][A-Z0-9./\- ]{2,40})([\s\S]{0,900})/gi;
-          let m: RegExpExecArray | null;
-          while ((m = blockRe.exec(content)) !== null) {
-            if (normalizeProductCode(m[1]) !== normalized) continue;
-            const min = m[2].match(/Rango m[íi]nimo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
-            const max = m[2].match(/Rango m[áa]ximo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
-            const single = m[2].match(/Precio \(CLP\):\s*([\d.,]{4,15})/i)?.[1];
-            if (min && max) return `${m[1].trim()} → rango referencial $${fmt(min)} a $${fmt(max)} neto`;
-            if (single) return `${m[1].trim()} → valor referencial aprox. $${fmt(single)} neto`;
-          }
-          return null;
-        };
 
-        for (const requested of extractProductCodes(message_text)) {
-          const normalized = normalizeProductCode(requested);
-          let fact: string | null = null;
-          for (const k of knowledgeMatches) {
-            fact = factFromBlock(k.content, normalized);
-            if (fact) break;
-          }
-          // The retrieved chunks may miss the price row, so the block is looked
-          // up directly in the knowledge base before letting the model guess.
-          if (!fact) {
-            const { data: priceRows } = await supabase
-              .from('bot_knowledge')
-              .select('content')
-              .eq('workshop_id', workshop_id)
-              .ilike('content', `%${requested}%Rango mínimo%`)
-              .limit(3);
-            for (const row of priceRows || []) {
-              fact = factFromBlock(row.content as string, normalized);
-              if (fact) break;
-            }
-          }
-          if (fact) priceFacts.push(fact);
-        }
-
-        const priceBlock = priceFacts.length > 0
-          ? `PRECIOS OFICIALES (ÚNICA fuente válida, no uses otras cifras):\n${[...new Set(priceFacts)].join('\n')}\n\n`
-          : '';
-
-        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${catalogBlockText}${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
           .map((k, i) => `[${i + 1}] Archivo: ${k.file_name}${k.codeHit ? ' | COINCIDENCIA DIRECTA DE CÓDIGO' : ''}\n${k.content}`)
           .join('\n---\n')
           }\n`;
+      } else if (priceBlock || catalogBlockText) {
+        ragMatchCount = 1;
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${catalogBlockText}`;
       }
     } catch (ragError) {
       console.error('RAG error (continuing without RAG):', ragError);
+      if (priceBlock || catalogBlockText) {
+        ragMatchCount = 1;
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${catalogBlockText}`;
+      }
     }
 
     // ===== Detect product/catalog query for anti-hallucination =====
