@@ -143,3 +143,28 @@ export async function resolvePdfDatasheet(
 
   return { document: null, matchedCode: null, ambiguous: foundAmbiguousCode };
 }
+
+// Resolve several datasheets when the customer asks for more than one model in
+// the same message. Each code is resolved independently and ambiguous family
+// codes are skipped instead of guessing.
+// deno-lint-ignore no-explicit-any
+export async function resolvePdfDatasheets(
+  supabase: any,
+  workshopId: string,
+  requestedCodes: string[],
+  maxDocuments = 3,
+): Promise<{ documents: DatasheetDocument[]; ambiguous: boolean }> {
+  const documents: DatasheetDocument[] = [];
+  let ambiguous = false;
+
+  for (const code of requestedCodes) {
+    if (documents.length >= maxDocuments) break;
+    const resolution = await resolvePdfDatasheet(supabase, workshopId, [code]);
+    if (resolution.ambiguous) ambiguous = true;
+    if (resolution.document && !documents.some(doc => doc.id === resolution.document!.id)) {
+      documents.push(resolution.document);
+    }
+  }
+
+  return { documents, ambiguous: ambiguous && documents.length === 0 };
+}
