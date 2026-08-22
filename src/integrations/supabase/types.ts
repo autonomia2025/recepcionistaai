@@ -1937,6 +1937,85 @@ export type Database = {
         }
         Relationships: []
       }
+      product_catalog: {
+        Row: {
+          created_at: string
+          datasheet_file: string | null
+          datasheet_number: number | null
+          flow_lmin: string | null
+          id: string
+          motor_type: string | null
+          pressure_bar: string | null
+          price_max: number | null
+          price_min: number | null
+          sku: string
+          sku_normalized: string
+          source_file: string | null
+          temp_max: string | null
+          updated_at: string
+          water_type: string | null
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          datasheet_file?: string | null
+          datasheet_number?: number | null
+          flow_lmin?: string | null
+          id?: string
+          motor_type?: string | null
+          pressure_bar?: string | null
+          price_max?: number | null
+          price_min?: number | null
+          sku: string
+          sku_normalized: string
+          source_file?: string | null
+          temp_max?: string | null
+          updated_at?: string
+          water_type?: string | null
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          datasheet_file?: string | null
+          datasheet_number?: number | null
+          flow_lmin?: string | null
+          id?: string
+          motor_type?: string | null
+          pressure_bar?: string | null
+          price_max?: number | null
+          price_min?: number | null
+          sku?: string
+          sku_normalized?: string
+          source_file?: string | null
+          temp_max?: string | null
+          updated_at?: string
+          water_type?: string | null
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_catalog_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_catalog_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_catalog_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
