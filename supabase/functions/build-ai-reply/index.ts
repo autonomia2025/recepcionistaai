@@ -1063,6 +1063,8 @@ Criterios:${isChatbotOnly ? '' : `
     // When the RAG found an exact product-code match and that chunk came from a
     // PDF document, expose a signed URL so the channel can attach the original file.
     let attachment: { document_id: string; file_name: string; url: string } | null = null;
+    const attachments: Array<{ document_id: string; file_name: string; url: string }> = [];
+
 
     let resolvedDatasheet: DatasheetDocument | null = null;
     let pdfRequested = false;
