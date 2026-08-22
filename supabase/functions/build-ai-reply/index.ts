@@ -194,11 +194,19 @@ function buildDocumentedProductReply(match: KnowledgeMatch): string {
   const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
   const description = firstMatch(text, [/Descripci[óo]n:\s*([^|]{40,280})/i]);
 
+  // Prices are always expressed as a documented range, never a closed figure.
+  const clp = (value: string) => Number(value.replace(/\D/g, '')).toLocaleString('es-CL');
+  const rangeMin = firstMatch(text, [/Rango m[íi]nimo \(CLP neto\):\s*([\d.,]{4,15})/i]);
+  const rangeMax = firstMatch(text, [/Rango m[áa]ximo \(CLP neto\):\s*([\d.,]{4,15})/i]);
+  const listPrice = firstMatch(text, [/Precio \(CLP\):\s*([\d.,]{4,15})/i]);
 
   if (model) bullets.unshift(`Modelo: ${model}`);
   if (power) bullets.push(`Alimentación: ${power}`);
   if (fuel) bullets.push(`Consumo combustible: ${fuel}`);
-  if (description && bullets.length < 5) bullets.push(description);
+  if (rangeMin && rangeMax) bullets.push(`Precio referencial: $${clp(rangeMin)} a $${clp(rangeMax)} neto`);
+  else if (listPrice) bullets.push(`Valor referencial aprox.: $${clp(listPrice)} neto`);
+  if (description && bullets.length < 6) bullets.push(description);
+
 
   const uniqueBullets = [...new Set(bullets)].slice(0, 5);
   const header = code || name ? `Encontré información para *${code || name}*:` : `Encontré información documentada en *${match.file_name}*:`;
