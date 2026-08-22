@@ -1,61 +1,55 @@
-# Corregir selección de menú interceptada por el guardrail PDF
+# Diagnóstico: el bot inventa códigos al responder selecciones de menú
 
-## Diagnóstico confirmado
+## 1. ¿Está leyendo el catálogo cuando recomienda? No.
 
-En la conversación real de **JT** (`39403937-d8ec-4b56-8864-669254fbd891`) ocurrió este flujo:
+En la conversación real de Marco, el mensaje que disparó la recomendación fue literalmente `D` (opción del menú de energía). El pipeline de recuperación descarta ese mensaje por completo:
 
-- `H` → abrió el diagnóstico de hidrolavadoras.
-- `E` → seleccionó piso industrial.
-- primera `C` → seleccionó grasa y barro y avanzó a energía.
-- segunda `C` → la IA sí fue llamada, pero su respuesta fue reemplazada por el guardrail PDF.
+- La búsqueda por palabras clave filtra tokens con `length > 2`. Con `D` no queda ninguna palabra, la función devuelve lista vacía sin consultar la base.
+- La búsqueda semántica solo corre si el mensaje tiene 4 o más caracteres (`normalized.length < 4` → return). `D` no llega ahí.
+- Resultado: `ragContext` vacío. El modelo respondió únicamente con el historial de chat y su conocimiento propio.
 
-El texto exacto está hardcodeado en `supabase/functions/build-ai-reply/index.ts`, dentro del bloque final de control de adjuntos, actualmente en las líneas **1288–1297**. Se dispara cuando:
+Por eso generó `SOC200/15ACD-C1` por analogía con los `-C2` reales. Verificado en la base: `SOC200/15ACD-C1` aparece en 0 fragmentos; `SOC200/15ACDCARRO2` aparece en 7.
 
-```text
-attachments.length === 0 && claimsFileDelivery === true
-```
+El guardrail antialucinación existente (`isProductQuery && ragEmpty` → handoff) tampoco se activa, porque `D` no contiene ninguna palabra de producto/precio.
 
-`claimsFileDelivery` considera que la respuesta generada por la IA promete una ficha si coincide con expresiones como “adjunto”, “envío” o “ficha técnica”. Entonces sustituye toda la respuesta por el mensaje fijo de la línea 1293.
+## 2. ¿El índice de selección por agua + motorización está completo en los fragmentos? No.
 
-La evidencia del caso JT muestra que para el mensaje `C`:
+`CATALOGO_BOT_SOC_v2.txt` está partido en 54 chunks y el "ÍNDICE 1 — POR AGUA Y MOTORIZACIÓN" quedó cortado a mitad:
 
-- no hay código de producto (`currentCodes` queda vacío);
-- `pdfRequested` no se activa por la letra;
-- no se intenta resolver un SKU desde el historial;
-- pero la respuesta posterior de la IA coincide con `claimsFileDelivery` y el guardrail la reemplaza.
+- El chunk 0 empieza con el encabezado del índice y la lista de AGUA CALIENTE · BENCINA, y termina en medio de la lista diésel (`...SOC250/30ACD-SK · 250 bar ·` corte).
+- El chunk 1 arranca sin encabezado: `neto SOC250/15ACD · 250 bar...`.
 
-Por tanto, la causa confirmada está en el postprocesamiento de adjuntos; no en el prompt ni directamente en `resolvePdfDatasheets`.
+Consecuencia: aunque el RAG recuperara el chunk 1, no hay ninguna señal de que esos equipos son diésel; y si recupera el chunk 0, la lista diésel está incompleta. Esto explica que mezclara `SOC250/30ACB-C2` (bencina) en una recomendación de diésel.
 
-## Implementación
+## 3. ¿Hay validación de códigos antes de enviar? No existe.
 
-1. Añadir un detector de **selección de menú** antes de toda la lógica PDF:
-   - mensaje actual: exactamente una letra `A-Z` o un solo número;
-   - último mensaje `outbound`: contiene un menú estructurado con opciones por letra o número;
-   - validar además que la opción escrita exista en ese menú, para no excluir mensajes cortos que no sean selecciones válidas.
+No hay ninguna verificación de que los códigos citados por la IA existan en el catálogo. Los únicos controles actuales son de precios (bloque `PRECIOS OFICIALES`) y de adjuntos PDF, ambos posteriores y ninguno valida el código en sí.
 
-2. Cuando sea una selección de menú:
-   - dejar que la IA interprete la opción usando el historial;
-   - omitir extracción de SKU y recuperación de contexto para fichas;
-   - omitir resolución de PDF;
-   - omitir ambos guardrails finales que reemplazan la respuesta por falta de adjunto;
-   - registrar en logs que se detectó una selección de menú para poder auditarla.
+## Propuesta de corrección (tres capas)
 
-3. Mantener intacto el flujo de seguimiento de fichas:
-   - `sí, mándame la ficha` no coincide con una selección de un carácter;
-   - seguirá activando `pdfRequested`, recuperando el SKU reciente y resolviendo el PDF como en el caso 14.
+### A. Recuperación consciente del menú
+Cuando el mensaje sea una selección de menú (ya detectada por `isMenuSelection`), construir la consulta RAG a partir del texto de la opción elegida en el último mensaje del bot (`D` → "Motor diésel (sin electricidad)") más el filtro ya acumulado en la conversación (agua caliente, uso: piso industrial). Con eso el RAG busca contra el índice real en vez de recibir una letra suelta.
+
+### B. Índice de selección no fragmentable
+Reindexar `CATALOGO_BOT_SOC_v2.txt` con corte por secciones: cada bloque `AGUA X · MOTORIZACIÓN Y` queda en un chunk propio y completo, con su encabezado repetido al inicio. Alternativa complementaria: inyectar el ÍNDICE 1 completo como bloque fijo en el prompt cuando la conversación esté en el flujo de diagnóstico (agua + motorización), sin depender del RAG.
+
+### C. Validación de códigos antes de enviar
+Cargar una vez por request el conjunto de códigos válidos del catálogo del negocio (parseando `Código exacto:` de los fragmentos, cacheado en memoria por workshop). Antes de enviar:
+
+1. Extraer todos los códigos mencionados en la respuesta generada.
+2. Cruzarlos contra el conjunto válido con la normalización que ya existe (`normalizeProductCode`).
+3. Si alguno no existe: un reintento único de generación con instrucción explícita ("estos códigos no existen: X; usa solo los del listado") y, si vuelve a fallar, eliminar las líneas que citan el código inválido y registrar el evento en logs para auditoría.
+4. Registrar siempre en logs: códigos citados, válidos e inválidos.
+
+Adicional: cuando la conversación tenga filtros activos (agua caliente + diésel), validar también que los códigos recomendados pertenezcan a ese grupo del índice, no solo que existan.
+
+## Archivos afectados
+
+- `supabase/functions/build-ai-reply/index.ts`: consulta RAG derivada de la opción de menú, inyección del índice de selección, validación de códigos y reintento.
+- Reindexación del documento del catálogo (`process-rag-document`) para cortar por secciones del índice.
 
 ## Validación
 
-- Reproducir de punta a punta el diagnóstico: `H → E → C → C`.
-- Confirmar que la segunda `C` llega a la IA como “Motor a bencina” y avanza hasta una recomendación documentada de equipos, sin disparar el mensaje fijo.
-- Repetir el caso 14: consulta por SKU → `sí, mándame la ficha`; confirmar respuesta útil y PDF adjunto.
-- Añadir controles de regresión para:
-  - selección por letra repetida en menús consecutivos;
-  - selección por número en menú numerado;
-  - un carácter que no aparece entre las opciones, que no debe clasificarse como selección válida.
-- Revisar los logs de la llamada real y confirmar que no haya errores ni derivación falsa por PDF.
-
-## Archivos
-
-- `supabase/functions/build-ai-reply/index.ts`: detección anticipada y exclusión del pipeline PDF para selecciones de menú.
-- Prueba de regresión existente del bot, o un test enfocado nuevo si el proyecto no tiene cobertura automatizada para este flujo.
+- Reproducir agua caliente → E → D y confirmar que las 3 recomendaciones salen de los 7 equipos diésel reales.
+- Forzar una respuesta con código inexistente y comprobar que el reintento o el filtrado lo elimina.
+- Repetir el caso de ficha por SKU para verificar que no hay regresión en adjuntos ni precios.
