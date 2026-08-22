@@ -348,15 +348,16 @@ async function keywordSearchKnowledge(
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
-  // 0a. Skip RAG entirely on low-signal messages (greetings, thanks, "ok", etc.)
-  //     RAG on "hola" only pollutes the prompt with random product chunks and
-  //     pushes the AI to a generic answer.
+  // 0a. Skip RAG only on pure greetings with no accumulated requirements. The
+  //     caller already merges the conversation state into the query, so length
+  //     alone never disqualifies a search.
   const GREETING_RE = /^(hola+|holi|buenas?(\s+(dias|tardes|noches))?|buen\s+dia|hey+|que\s+tal|qtal|saludos|gracias|muchas\s+gracias|ok|okay|listo|si+|no+|👍|👋|🙏)[\s!¡?¿.,]*$/i;
   const normalizedQuery = (query || '').trim();
-  if (!normalizedQuery || normalizedQuery.length < 4 || GREETING_RE.test(normalizedQuery)) {
+  if (!normalizedQuery || GREETING_RE.test(normalizedQuery)) {
     console.log('RAG skipped: low-signal/greeting message');
     return [];
   }
+
 
   // 0. Detect product codes in query (e.g. W186, NPM-GR, HHP4150, SOC200/41EC)
   // Must mix letters AND digits to avoid matching common Spanish words like "necesito".
