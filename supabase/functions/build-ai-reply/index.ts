@@ -5,7 +5,7 @@ import {
   extractProductCodes,
   normalizeProductCode,
   resolvePdfDatasheets,
-  resolvePdfDatasheets,
+
 } from "../_shared/datasheets.ts";
 
 const corsHeaders = {
