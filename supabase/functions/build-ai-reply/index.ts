@@ -1504,7 +1504,10 @@ Criterios:${isChatbotOnly ? '' : `
         const notice =
           'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
 
-        result.replies = sanitized.length > 0 ? [...sanitized.slice(0, 2), notice] : [notice];
+        const alreadyDerives = /especialista|ejecutivo|vendedor|te conecto|te derivo/i.test(sanitized.join(' '));
+        result.replies = sanitized.length === 0
+          ? [notice]
+          : alreadyDerives ? sanitized.slice(0, 2) : [...sanitized.slice(0, 2), notice];
         result.should_handoff = true;
         result.intent = 'humano';
         result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
