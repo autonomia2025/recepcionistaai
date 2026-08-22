@@ -7,6 +7,16 @@ import {
   resolvePdfDatasheets,
 
 } from "../_shared/datasheets.ts";
+import {
+  type CatalogRow,
+  fetchCatalogBlock,
+  fetchCatalogBySkus,
+  fetchCatalogSkuSet,
+  findInventedCodes,
+  formatCatalogLine,
+  mapMotorType,
+  mapWaterType,
+} from "../_shared/catalog.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
