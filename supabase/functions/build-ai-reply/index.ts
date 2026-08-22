@@ -1480,6 +1480,39 @@ Criterios:${isChatbotOnly ? '' : `
       result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
 
+    // ===== Layer C: every product code must exist in the catalog =====
+    // A code the model invented is removed together with the sentence that
+    // carries it. If nothing verifiable survives, the lead goes to a human
+    // instead of receiving a fabricated recommendation.
+    if (catalogSkus.size > 0) {
+      const offending = [...new Set(
+        (result.replies || []).flatMap(reply => findInventedCodes(reply, catalogSkus))
+      )];
+
+      if (offending.length > 0) {
+        console.warn('Invented product codes detected:', offending);
+
+        const sanitized = (result.replies || [])
+          .map(reply => {
+            const sentences = reply.split(/(?<=[.!?🙌📄👍])\s+|\n+/);
+            return compactText(
+              sentences.filter(s => findInventedCodes(s, catalogSkus).length === 0).join(' ')
+            );
+          })
+          .filter(reply => reply.length > 0);
+
+        const notice =
+          'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
+
+        result.replies = sanitized.length > 0 ? [...sanitized.slice(0, 2), notice] : [notice];
+        result.should_handoff = true;
+        result.intent = 'humano';
+        result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
+      }
+    }
+
+
+
 
 
     return new Response(JSON.stringify({
