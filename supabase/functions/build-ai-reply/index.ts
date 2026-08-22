@@ -563,8 +563,11 @@ async function searchKnowledge(
   const hasCodeHit = keywordMatches.some((m) => (m as { codeHit?: boolean }).codeHit);
   if (hasCodeHit && keywordMatches.length >= 3) return keywordMatches;
 
+  // Length is never a reason to skip retrieval: the query already carries the
+  // accumulated conversation state, so even a one-letter turn searches properly.
   const normalized = (query || '').trim();
-  if (normalized.length < 4) return keywordMatches;
+  if (!normalized) return keywordMatches;
+
 
   const semanticMatches = await semanticSearchKnowledge(
     supabase,
