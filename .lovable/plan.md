@@ -1,49 +1,38 @@
-# Corregir las invenciones del bot (SOC Ingeniería)
+# Verificación final del bot de SOC Ingeniería
 
-Tres frentes, en orden de impacto: activar búsqueda semántica real, afinar el ranking y corregir el prompt.
+## Estado actual (verificado en la base de datos)
 
-## 1. Embeddings y búsqueda semántica
+- 166 documentos cargados, todos con archivo en storage (164 son PDF).
+- 257 fragmentos de conocimiento, **0 sin embedding** (búsqueda híbrida activa al 100%).
+- Cada ficha aporta ~1.600 caracteres de texto real, así que la IA sí puede leer el contenido.
+- `send_pdf_datasheets` está en **true**.
 
-Hoy los 257 fragmentos de SOC están sin embedding, porque la función `generate-embedding` es un stub que devuelve `null` (se escribió cuando la pasarela de IA no ofrecía embeddings; hoy sí los ofrece). Resultado: la búsqueda es solo literal.
+Es decir: la base técnica está lista. Lo que todavía no está comprobado con evidencia es el comportamiento end-to-end: que responda bien y adjunte la ficha correcta en todos los casos típicos, no solo en los que ya probamos.
 
-- Reescribir `generate-embedding` para llamar al endpoint de embeddings de Lovable AI con `google/gemini-embedding-2`, manejando 429/402/403 según corresponde.
-- Migración: la columna `bot_knowledge.embedding` es `vector(768)` y está 100% vacía, así que se redimensiona a `vector(3072)` y se crea el índice HNSW sobre `embedding::halfvec(3072)`. Se actualiza `match_bot_knowledge` a la nueva dimensión (manteniendo su control de acceso y `search_path`).
-- Ejecutar `backfill-embeddings` por lotes hasta cubrir los 257 fragmentos actuales (y los de Ecosan y AulaCDP).
-- `process-rag-document` ya llama a `generate-embedding` al indexar, así que los documentos nuevos quedan cubiertos automáticamente sin tocar esa función.
+Respuesta honesta a "¿responderá todo bien siempre?": para productos **con ficha cargada**, sí debería. Para productos que no están entre esos 166 documentos, el bot no inventará (regla N°1 del prompt) pero tampoco podrá responder: derivará a un especialista. Eso es esperado, no un error.
 
-## 2. Búsqueda híbrida y ranking
+## Qué propongo hacer antes de darlo por listo
 
-En `build-ai-reply`, la búsqueda pasa a combinar dos señales en vez de una:
+### 1. Ronda de pruebas automatizada (sin tocar código)
+Ejecutar contra la lógica real del bot un set de ~12 consultas representativas:
 
-- Semántica: `match_bot_knowledge` con el embedding de la consulta (resuelve el caso "máquina para lavar a presión" contra un documento que dice "hidrolavadora").
-- Literal: la búsqueda por palabras actual, que sigue siendo la mejor para códigos exactos tipo SOC250/15ACD.
+- Código exacto de producto (ej. `SOC170-13EF`) → debe responder con datos de la ficha y adjuntar el PDF.
+- Código con formato distinto (minúsculas, con guion/espacio) → mismo resultado.
+- Pedido en lenguaje natural ("hidrolavadora de 200 bar") → debe encontrar candidatos vía búsqueda semántica.
+- Seguimiento ("sí", "mándame la ficha") tras ofrecer un producto → debe recuperar el SKU del contexto y adjuntar.
+- Producto inexistente → NO debe inventar; debe derivar.
+- Consulta de precio/stock no documentada → debe derivar sin inventar.
 
-Se fusionan resultados sin duplicados, los códigos exactos mantienen su prioridad y se conserva el tope de 6 fragmentos. Además:
+Se registra cada caso: respuesta, si adjuntó PDF, si el PDF corresponde al SKU pedido.
 
-- Se baja el umbral actual de "mínimo 2 coincidencias de palabras" cuando la consulta tiene una sola palabra útil, que hoy puede devolver cero resultados aunque el dato exista.
-- Se penalizan los fragmentos del Excel guía (`Col2 / Col3 / Col26…`) frente a las fichas PDF cuando ambos empatan, para que gane la ficha del producto.
+### 2. Informe de resultados
+Una tabla con los casos que pasan y los que fallan, con la causa concreta de cada fallo.
 
-No se cambia el comportamiento de derivación ni la lógica de adjuntar PDF.
-
-## 3. Prompt de SOC Ingeniería
-
-El prompt personalizado (28.087 caracteres) abre definiendo al bot como "un vendedor técnico senior que se sabe los productos de memoria", y su menú de apertura ofrece 12 líneas de producto de las cuales solo hidrolavadoras está documentada (0 fragmentos de abrillantadoras, por ejemplo). Esa combinación es la invitación directa a improvisar.
-
-- Quitar la frase de "se sabe los productos de memoria" y reemplazarla por una definición equivalente que ancle las respuestas a la documentación.
-- Poner la regla anti-invención al inicio del prompt, no enterrada después de miles de líneas de instrucciones de venta.
-- Ajustar el menú de apertura: hidrolavadoras como línea asesorable en línea y el resto marcadas explícitamente como "te derivo con un especialista", para que el bot no se sienta obligado a responder por líneas sin respaldo.
-
-Los cambios de prompt se aplican sobre el registro de configuración del bot de SOC Ingeniería, no en el código.
-
-## Verificación
-
-- Confirmar que los 257 fragmentos quedan con embedding.
-- Probar consultas reales contra la búsqueda: un código exacto (`SOC250/15ACD`), un sinónimo ("máquina para lavar a presión") y una línea no documentada ("abrillantadoras"), verificando que las dos primeras devuelvan fragmentos correctos y la tercera derive a un ejecutivo sin inventar.
-- Revisar los logs de `build-ai-reply` para ver cuántos fragmentos entrega cada consulta.
+### 3. Correcciones dirigidas
+Solo si aparecen fallos, y sobre la causa exacta detectada (resolución de SKU, umbral semántico, adjunto o prompt). Sin refactors amplios.
 
 ## Detalles técnicos
 
-- Archivos: `supabase/functions/generate-embedding/index.ts` (reescritura), `supabase/functions/build-ai-reply/index.ts` (búsqueda híbrida y ranking), migración SQL para la columna, el índice y `match_bot_knowledge`.
-- `process-rag-document` queda intacto.
-- Modelo de embeddings: `google/gemini-embedding-2` (3072 dims), llamado solo desde el backend con `LOVABLE_API_KEY`.
-- El backfill corre en lotes para respetar el límite de 100 entradas por solicitud del proveedor.
+- Las pruebas se ejecutan invocando la edge function `build-ai-reply` con conversaciones simuladas del workshop SOC Ingeniería, revisando el campo de adjunto (`storage_path` / URL firmada) además del texto.
+- No se crean tablas ni se modifica el prompt salvo que una prueba lo justifique.
+- Los mensajes de prueba se limpian al terminar para no contaminar el contexto de conversaciones reales.
