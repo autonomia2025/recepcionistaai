@@ -1141,10 +1141,12 @@ Criterios:${isChatbotOnly ? '' : `
 
           console.log('Datasheet resolution:', {
             codes,
+            historyDerivedCodes,
             resolved: resolvedDatasheets.map(doc => doc.file_name),
             ambiguous: datasheetAmbiguous,
             pdfRequested,
           });
+
         }
       } catch (ctxErr) {
         console.error('Datasheet context resolution error:', ctxErr);
