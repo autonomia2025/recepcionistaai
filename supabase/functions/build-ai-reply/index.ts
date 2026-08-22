@@ -159,6 +159,52 @@ function compactText(str: string): string {
   return (str || '').replace(/\s+/g, ' ').trim();
 }
 
+// ===== Menu selection detection =====
+// A bare "C" answering a lettered menu is a navigation step, never a product
+// code or a datasheet follow-up. Detecting it early keeps the whole PDF
+// pipeline (SKU extraction, history recovery, delivery guardrails) out of the
+// way so the model can simply interpret the chosen option.
+function extractMenuOptions(botText: string): string[] {
+  const options = new Set<string>();
+  for (const line of (botText || '').split('\n')) {
+    const match = line.match(/^\s*\*?([A-Za-z0-9])\*?\s*[).:.-]\s+\S/);
+    if (match) options.add(match[1].toUpperCase());
+  }
+  return [...options];
+}
+
+function isMenuSelection(messageText: string, lastBotText: string): boolean {
+  const trimmed = removeAccents((messageText || '').trim())
+    .replace(/[\s.,!¡?¿)]+$/g, '')
+    .toUpperCase();
+  if (!/^[A-Z0-9]$/.test(trimmed)) return false;
+
+  const options = extractMenuOptions(lastBotText);
+  if (options.length < 2) return false;
+  return options.includes(trimmed);
+}
+
+// Only a claim that the file is being delivered RIGHT NOW is a false promise.
+// Inviting the customer to ask for it ("copia y pega el código y te llega su
+// ficha") is legitimate sales copy and must survive untouched.
+const DELIVERY_CLAIM_RE = /(te\s+(la\s+|lo\s+|los\s+|las\s+)?(adjunto|envio|env[ií]o|mando|dejo|comparto|paso)\b|aqui\s+(va|te\s+va|tienes)\s+(la|el|tu)\s+(ficha|pdf|archivo|documento)|adjunto\s+(la|el|las|los)\s+(ficha|pdf|archivo|documento)|(ficha|pdf|archivo|documento)\s+adjunt[oa]|ya\s+te\s+(la|lo)\s+(envie|mande|adjunte)|procede\s+a\s+enviar)/i;
+
+// Invitations / conditional offers: not a delivery claim.
+const DELIVERY_INVITATION_RE = /(copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
+
+// Split a reply into sentences so a single offending clause can be removed
+// without discarding the rest of the recommendation.
+function stripDeliveryClaims(reply: string): string {
+  const sentences = (reply || '').split(/(?<=[.!?🙌📄👍])\s+|\n+/);
+  const kept = sentences.filter(sentence => {
+    const plain = removeAccents(sentence);
+    if (!DELIVERY_CLAIM_RE.test(plain)) return true;
+    return DELIVERY_INVITATION_RE.test(plain);
+  });
+  return compactText(kept.join(' '));
+}
+
+
 function firstMatch(text: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -1153,8 +1199,24 @@ Criterios:${isChatbotOnly ? '' : `
     let pdfRequested = false;
     let datasheetAmbiguous = false;
 
-    if (botSettings?.send_pdf_datasheets) {
+    // Guard evaluated BEFORE any datasheet logic: a single letter/number that
+    // matches an option of the bot's last menu is menu navigation, so no SKU
+    // extraction, no follow-up memory and no delivery guardrails apply.
+    const lastBotMessageText =
+      ((messages || []) as Array<{ text: string; direction: string }>)
+        .filter(m => m.direction === 'outbound')
+        .slice(-1)[0]?.text || '';
+    const menuSelection = isMenuSelection(message_text, lastBotMessageText);
+    if (menuSelection) {
+      console.log('Menu selection detected → skipping datasheet pipeline:', {
+        message_text,
+        options: extractMenuOptions(lastBotMessageText),
+      });
+    }
+
+    if (botSettings?.send_pdf_datasheets && !menuSelection) {
       try {
+
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
         const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviame(la|lo|las|los)?|mandame(la|lo|las|los)?|pasame(la|lo|las|los)?|compartemela|mandalo|enviala)\b/;
         const shortConfirmRe = /^(si+|sí+|dale|ok|okay|listo|claro|por favor|porfa|obvio|ya|correcto|exacto|asi es|👍)[\s!¡.?¿,]*$/i;
@@ -1272,29 +1334,48 @@ Criterios:${isChatbotOnly ? '' : `
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
-    if (pdfRequested && attachments.length === 0) {
-      result.replies = [datasheetAmbiguous
+    // The useful part of the answer is preserved: only the delivery promise is
+    // removed and a clarifying line is appended.
+    if (pdfRequested && attachments.length === 0 && !menuSelection) {
+      const notice = datasheetAmbiguous
         ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
-        : 'No tengo la ficha técnica de ese modelo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para que te confirme la información. 🙌'];
+        : 'Sobre la ficha en PDF: no la tengo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para confirmarla. 🙌';
+
+      const kept = (result.replies || [])
+        .map(stripDeliveryClaims)
+        .filter(reply => compactText(reply).length > 0);
+
+      result.replies = [...kept.slice(0, 2), notice];
       result.should_handoff = !datasheetAmbiguous;
       result.reasoning = datasheetAmbiguous
-        ? 'Hay más de una ficha PDF compatible con el código parcial; se solicita el modelo completo para evitar enviar un documento incorrecto.'
-        : 'El cliente solicitó un PDF inexistente en la documentación; se deriva a un humano en vez de prometer información.';
+        ? 'Hay más de una ficha PDF compatible con el código parcial; se conserva la respuesta y se solicita el modelo completo.'
+        : 'No existe la ficha solicitada: se conserva la información útil y se aclara que el PDF no está disponible.';
     }
 
     // The language model must never claim a delivery that the attachment
-    // pipeline did not prepare. This also covers a bare SKU: direct SKU queries
-    // attempt attachment resolution even when the customer did not type "PDF".
-    const claimsFileDelivery = (result.replies || []).some(reply =>
-      /\b(te\s+(dejo|adjunto|envio|mando)|adjunto|enviad[oa]|ficha\s+t[eé]cnica\s+(de|en)|procede\s+a\s+enviar)\b/i.test(removeAccents(reply))
-    );
-    if (attachments.length === 0 && claimsFileDelivery) {
-      result.replies = [
-        'No tengo la ficha PDF de ese modelo disponible para adjuntarla, y no quiero darte datos sin respaldo. Te derivo con un especialista para confirmarlo. 🙌',
-      ];
+    // pipeline did not prepare. Only a present-tense delivery claim counts:
+    // inviting the customer to request the datasheet ("copia y pega el código y
+    // te llega su ficha") is legitimate and must be preserved verbatim.
+    const claimsFileDelivery =
+      !menuSelection &&
+      attachments.length === 0 &&
+      (result.replies || []).some(reply => {
+        const plain = removeAccents(reply);
+        return DELIVERY_CLAIM_RE.test(plain) && !DELIVERY_INVITATION_RE.test(plain);
+      });
+
+    if (claimsFileDelivery) {
+      const kept = (result.replies || [])
+        .map(stripDeliveryClaims)
+        .filter(reply => compactText(reply).length > 0);
+
+      const notice = 'Sobre la ficha en PDF: no la tengo disponible para adjuntarla en este momento, así que te derivo con un especialista para confirmarla. 🙌';
+
+      result.replies = [...kept.slice(0, 2), notice];
       result.should_handoff = true;
-      result.reasoning = 'Se bloqueó una promesa de envío porque el sistema no preparó ningún adjunto PDF.';
+      result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
+
 
 
     return new Response(JSON.stringify({
