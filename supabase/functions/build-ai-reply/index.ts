@@ -341,6 +341,118 @@ async function keywordSearchKnowledge(
   }
 }
 
+// ---- Semantic (vector) search ------------------------------------------------
+// bot_knowledge.embedding is vector(768); we ask the gateway for 768 dims so the
+// query vector matches the stored ones and the HNSW index is used.
+const EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+const EMBEDDING_DIMS = 768;
+
+async function embedQuery(lovableApiKey: string, text: string): Promise<number[] | null> {
+  try {
+    const res = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${lovableApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: EMBEDDING_MODEL, input: text.slice(0, 8000), dimensions: EMBEDDING_DIMS }),
+    });
+    if (!res.ok) {
+      console.error('Query embedding failed:', res.status, await res.text());
+      return null;
+    }
+    const json = await res.json();
+    const vec = json?.data?.[0]?.embedding;
+    return Array.isArray(vec) && vec.length === EMBEDDING_DIMS ? vec : null;
+  } catch (err) {
+    console.error('Query embedding error:', err);
+    return null;
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+async function semanticSearchKnowledge(
+  supabase: any,
+  lovableApiKey: string,
+  workshopId: string,
+  query: string,
+  limit = 5
+): Promise<KnowledgeMatch[]> {
+  const t0 = Date.now();
+  const vector = await embedQuery(lovableApiKey, query);
+  if (!vector) return [];
+  try {
+    const { data, error } = await supabase.rpc('match_bot_knowledge', {
+      query_embedding: `[${vector.join(',')}]`,
+      p_workshop_id: workshopId,
+      match_threshold: 0.35,
+      match_count: limit,
+    });
+    if (error) {
+      console.error('Semantic search error:', error);
+      return [];
+    }
+    const matches = (data || []) as Array<{ id: string; content: string; file_name: string; similarity: number }>;
+    console.log(
+      `Semantic search: ${matches.length} matches in ${Date.now() - t0}ms`,
+      matches.map(m => ({ file: m.file_name, sim: Number(m.similarity?.toFixed?.(3) ?? m.similarity) }))
+    );
+    return matches.map(m => ({
+      id: m.id,
+      content: m.content,
+      file_name: m.file_name,
+      document_id: undefined,
+      score: 0,
+      codeHit: false,
+      semantic: true,
+      similarity: m.similarity,
+      // deno-lint-ignore no-explicit-any
+    })) as any as KnowledgeMatch[];
+  } catch (err) {
+    console.error('Semantic search execution error:', err);
+    return [];
+  }
+}
+
+// Hybrid search: keyword/ILIKE first (exact SKUs win), semantic as complement
+// so that a client wording that does not literally match the documents still
+// retrieves context instead of leaving the model to improvise.
+// deno-lint-ignore no-explicit-any
+async function searchKnowledge(
+  supabase: any,
+  lovableApiKey: string,
+  workshopId: string,
+  query: string
+): Promise<KnowledgeMatch[]> {
+  const keywordMatches = await keywordSearchKnowledge(supabase, lovableApiKey, workshopId, query);
+
+  // Exact product-code hits are authoritative; don't dilute them.
+  const hasCodeHit = keywordMatches.some((m) => (m as { codeHit?: boolean }).codeHit);
+  if (hasCodeHit && keywordMatches.length >= 3) return keywordMatches;
+
+  const normalized = (query || '').trim();
+  if (normalized.length < 4) return keywordMatches;
+
+  const semanticMatches = await semanticSearchKnowledge(
+    supabase,
+    lovableApiKey,
+    workshopId,
+    normalized,
+    keywordMatches.length === 0 ? 6 : 4
+  );
+  if (semanticMatches.length === 0) return keywordMatches;
+
+  const seen = new Set(keywordMatches.map((m) => m.id));
+  const merged = [...keywordMatches];
+  for (const m of semanticMatches) {
+    if (!seen.has(m.id)) {
+      seen.add(m.id);
+      merged.push(m);
+    }
+  }
+  console.log(`Hybrid RAG: ${keywordMatches.length} keyword + ${semanticMatches.length} semantic → ${merged.length} total`);
+  return merged.slice(0, 8);
+}
+
+
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
