@@ -131,12 +131,23 @@ export async function fetchCatalogSkuSet(supabase: any, workshopId: string): Pro
 // Codes as they are written in a reply: at least two letters followed by digits
 // (SOC250/15ACD-C2, PWGB200-15T, TX1318000, MH120-10M...). Plain measurements
 // ("250 bar", "15 L/min") never match.
-const REPLY_CODE_RE = /\b[A-Z]{2,7}\s?\d{2,4}(?:[/\-.][A-Z0-9]{1,10}){0,3}[A-Z0-9]*\b/g;
+const REPLY_CODE_RE = /\b[A-Z]{2,7}\d{2,4}(?:[/\-.][A-Z0-9]{1,10}){0,3}[A-Z0-9]*\b/g;
+
+// Spanish words that would otherwise look like a prefix ("ELECTRICA 380V").
+const CODE_PREFIX_STOPLIST = new Set([
+  'ELECTRICA', 'ELECTRICO', 'TRIFASICA', 'MONOFASICA', 'AGUA', 'CALIENTE', 'FRIA',
+  'BAR', 'PSI', 'HP', 'KW', 'RPM', 'IVA', 'CLP', 'PDF', 'MODELO', 'FICHA', 'RUTA',
+]);
 
 export function extractQuotedCodes(text: string): string[] {
-  const found = (text || '').toUpperCase().match(REPLY_CODE_RE) || [];
+  const plain = (text || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  const found = plain.match(REPLY_CODE_RE) || [];
   const out: string[] = [];
   for (const raw of found) {
+    const prefix = raw.match(/^[A-Z]+/)?.[0] || '';
+    if (CODE_PREFIX_STOPLIST.has(prefix)) continue;
     const normalized = normalizeProductCode(raw);
     if (normalized.length < 6) continue;
     if (!out.includes(raw.trim())) out.push(raw.trim());
