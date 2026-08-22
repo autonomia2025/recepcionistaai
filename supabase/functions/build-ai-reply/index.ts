@@ -184,6 +184,86 @@ function isMenuSelection(messageText: string, lastBotText: string): boolean {
   return options.includes(trimmed);
 }
 
+// ---- Accumulated conversation state -----------------------------------------
+// The retrieval query must not depend on how long the last message is. We rebuild
+// the requirements the customer has already stated across the whole thread, so
+// "D", "sí ese" or a full sentence all produce the same catalog query.
+interface ConversationState {
+  agua: string | null;
+  motor: string | null;
+  uso: string | null;
+  specs: string[];
+  codes: string[];
+}
+
+const USE_CASES = [
+  'packing', 'corrales', 'piso industrial', 'pisos industriales', 'camiones', 'camion',
+  'maquinaria', 'bodega', 'bodegas', 'agricola', 'lecheria', 'planta', 'faenadora',
+  'minera', 'mineria', 'construccion', 'autos', 'lavado de autos', 'establo', 'galpon',
+];
+
+function resolveMenuLetter(text: string, lastBotText: string): string {
+  const trimmed = removeAccents((text || '').trim()).replace(/[\s.,!¡?¿)]+$/g, '').toUpperCase();
+  if (!/^[A-Z0-9]$/.test(trimmed)) return text || '';
+  const line = (lastBotText || '')
+    .split('\n')
+    .find(l => new RegExp(`^\\s*\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+\\S`, 'i').test(removeAccents(l)));
+  return line ? `${text} ${line}` : (text || '');
+}
+
+function buildConversationState(
+  history: Array<{ text: string | null; direction: string }>,
+  currentText: string
+): ConversationState {
+  const state: ConversationState = { agua: null, motor: null, uso: null, specs: [], codes: [] };
+  const seq = [...history, { text: currentText, direction: 'inbound' }];
+  let lastBot = '';
+
+  for (const m of seq) {
+    if (m.direction !== 'inbound') { lastBot = m.text || ''; continue; }
+    const resolved = resolveMenuLetter(m.text || '', lastBot);
+    const plain = removeAccents(resolved.toLowerCase());
+
+    if (/agua\s+caliente|caliente/.test(plain)) state.agua = 'agua caliente';
+    else if (/agua\s+fria|\bfria\b/.test(plain)) state.agua = 'agua fría';
+
+    if (/diesel|petroleo/.test(plain)) state.motor = 'motor diésel';
+    else if (/bencina|gasolina/.test(plain)) state.motor = 'motor a bencina';
+    else if (/\b380\b/.test(plain)) state.motor = 'eléctrica 380V trifásica';
+    else if (/\b220\b/.test(plain)) state.motor = 'eléctrica 220V monofásica';
+
+    for (const u of USE_CASES) if (plain.includes(u)) state.uso = u;
+
+    const specs = resolved.match(/\b\d{2,4}\s?(bar|psi|l\/min|lpm|hp|kw)\b/gi);
+    if (specs) for (const s of specs) if (!state.specs.includes(s)) state.specs.push(s);
+
+    for (const c of extractProductCodes(resolved)) if (!state.codes.includes(c)) state.codes.push(c);
+  }
+
+  return state;
+}
+
+// The query is built from the accumulated state; the current message is appended
+// only when it carries its own words. Empty state → behave exactly as before.
+function buildRetrievalQuery(state: ConversationState, currentText: string): string {
+  const parts: string[] = [];
+  if (state.agua) parts.push(state.agua);
+  if (state.motor) parts.push(state.motor);
+  if (state.uso) parts.push(state.uso);
+  parts.push(...state.specs.slice(-2));
+  parts.push(...state.codes.slice(-3));
+
+  const current = (currentText || '').trim();
+  const hasOwnWords = removeAccents(current.toLowerCase())
+    .split(/\s+/)
+    .some(w => w.replace(/[^a-z0-9/-]/g, '').length > 2);
+  if (hasOwnWords) parts.push(current);
+
+  const query = [...new Set(parts)].join(' ').trim();
+  return query || current;
+}
+
+
 // Only a claim that the file is being delivered RIGHT NOW is a false promise.
 // Inviting the customer to ask for it ("copia y pega el código y te llega su
 // ficha") is legitimate sales copy and must survive untouched.
@@ -268,15 +348,16 @@ async function keywordSearchKnowledge(
   workshopId: string,
   query: string
 ): Promise<KnowledgeMatch[]> {
-  // 0a. Skip RAG entirely on low-signal messages (greetings, thanks, "ok", etc.)
-  //     RAG on "hola" only pollutes the prompt with random product chunks and
-  //     pushes the AI to a generic answer.
+  // 0a. Skip RAG only on pure greetings with no accumulated requirements. The
+  //     caller already merges the conversation state into the query, so length
+  //     alone never disqualifies a search.
   const GREETING_RE = /^(hola+|holi|buenas?(\s+(dias|tardes|noches))?|buen\s+dia|hey+|que\s+tal|qtal|saludos|gracias|muchas\s+gracias|ok|okay|listo|si+|no+|👍|👋|🙏)[\s!¡?¿.,]*$/i;
   const normalizedQuery = (query || '').trim();
-  if (!normalizedQuery || normalizedQuery.length < 4 || GREETING_RE.test(normalizedQuery)) {
+  if (!normalizedQuery || GREETING_RE.test(normalizedQuery)) {
     console.log('RAG skipped: low-signal/greeting message');
     return [];
   }
+
 
   // 0. Detect product codes in query (e.g. W186, NPM-GR, HHP4150, SOC200/41EC)
   // Must mix letters AND digits to avoid matching common Spanish words like "necesito".
@@ -483,8 +564,11 @@ async function searchKnowledge(
   const hasCodeHit = keywordMatches.some((m) => (m as { codeHit?: boolean }).codeHit);
   if (hasCodeHit && keywordMatches.length >= 3) return keywordMatches;
 
+  // Length is never a reason to skip retrieval: the query already carries the
+  // accumulated conversation state, so even a one-letter turn searches properly.
   const normalized = (query || '').trim();
-  if (normalized.length < 4) return keywordMatches;
+  if (!normalized) return keywordMatches;
+
 
   const semanticMatches = await semanticSearchKnowledge(
     supabase,
@@ -621,12 +705,57 @@ serve(async (req) => {
       system_prompt: botSettings?.system_prompt || null,
     };
 
-    // ===== RAG: AI-enhanced keyword search =====
+    // Validate conversation belongs to workshop if it exists
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('workshop_id, contact_id, assigned_to_user_id')
+      .eq('id', conversation_id)
+      .maybeSingle();
+
+    if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load contact zone (for zone-detection feature)
+    let contactRecord: { id: string; zone: string | null } | null = null;
+    if (conversation?.contact_id) {
+      const { data: c } = await supabase
+        .from('contacts')
+        .select('id, zone')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      if (c) contactRecord = c as { id: string; zone: string | null };
+    }
+    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
+    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
+
+    // Conversation history (last 10 messages, oldest first)
+    const { data: messageRows, error: messagesError } = await supabase
+      .from('messages')
+      .select('text, direction, created_at')
+      .eq('conversation_id', conversation_id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+    }
+    const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
+
+    // ===== RAG: query built from accumulated conversation state =====
+    const conversationState = buildConversationState(messages, message_text);
+    const retrievalQuery = buildRetrievalQuery(conversationState, message_text);
+    console.log('Conversation state:', conversationState, '→ retrieval query:', retrievalQuery);
+
     let ragContext = '';
     let ragMatchCount = 0;
     let directCodeMatch: KnowledgeMatch | null = null;
     try {
-      const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
+      const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, retrievalQuery);
+
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
@@ -694,50 +823,11 @@ serve(async (req) => {
     const isProductQuery = productQueryRe.test(lowerMsg);
     const ragEmpty = ragMatchCount === 0;
 
-    // Validate conversation belongs to workshop if it exists
-    const { data: conversation } = await supabase
-      .from('conversations')
-      .select('workshop_id, contact_id, assigned_to_user_id')
-      .eq('id', conversation_id)
-      .maybeSingle();
-
-    if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Load contact zone (for zone-detection feature)
-    let contactRecord: { id: string; zone: string | null } | null = null;
-    if (conversation?.contact_id) {
-      const { data: c } = await supabase
-        .from('contacts')
-        .select('id, zone')
-        .eq('id', conversation.contact_id)
-        .maybeSingle();
-      if (c) contactRecord = c as { id: string; zone: string | null };
-    }
-    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
-    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
-
-    // Get conversation history (last 10 messages)
-    const { data: messages, error: messagesError } = await supabase
-      .from('messages')
-      .select('text, direction, created_at')
-      .eq('conversation_id', conversation_id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (messagesError) {
-      console.error('Error fetching messages:', messagesError);
-    }
-
-    // Format conversation history (newest first, then reverse for context)
-    const conversationHistory = (messages || [])
-      .reverse()
+    // Conversation history for the prompt (oldest first)
+    const conversationHistory = messages
       .map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Negocio'}: ${m.text}`)
       .join('\n');
+
 
     // Build booking URL
     let fullBookingUrl: string | null = null;
