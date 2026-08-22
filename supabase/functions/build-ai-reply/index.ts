@@ -1066,7 +1066,7 @@ Criterios:${isChatbotOnly ? '' : `
     const attachments: Array<{ document_id: string; file_name: string; url: string }> = [];
 
 
-    let resolvedDatasheet: DatasheetDocument | null = null;
+    let resolvedDatasheets: DatasheetDocument[] = [];
     let pdfRequested = false;
     let datasheetAmbiguous = false;
 
@@ -1092,7 +1092,7 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
-          if (pdfRequested) {
+          if (pdfRequested && currentCodes.length === 0) {
             for (const historyMessage of [...historyRows].reverse()) {
               const historyCodes = extractProductCodes(historyMessage.text);
               // Lists of alternatives do not establish sticky product context.
@@ -1107,50 +1107,49 @@ Criterios:${isChatbotOnly ? '' : `
             }
           }
 
-          const resolution = await resolvePdfDatasheet(supabase, workshop_id, codes);
-          resolvedDatasheet = resolution.document;
+          // A single message can legitimately ask for several models, so every
+          // requested code is resolved instead of only the first one.
+          const resolution = await resolvePdfDatasheets(supabase, workshop_id, codes, 3);
+          resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
 
-          if (resolvedDatasheet) {
-            console.log('Datasheet PDF selected:', {
-              requestedCode: resolution.matchedCode,
-              documentId: resolvedDatasheet.id,
-              fileName: resolvedDatasheet.file_name,
-            });
-          } else {
-            console.log('Datasheet PDF not resolved:', {
-              codes,
-              ambiguous: datasheetAmbiguous,
-              pdfRequested,
-            });
-          }
+          console.log('Datasheet resolution:', {
+            codes,
+            resolved: resolvedDatasheets.map(doc => doc.file_name),
+            ambiguous: datasheetAmbiguous,
+            pdfRequested,
+          });
         }
       } catch (ctxErr) {
         console.error('Datasheet context resolution error:', ctxErr);
       }
     }
 
-    if (botSettings?.send_pdf_datasheets && resolvedDatasheet) {
-      try {
-        const { data: signed, error: signErr } = await supabase
-          .storage
-          .from('bot-documents')
-          .createSignedUrl(resolvedDatasheet.storage_path, 60 * 60 * 24);
+    if (botSettings?.send_pdf_datasheets && resolvedDatasheets.length > 0) {
+      for (const doc of resolvedDatasheets) {
+        try {
+          const { data: signed, error: signErr } = await supabase
+            .storage
+            .from('bot-documents')
+            .createSignedUrl(doc.storage_path, 60 * 60 * 24);
 
-        if (signErr) {
-          console.error('Failed to sign datasheet URL:', signErr);
-        } else if (signed?.signedUrl) {
-          attachment = {
-            document_id: resolvedDatasheet.id,
-            file_name: resolvedDatasheet.file_name,
-            url: signed.signedUrl,
-          };
-          console.log('Datasheet attachment ready:', resolvedDatasheet.file_name);
+          if (signErr) {
+            console.error('Failed to sign datasheet URL:', signErr);
+          } else if (signed?.signedUrl) {
+            attachments.push({
+              document_id: doc.id,
+              file_name: doc.file_name,
+              url: signed.signedUrl,
+            });
+          }
+        } catch (attachErr) {
+          console.error('Datasheet attachment error:', attachErr);
         }
-      } catch (attachErr) {
-        console.error('Datasheet attachment error:', attachErr);
       }
+      attachment = attachments[0] || null;
+      console.log('Datasheet attachments ready:', attachments.map(a => a.file_name));
     }
+
 
     if (pdfRequested && attachment) {
       const displayName = attachment.file_name.replace(/\.pdf$/i, '');
