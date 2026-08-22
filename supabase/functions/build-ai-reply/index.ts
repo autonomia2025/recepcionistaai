@@ -701,12 +701,57 @@ serve(async (req) => {
       system_prompt: botSettings?.system_prompt || null,
     };
 
-    // ===== RAG: AI-enhanced keyword search =====
+    // Validate conversation belongs to workshop if it exists
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('workshop_id, contact_id, assigned_to_user_id')
+      .eq('id', conversation_id)
+      .maybeSingle();
+
+    if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Load contact zone (for zone-detection feature)
+    let contactRecord: { id: string; zone: string | null } | null = null;
+    if (conversation?.contact_id) {
+      const { data: c } = await supabase
+        .from('contacts')
+        .select('id, zone')
+        .eq('id', conversation.contact_id)
+        .maybeSingle();
+      if (c) contactRecord = c as { id: string; zone: string | null };
+    }
+    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
+    const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
+
+    // Conversation history (last 10 messages, oldest first)
+    const { data: messageRows, error: messagesError } = await supabase
+      .from('messages')
+      .select('text, direction, created_at')
+      .eq('conversation_id', conversation_id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+    }
+    const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
+
+    // ===== RAG: query built from accumulated conversation state =====
+    const conversationState = buildConversationState(messages, message_text);
+    const retrievalQuery = buildRetrievalQuery(conversationState, message_text);
+    console.log('Conversation state:', conversationState, '→ retrieval query:', retrievalQuery);
+
     let ragContext = '';
     let ragMatchCount = 0;
     let directCodeMatch: KnowledgeMatch | null = null;
     try {
-      const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, message_text);
+      const knowledgeMatches = await searchKnowledge(supabase, lovableApiKey, workshop_id, retrievalQuery);
+
 
       if (knowledgeMatches && knowledgeMatches.length > 0) {
         console.log('RAG found matches:', knowledgeMatches.length);
