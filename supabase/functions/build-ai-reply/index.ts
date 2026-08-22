@@ -715,6 +715,10 @@ ${ragContext}`;
 
     // Guardrails that always win over any business-authored prompt: they fix
     // menu-before-answer behaviour, redundant code requests and invented data.
+    // The bot already spoke in this thread → the welcome greeting/menu was used.
+    const conversationAlreadyStarted = (messages || []).some((m: { direction: string }) => m.direction === 'outbound');
+
+
     const replyGuardrails = `
 REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción anterior):
 1. Si el cliente ya escribió un código, modelo o consulta concreta (aunque sea su PRIMER mensaje), RESPONDE ESA CONSULTA. NO muestres el menú de opciones antes de responder.
@@ -723,7 +727,11 @@ REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción an
 4. NUNCA digas "escríbeme el código para enviarte la ficha" si el cliente ya especificó el producto.
 5. Si el producto/modelo NO aparece en la DOCUMENTACIÓN DE REFERENCIA: dilo explícitamente ("no lo tengo en mi documentación"), NO inventes datos, y deriva con un especialista (should_handoff: true). Nunca digas "tengo la información" si no está documentada.
 6. Si el cliente pide varias fichas o modelos en un mismo mensaje, respóndelos todos, no solo el primero.
-7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.`;
+7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.
+8. Si el cliente hace una pregunta puntual (presión, caudal, potencia, precio, horario, disponibilidad), RESPÓNDELA en texto con el dato documentado. El PDF es un complemento, nunca reemplaza la respuesta.
+${conversationAlreadyStarted ? '9. Esta conversación YA ESTÁ INICIADA: NO repitas el saludo de bienvenida ni el menú de opciones. Ve directo a la respuesta.' : '9. Puedes saludar brevemente una sola vez al inicio.'}
+10. PRECIOS: cuando la documentación traiga "Rango mínimo (CLP neto)" y "Rango máximo (CLP neto)", entrega SIEMPRE un *rango referencial* (ej: "entre $3.116.000 y $3.666.000 neto"), nunca un precio único cerrado. Si solo existe "Precio (CLP)", preséntalo como "valor referencial aprox. $X neto" e indica que el precio final se confirma con un ejecutivo. Si no hay ningún precio documentado, dilo y deriva; no inventes cifras.`;
+
 
     if (settings.system_prompt) {
       systemPrompt = `${settings.system_prompt}
@@ -1111,33 +1119,42 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
+          // Codes recovered from history must not multiply the attachments, so
+          // they are resolved separately with a single-document budget while the
+          // current message keeps the full multi-attachment budget.
+          const historyDerivedCodes: string[] = [];
           if (pdfRequested && currentCodes.length === 0) {
             for (const historyMessage of [...historyRows].reverse()) {
               const historyCodes = extractProductCodes(historyMessage.text);
-              // Lists of alternatives do not establish sticky product context.
-              // Only a message centered on one model can identify the requested PDF.
-              if (historyCodes.length !== 1) continue;
+              // Long enumerations of alternatives are ambiguous context, but a
+              // message carrying a couple of codes still identifies the product.
+              if (historyCodes.length === 0 || historyCodes.length > 3) continue;
               for (const code of historyCodes) {
-                if (!codes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
-                  codes.push(code);
+                if (!historyDerivedCodes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
+                  historyDerivedCodes.push(code);
                 }
               }
-              if (codes.length >= 10) break;
+              if (historyDerivedCodes.length >= 6) break;
             }
           }
 
           // A single message can legitimately ask for several models, so every
           // requested code is resolved instead of only the first one.
-          const resolution = await resolvePdfDatasheets(supabase, workshop_id, codes, 3);
+          const resolution = codes.length > 0
+            ? await resolvePdfDatasheets(supabase, workshop_id, codes, 3)
+            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
+
           resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
 
           console.log('Datasheet resolution:', {
             codes,
+            historyDerivedCodes,
             resolved: resolvedDatasheets.map(doc => doc.file_name),
             ambiguous: datasheetAmbiguous,
             pdfRequested,
           });
+
         }
       } catch (ctxErr) {
         console.error('Datasheet context resolution error:', ctxErr);
@@ -1172,18 +1189,30 @@ Criterios:${isChatbotOnly ? '' : `
 
     const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
 
-    // Whenever files are actually prepared, the reply must confirm the delivery
-    // and never ask again for a code the customer already provided.
+    // The PDF is a COMPLEMENT, never a replacement: the customer's actual
+    // question (pressure, price, availability…) must still be answered in text
+    // and the attachment confirmation is appended as an extra message.
     if (attachments.length > 0) {
-      result.replies = [
-        attachments.length === 1
-          ? `Listo, te adjunto la ficha técnica ${datasheetNames[0]} en PDF. 📄`
-          : `Listo, te adjunto ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`,
-      ];
+      const deliveryLine = attachments.length === 1
+        ? `Te adjunto además la ficha técnica ${datasheetNames[0]} en PDF. 📄`
+        : `Te adjunto además ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`;
+
+      // Drop only the sentences that contradict the delivery (asking again for
+      // a code, or claiming the datasheet does not exist).
+      const contradictionRe = /(no tengo (la )?ficha|no puedo envi|ind[ií]came el (c[oó]digo|modelo)|escr[ií]beme el c[oó]digo|necesito el c[oó]digo)/i;
+
+      const keptReplies = (result.replies || [])
+        .filter(reply => compactText(reply).length > 0)
+        .filter(reply => !contradictionRe.test(removeAccents(reply)));
+
+      result.replies = keptReplies.length > 0
+        ? [...keptReplies.slice(0, 2), deliveryLine]
+        : [deliveryLine];
       result.should_handoff = false;
       result.intent = 'consulta';
-      result.reasoning = `Se prepararon ${attachments.length} PDF(s): ${attachments.map(a => a.file_name).join(', ')}.`;
+      result.reasoning = `Respuesta en texto + ${attachments.length} PDF(s) adjunto(s): ${attachments.map(a => a.file_name).join(', ')}.`;
     }
+
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
