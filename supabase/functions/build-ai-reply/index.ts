@@ -1111,24 +1111,31 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
+          // Codes recovered from history must not multiply the attachments, so
+          // they are resolved separately with a single-document budget while the
+          // current message keeps the full multi-attachment budget.
+          const historyDerivedCodes: string[] = [];
           if (pdfRequested && currentCodes.length === 0) {
             for (const historyMessage of [...historyRows].reverse()) {
               const historyCodes = extractProductCodes(historyMessage.text);
-              // Lists of alternatives do not establish sticky product context.
-              // Only a message centered on one model can identify the requested PDF.
-              if (historyCodes.length !== 1) continue;
+              // Long enumerations of alternatives are ambiguous context, but a
+              // message carrying a couple of codes still identifies the product.
+              if (historyCodes.length === 0 || historyCodes.length > 3) continue;
               for (const code of historyCodes) {
-                if (!codes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
-                  codes.push(code);
+                if (!historyDerivedCodes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
+                  historyDerivedCodes.push(code);
                 }
               }
-              if (codes.length >= 10) break;
+              if (historyDerivedCodes.length >= 6) break;
             }
           }
 
           // A single message can legitimately ask for several models, so every
           // requested code is resolved instead of only the first one.
-          const resolution = await resolvePdfDatasheets(supabase, workshop_id, codes, 3);
+          const resolution = codes.length > 0
+            ? await resolvePdfDatasheets(supabase, workshop_id, codes, 3)
+            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
+
           resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
 
