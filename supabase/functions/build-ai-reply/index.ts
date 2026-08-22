@@ -1199,8 +1199,24 @@ Criterios:${isChatbotOnly ? '' : `
     let pdfRequested = false;
     let datasheetAmbiguous = false;
 
-    if (botSettings?.send_pdf_datasheets) {
+    // Guard evaluated BEFORE any datasheet logic: a single letter/number that
+    // matches an option of the bot's last menu is menu navigation, so no SKU
+    // extraction, no follow-up memory and no delivery guardrails apply.
+    const lastBotMessageText =
+      ((messages || []) as Array<{ text: string; direction: string }>)
+        .filter(m => m.direction === 'outbound')
+        .slice(-1)[0]?.text || '';
+    const menuSelection = isMenuSelection(message_text, lastBotMessageText);
+    if (menuSelection) {
+      console.log('Menu selection detected → skipping datasheet pipeline:', {
+        message_text,
+        options: extractMenuOptions(lastBotMessageText),
+      });
+    }
+
+    if (botSettings?.send_pdf_datasheets && !menuSelection) {
       try {
+
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
         const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviame(la|lo|las|los)?|mandame(la|lo|las|los)?|pasame(la|lo|las|los)?|compartemela|mandalo|enviala)\b/;
         const shortConfirmRe = /^(si+|sí+|dale|ok|okay|listo|claro|por favor|porfa|obvio|ya|correcto|exacto|asi es|👍)[\s!¡.?¿,]*$/i;
