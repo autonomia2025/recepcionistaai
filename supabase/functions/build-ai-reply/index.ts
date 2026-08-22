@@ -766,6 +766,8 @@ CUÁNDO DIVIDIR EN MÚLTIPLES MENSAJES:
 - Para respuestas cortas (saludos, confirmaciones, preguntas simples): USA UN SOLO MENSAJE
 - Máximo 2 mensajes, rara vez 3
 
+${replyGuardrails}
+
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
     } else {
       systemPrompt = `Eres el asistente virtual profesional de ${workshop.name}.
@@ -792,6 +794,8 @@ CUÁNDO DIVIDIR EN MÚLTIPLES MENSAJES:
 - SOLO divide si hay temas claramente diferentes (ej: info de servicios + link de agenda)
 - Para respuestas cortas (saludos, confirmaciones, preguntas simples): USA UN SOLO MENSAJE
 - Máximo 2 mensajes, rara vez 3
+
+${replyGuardrails}
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
     }
