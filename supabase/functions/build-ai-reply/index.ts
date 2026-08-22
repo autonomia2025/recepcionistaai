@@ -189,17 +189,26 @@ function buildDocumentedProductReply(match: KnowledgeMatch): string {
     bullets.push(`Potencia: ${tableSpecs[4]} HP`);
   }
 
-  const model = firstMatch(text, [/MODELO:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
-  const power = firstMatch(text, [/ALIMENTACI[ÓO]N:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
-  const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const model = firstMatch(text, [/MODELO:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const power = firstMatch(text, [/ALIMENTACI[ÓO]N:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
   const description = firstMatch(text, [/Descripci[óo]n:\s*([^|]{40,280})/i]);
+
+  // Prices are always expressed as a documented range, never a closed figure.
+  const clp = (value: string) => Number(value.replace(/\D/g, '')).toLocaleString('es-CL');
+  const rangeMin = firstMatch(text, [/Rango m[íi]nimo \(CLP neto\):\s*([\d.,]{4,15})/i]);
+  const rangeMax = firstMatch(text, [/Rango m[áa]ximo \(CLP neto\):\s*([\d.,]{4,15})/i]);
+  const listPrice = firstMatch(text, [/Precio \(CLP\):\s*([\d.,]{4,15})/i]);
 
   if (model) bullets.unshift(`Modelo: ${model}`);
   if (power) bullets.push(`Alimentación: ${power}`);
   if (fuel) bullets.push(`Consumo combustible: ${fuel}`);
-  if (description && bullets.length < 5) bullets.push(description);
+  if (rangeMin && rangeMax) bullets.push(`Precio referencial: $${clp(rangeMin)} a $${clp(rangeMax)} neto`);
+  else if (listPrice) bullets.push(`Valor referencial aprox.: $${clp(listPrice)} neto`);
+  if (description && bullets.length < 6) bullets.push(description);
 
-  const uniqueBullets = [...new Set(bullets)].slice(0, 5);
+
+  const uniqueBullets = [...new Set(bullets)].slice(0, 6);
   const header = code || name ? `Encontré información para *${code || name}*:` : `Encontré información documentada en *${match.file_name}*:`;
 
   return `*Sí, ese modelo está documentado ✅*\n\n${header}\n${name && code ? `• Producto: ${name}\n` : ''}${uniqueBullets.map(b => `• ${b}`).join('\n')}\n\n¿Quieres que te ayude con la cotización o disponibilidad según tu zona?`;
@@ -578,7 +587,53 @@ serve(async (req) => {
         ragMatchCount = knowledgeMatches.length;
         const hasExactCodeMatch = knowledgeMatches.some(k => k.codeHit);
         directCodeMatch = knowledgeMatches.find(k => k.codeHit) || null;
-        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
+        // Authoritative price facts: parsed straight from the documented block
+        // of each requested code so the model cannot borrow another model's price.
+        const priceFacts: string[] = [];
+        const fmt = (v: string) => Number(v.replace(/\D/g, '')).toLocaleString('es-CL');
+        const factFromBlock = (content: string, normalized: string): string | null => {
+          const blockRe = /C[óo]digo(?: exacto)?:\s*([A-Z0-9][A-Z0-9./\- ]{2,40})([\s\S]{0,900})/gi;
+          let m: RegExpExecArray | null;
+          while ((m = blockRe.exec(content)) !== null) {
+            if (normalizeProductCode(m[1]) !== normalized) continue;
+            const min = m[2].match(/Rango m[íi]nimo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
+            const max = m[2].match(/Rango m[áa]ximo \(CLP neto\):\s*([\d.,]{4,15})/i)?.[1];
+            const single = m[2].match(/Precio \(CLP\):\s*([\d.,]{4,15})/i)?.[1];
+            if (min && max) return `${m[1].trim()} → rango referencial $${fmt(min)} a $${fmt(max)} neto`;
+            if (single) return `${m[1].trim()} → valor referencial aprox. $${fmt(single)} neto`;
+          }
+          return null;
+        };
+
+        for (const requested of extractProductCodes(message_text)) {
+          const normalized = normalizeProductCode(requested);
+          let fact: string | null = null;
+          for (const k of knowledgeMatches) {
+            fact = factFromBlock(k.content, normalized);
+            if (fact) break;
+          }
+          // The retrieved chunks may miss the price row, so the block is looked
+          // up directly in the knowledge base before letting the model guess.
+          if (!fact) {
+            const { data: priceRows } = await supabase
+              .from('bot_knowledge')
+              .select('content')
+              .eq('workshop_id', workshop_id)
+              .ilike('content', `%${requested}%Rango mínimo%`)
+              .limit(3);
+            for (const row of priceRows || []) {
+              fact = factFromBlock(row.content as string, normalized);
+              if (fact) break;
+            }
+          }
+          if (fact) priceFacts.push(fact);
+        }
+
+        const priceBlock = priceFacts.length > 0
+          ? `PRECIOS OFICIALES (ÚNICA fuente válida, no uses otras cifras):\n${[...new Set(priceFacts)].join('\n')}\n\n`
+          : '';
+
+        ragContext = `\nDOCUMENTACIÓN DE REFERENCIA (usa esta información para responder):\n${priceBlock}${hasExactCodeMatch ? 'IMPORTANTE: Hay coincidencia directa con el código/modelo consultado. Si el código aparece abajo, SÍ está documentado; no respondas que no hay información.\n' : ''}${knowledgeMatches
           .map((k, i) => `[${i + 1}] Archivo: ${k.file_name}${k.codeHit ? ' | COINCIDENCIA DIRECTA DE CÓDIGO' : ''}\n${k.content}`)
           .join('\n---\n')
           }\n`;
@@ -730,7 +785,8 @@ REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción an
 7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.
 8. Si el cliente hace una pregunta puntual (presión, caudal, potencia, precio, horario, disponibilidad), RESPÓNDELA en texto con el dato documentado. El PDF es un complemento, nunca reemplaza la respuesta.
 ${conversationAlreadyStarted ? '9. Esta conversación YA ESTÁ INICIADA: NO repitas el saludo de bienvenida ni el menú de opciones. Ve directo a la respuesta.' : '9. Puedes saludar brevemente una sola vez al inicio.'}
-10. PRECIOS: cuando la documentación traiga "Rango mínimo (CLP neto)" y "Rango máximo (CLP neto)", entrega SIEMPRE un *rango referencial* (ej: "entre $3.116.000 y $3.666.000 neto"), nunca un precio único cerrado. Si solo existe "Precio (CLP)", preséntalo como "valor referencial aprox. $X neto" e indica que el precio final se confirma con un ejecutivo. Si no hay ningún precio documentado, dilo y deriva; no inventes cifras.`;
+10. PRECIOS: cuando la documentación traiga "Rango mínimo (CLP neto)" y "Rango máximo (CLP neto)", entrega SIEMPRE un *rango referencial* (ej: "entre $3.116.000 y $3.666.000 neto"), nunca un precio único cerrado. Si solo existe "Precio (CLP)", preséntalo como "valor referencial aprox. $X neto" e indica que el precio final se confirma con un ejecutivo. Si no hay ningún precio documentado, dilo y deriva; no inventes cifras.
+11. El precio DEBE salir del bloque cuyo "Código:" coincide EXACTAMENTE con el modelo consultado. Está PROHIBIDO tomar el precio de otro modelo parecido, de otra fila o de otro bloque. Si el bloque de ese código no trae precio, dilo y deriva; no estimes.`;
 
 
     if (settings.system_prompt) {
@@ -1100,7 +1156,7 @@ Criterios:${isChatbotOnly ? '' : `
     if (botSettings?.send_pdf_datasheets) {
       try {
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
-        const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviamelo|mandamelo|enviame|mandame)\b/;
+        const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviame(la|lo|las|los)?|mandame(la|lo|las|los)?|pasame(la|lo|las|los)?|compartemela|mandalo|enviala)\b/;
         const shortConfirmRe = /^(si+|sí+|dale|ok|okay|listo|claro|por favor|porfa|obvio|ya|correcto|exacto|asi es|👍)[\s!¡.?¿,]*$/i;
 
         const historyRows = (messages || []) as Array<{ text: string; direction: string }>;
