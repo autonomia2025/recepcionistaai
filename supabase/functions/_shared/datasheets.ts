@@ -18,17 +18,33 @@ export function normalizeProductCode(str: string): string {
 }
 
 export function extractProductCodes(text: string): string[] {
-  const matches = (text || '').match(/\b[A-Za-z][A-Za-z0-9\-\/]{2,40}\b/g) || [];
+  const raw = text || '';
+  const tokens = raw.match(/\b[A-Za-z0-9][A-Za-z0-9\-\/]{0,40}\b/g) || [];
   const codes: string[] = [];
 
-  for (const raw of matches) {
-    if (!/[A-Za-z]/.test(raw) || !/[0-9]/.test(raw)) continue;
-    const normalized = normalizeProductCode(raw);
-    if (normalized.length >= 3 && !codes.includes(raw)) codes.push(raw);
+  const push = (candidate: string) => {
+    if (!/[A-Za-z]/.test(candidate) || !/[0-9]/.test(candidate)) return;
+    const normalized = normalizeProductCode(candidate);
+    if (normalized.length < 3) return;
+    if (!codes.some(existing => normalizeProductCode(existing) === normalized)) codes.push(candidate);
+  };
+
+  // Codes typed with a space ("soc170 13ef") must resolve like "SOC170-13EF",
+  // so adjacent tokens are also tested as a single merged candidate.
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.length >= 3) push(token);
+
+    const next = tokens[i + 1];
+    if (!next) continue;
+    const merged = `${token}${next}`;
+    if (merged.length <= 41 && /^[A-Za-z0-9\-\/]+$/.test(merged)) push(merged);
   }
 
-  return codes;
+  // Longer (more specific) codes first so a full model wins over its family code.
+  return codes.sort((a, b) => normalizeProductCode(b).length - normalizeProductCode(a).length);
 }
+
 
 export function isPdfDocument(doc: { file_type?: string | null; file_name: string }): boolean {
   return (doc.file_type || '').toLowerCase().includes('pdf') || doc.file_name.toLowerCase().endsWith('.pdf');
@@ -126,4 +142,29 @@ export async function resolvePdfDatasheet(
   }
 
   return { document: null, matchedCode: null, ambiguous: foundAmbiguousCode };
+}
+
+// Resolve several datasheets when the customer asks for more than one model in
+// the same message. Each code is resolved independently and ambiguous family
+// codes are skipped instead of guessing.
+// deno-lint-ignore no-explicit-any
+export async function resolvePdfDatasheets(
+  supabase: any,
+  workshopId: string,
+  requestedCodes: string[],
+  maxDocuments = 3,
+): Promise<{ documents: DatasheetDocument[]; ambiguous: boolean }> {
+  const documents: DatasheetDocument[] = [];
+  let ambiguous = false;
+
+  for (const code of requestedCodes) {
+    if (documents.length >= maxDocuments) break;
+    const resolution = await resolvePdfDatasheet(supabase, workshopId, [code]);
+    if (resolution.ambiguous) ambiguous = true;
+    if (resolution.document && !documents.some(doc => doc.id === resolution.document!.id)) {
+      documents.push(resolution.document);
+    }
+  }
+
+  return { documents, ambiguous: ambiguous && documents.length === 0 };
 }

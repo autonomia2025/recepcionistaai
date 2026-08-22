@@ -4,7 +4,8 @@ import {
   type DatasheetDocument,
   extractProductCodes,
   normalizeProductCode,
-  resolvePdfDatasheet,
+  resolvePdfDatasheets,
+
 } from "../_shared/datasheets.ts";
 
 const corsHeaders = {
@@ -712,10 +713,23 @@ ${ragContext}`;
     // Build system prompt
     let systemPrompt: string;
 
+    // Guardrails that always win over any business-authored prompt: they fix
+    // menu-before-answer behaviour, redundant code requests and invented data.
+    const replyGuardrails = `
+REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción anterior):
+1. Si el cliente ya escribió un código, modelo o consulta concreta (aunque sea su PRIMER mensaje), RESPONDE ESA CONSULTA. NO muestres el menú de opciones antes de responder.
+2. El menú de opciones solo se usa cuando el mensaje es un saludo genérico o el cliente no indica qué necesita.
+3. NUNCA pidas un código que el cliente ya entregó en este mensaje o en el historial reciente.
+4. NUNCA digas "escríbeme el código para enviarte la ficha" si el cliente ya especificó el producto.
+5. Si el producto/modelo NO aparece en la DOCUMENTACIÓN DE REFERENCIA: dilo explícitamente ("no lo tengo en mi documentación"), NO inventes datos, y deriva con un especialista (should_handoff: true). Nunca digas "tengo la información" si no está documentada.
+6. Si el cliente pide varias fichas o modelos en un mismo mensaje, respóndelos todos, no solo el primero.
+7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.`;
+
     if (settings.system_prompt) {
       systemPrompt = `${settings.system_prompt}
 
 ${contextInfo}
+${replyGuardrails}
 
 FORMATO WHATSAPP - USA ESTO:
 - *texto* para negritas (títulos, destacados)
@@ -724,6 +738,7 @@ FORMATO WHATSAPP - USA ESTO:
 - Separa ideas con saltos de línea
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional ni markdown.${isChatbotOnly ? '\nNO menciones agendamiento, citas ni links de booking.' : ''}`;
+
     } else if (isChatbotOnly) {
       systemPrompt = `Eres el asistente virtual profesional de ${workshop.name}.
 
@@ -751,6 +766,8 @@ CUÁNDO DIVIDIR EN MÚLTIPLES MENSAJES:
 - Para respuestas cortas (saludos, confirmaciones, preguntas simples): USA UN SOLO MENSAJE
 - Máximo 2 mensajes, rara vez 3
 
+${replyGuardrails}
+
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
     } else {
       systemPrompt = `Eres el asistente virtual profesional de ${workshop.name}.
@@ -777,6 +794,8 @@ CUÁNDO DIVIDIR EN MÚLTIPLES MENSAJES:
 - SOLO divide si hay temas claramente diferentes (ej: info de servicios + link de agenda)
 - Para respuestas cortas (saludos, confirmaciones, preguntas simples): USA UN SOLO MENSAJE
 - Máximo 2 mensajes, rara vez 3
+
+${replyGuardrails}
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
     }
@@ -1063,8 +1082,10 @@ Criterios:${isChatbotOnly ? '' : `
     // When the RAG found an exact product-code match and that chunk came from a
     // PDF document, expose a signed URL so the channel can attach the original file.
     let attachment: { document_id: string; file_name: string; url: string } | null = null;
+    const attachments: Array<{ document_id: string; file_name: string; url: string }> = [];
 
-    let resolvedDatasheet: DatasheetDocument | null = null;
+
+    let resolvedDatasheets: DatasheetDocument[] = [];
     let pdfRequested = false;
     let datasheetAmbiguous = false;
 
@@ -1090,7 +1111,7 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
-          if (pdfRequested) {
+          if (pdfRequested && currentCodes.length === 0) {
             for (const historyMessage of [...historyRows].reverse()) {
               const historyCodes = extractProductCodes(historyMessage.text);
               // Lists of alternatives do not establish sticky product context.
@@ -1105,68 +1126,75 @@ Criterios:${isChatbotOnly ? '' : `
             }
           }
 
-          const resolution = await resolvePdfDatasheet(supabase, workshop_id, codes);
-          resolvedDatasheet = resolution.document;
+          // A single message can legitimately ask for several models, so every
+          // requested code is resolved instead of only the first one.
+          const resolution = await resolvePdfDatasheets(supabase, workshop_id, codes, 3);
+          resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
 
-          if (resolvedDatasheet) {
-            console.log('Datasheet PDF selected:', {
-              requestedCode: resolution.matchedCode,
-              documentId: resolvedDatasheet.id,
-              fileName: resolvedDatasheet.file_name,
-            });
-          } else {
-            console.log('Datasheet PDF not resolved:', {
-              codes,
-              ambiguous: datasheetAmbiguous,
-              pdfRequested,
-            });
-          }
+          console.log('Datasheet resolution:', {
+            codes,
+            resolved: resolvedDatasheets.map(doc => doc.file_name),
+            ambiguous: datasheetAmbiguous,
+            pdfRequested,
+          });
         }
       } catch (ctxErr) {
         console.error('Datasheet context resolution error:', ctxErr);
       }
     }
 
-    if (botSettings?.send_pdf_datasheets && resolvedDatasheet) {
-      try {
-        const { data: signed, error: signErr } = await supabase
-          .storage
-          .from('bot-documents')
-          .createSignedUrl(resolvedDatasheet.storage_path, 60 * 60 * 24);
+    if (botSettings?.send_pdf_datasheets && resolvedDatasheets.length > 0) {
+      for (const doc of resolvedDatasheets) {
+        try {
+          const { data: signed, error: signErr } = await supabase
+            .storage
+            .from('bot-documents')
+            .createSignedUrl(doc.storage_path, 60 * 60 * 24);
 
-        if (signErr) {
-          console.error('Failed to sign datasheet URL:', signErr);
-        } else if (signed?.signedUrl) {
-          attachment = {
-            document_id: resolvedDatasheet.id,
-            file_name: resolvedDatasheet.file_name,
-            url: signed.signedUrl,
-          };
-          console.log('Datasheet attachment ready:', resolvedDatasheet.file_name);
+          if (signErr) {
+            console.error('Failed to sign datasheet URL:', signErr);
+          } else if (signed?.signedUrl) {
+            attachments.push({
+              document_id: doc.id,
+              file_name: doc.file_name,
+              url: signed.signedUrl,
+            });
+          }
+        } catch (attachErr) {
+          console.error('Datasheet attachment error:', attachErr);
         }
-      } catch (attachErr) {
-        console.error('Datasheet attachment error:', attachErr);
       }
+      attachment = attachments[0] || null;
+      console.log('Datasheet attachments ready:', attachments.map(a => a.file_name));
     }
 
-    if (pdfRequested && attachment) {
-      const displayName = attachment.file_name.replace(/\.pdf$/i, '');
-      result.replies = [`Listo, adjunto la ficha técnica *${displayName}* en PDF. 📄`];
+
+    const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
+
+    // Whenever files are actually prepared, the reply must confirm the delivery
+    // and never ask again for a code the customer already provided.
+    if (attachments.length > 0) {
+      result.replies = [
+        attachments.length === 1
+          ? `Listo, te adjunto la ficha técnica ${datasheetNames[0]} en PDF. 📄`
+          : `Listo, te adjunto ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`,
+      ];
       result.should_handoff = false;
-      result.reasoning = `Se resolvió y preparó el PDF exacto ${attachment.file_name} para enviarlo como documento.`;
+      result.intent = 'consulta';
+      result.reasoning = `Se prepararon ${attachments.length} PDF(s): ${attachments.map(a => a.file_name).join(', ')}.`;
     }
 
     // Do not claim a file was sent when no attachment was prepared. When a
     // family code is ambiguous, ask for the exact model instead of guessing.
-    if (pdfRequested && !attachment) {
+    if (pdfRequested && attachments.length === 0) {
       result.replies = [datasheetAmbiguous
         ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
-        : 'Tengo la información técnica, pero no pude preparar un PDF para adjuntar en este momento. Si me indicas el *modelo completo*, reviso la ficha exacta sin enviarte un archivo incorrecto.'];
-      result.should_handoff = false;
+        : 'No tengo la ficha técnica de ese modelo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para que te confirme la información. 🙌'];
+      result.should_handoff = !datasheetAmbiguous;
       result.reasoning = datasheetAmbiguous
         ? 'Hay más de una ficha PDF compatible con el código parcial; se solicita el modelo completo para evitar enviar un documento incorrecto.'
-        : 'El cliente solicitó un PDF, pero no se pudo resolver un archivo PDF válido; se evita prometer un envío inexistente.';
+        : 'El cliente solicitó un PDF inexistente en la documentación; se deriva a un humano en vez de prometer información.';
     }
 
     // The language model must never claim a delivery that the attachment
@@ -1175,20 +1203,21 @@ Criterios:${isChatbotOnly ? '' : `
     const claimsFileDelivery = (result.replies || []).some(reply =>
       /\b(te\s+(dejo|adjunto|envio|mando)|adjunto|enviad[oa]|ficha\s+t[eé]cnica\s+(de|en)|procede\s+a\s+enviar)\b/i.test(removeAccents(reply))
     );
-    if (!attachment && claimsFileDelivery) {
+    if (attachments.length === 0 && claimsFileDelivery) {
       result.replies = [
-        resolvedDatasheet
-          ? 'Encontré la ficha técnica, pero no pude preparar el archivo para adjuntarlo en este momento. Te puedo compartir la información técnica disponible mientras lo revisamos.'
-          : 'Tengo información técnica de ese modelo, pero su ficha PDF no está cargada para adjuntarla. Te puedo compartir el resumen disponible o derivarte con un especialista.',
+        'No tengo la ficha PDF de ese modelo disponible para adjuntarla, y no quiero darte datos sin respaldo. Te derivo con un especialista para confirmarlo. 🙌',
       ];
+      result.should_handoff = true;
       result.reasoning = 'Se bloqueó una promesa de envío porque el sistema no preparó ningún adjunto PDF.';
     }
+
 
     return new Response(JSON.stringify({
       success: true,
       ...result,
       booking_url: fullBookingUrl,
       attachment,
+      attachments,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
