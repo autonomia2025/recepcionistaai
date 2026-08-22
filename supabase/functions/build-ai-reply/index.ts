@@ -715,7 +715,9 @@ ${ragContext}`;
 
     // Guardrails that always win over any business-authored prompt: they fix
     // menu-before-answer behaviour, redundant code requests and invented data.
-    const conversationAlreadyStarted = (messages || []).length > 0;
+    // The bot already spoke in this thread → the welcome greeting/menu was used.
+    const conversationAlreadyStarted = (messages || []).some((m: { direction: string }) => m.direction === 'outbound');
+
 
     const replyGuardrails = `
 REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción anterior):
