@@ -1100,7 +1100,7 @@ Criterios:${isChatbotOnly ? '' : `
     if (botSettings?.send_pdf_datasheets) {
       try {
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
-        const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviamelo|mandamelo|enviame|mandame)\b/;
+        const pdfRequestRe = /\b(pdf|ficha|fichas|archivo|adjunto|documento|catalogo|folleto|brochure|especificaciones|hoja tecnica|enviame(la|lo|las|los)?|mandame(la|lo|las|los)?|pasame(la|lo|las|los)?|compartemela|mandalo|enviala)\b/;
         const shortConfirmRe = /^(si+|sí+|dale|ok|okay|listo|claro|por favor|porfa|obvio|ya|correcto|exacto|asi es|👍)[\s!¡.?¿,]*$/i;
 
         const historyRows = (messages || []) as Array<{ text: string; direction: string }>;
