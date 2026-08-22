@@ -159,6 +159,52 @@ function compactText(str: string): string {
   return (str || '').replace(/\s+/g, ' ').trim();
 }
 
+// ===== Menu selection detection =====
+// A bare "C" answering a lettered menu is a navigation step, never a product
+// code or a datasheet follow-up. Detecting it early keeps the whole PDF
+// pipeline (SKU extraction, history recovery, delivery guardrails) out of the
+// way so the model can simply interpret the chosen option.
+function extractMenuOptions(botText: string): string[] {
+  const options = new Set<string>();
+  for (const line of (botText || '').split('\n')) {
+    const match = line.match(/^\s*\*?([A-Za-z0-9])\*?\s*[).:.-]\s+\S/);
+    if (match) options.add(match[1].toUpperCase());
+  }
+  return [...options];
+}
+
+function isMenuSelection(messageText: string, lastBotText: string): boolean {
+  const trimmed = removeAccents((messageText || '').trim())
+    .replace(/[\s.,!¡?¿)]+$/g, '')
+    .toUpperCase();
+  if (!/^[A-Z0-9]$/.test(trimmed)) return false;
+
+  const options = extractMenuOptions(lastBotText);
+  if (options.length < 2) return false;
+  return options.includes(trimmed);
+}
+
+// Only a claim that the file is being delivered RIGHT NOW is a false promise.
+// Inviting the customer to ask for it ("copia y pega el código y te llega su
+// ficha") is legitimate sales copy and must survive untouched.
+const DELIVERY_CLAIM_RE = /(te\s+(la\s+|lo\s+|los\s+|las\s+)?(adjunto|envio|env[ií]o|mando|dejo|comparto|paso)\b|aqui\s+(va|te\s+va|tienes)\s+(la|el|tu)\s+(ficha|pdf|archivo|documento)|adjunto\s+(la|el|las|los)\s+(ficha|pdf|archivo|documento)|(ficha|pdf|archivo|documento)\s+adjunt[oa]|ya\s+te\s+(la|lo)\s+(envie|mande|adjunte)|procede\s+a\s+enviar)/i;
+
+// Invitations / conditional offers: not a delivery claim.
+const DELIVERY_INVITATION_RE = /(copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
+
+// Split a reply into sentences so a single offending clause can be removed
+// without discarding the rest of the recommendation.
+function stripDeliveryClaims(reply: string): string {
+  const sentences = (reply || '').split(/(?<=[.!?🙌📄👍])\s+|\n+/);
+  const kept = sentences.filter(sentence => {
+    const plain = removeAccents(sentence);
+    if (!DELIVERY_CLAIM_RE.test(plain)) return true;
+    return DELIVERY_INVITATION_RE.test(plain);
+  });
+  return compactText(kept.join(' '));
+}
+
+
 function firstMatch(text: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {
     const match = text.match(pattern);
