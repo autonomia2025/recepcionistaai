@@ -189,10 +189,11 @@ function buildDocumentedProductReply(match: KnowledgeMatch): string {
     bullets.push(`Potencia: ${tableSpecs[4]} HP`);
   }
 
-  const model = firstMatch(text, [/MODELO:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
-  const power = firstMatch(text, [/ALIMENTACI[ÓO]N:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
-  const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:]{2,80})(?=\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const model = firstMatch(text, [/MODELO:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const power = firstMatch(text, [/ALIMENTACI[ÓO]N:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
+  const fuel = firstMatch(text, [/CONSUMO COMBUSTIBLE:\s*([^:|]{2,80})(?=\s*\||\s+[A-ZÁÉÍÓÚÑ ]{3,}:|$)/i]);
   const description = firstMatch(text, [/Descripci[óo]n:\s*([^|]{40,280})/i]);
+
 
   if (model) bullets.unshift(`Modelo: ${model}`);
   if (power) bullets.push(`Alimentación: ${power}`);
