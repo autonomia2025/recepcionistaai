@@ -1182,9 +1182,8 @@ Criterios:${isChatbotOnly ? '' : `
 
       // Drop only the sentences that contradict the delivery (asking again for
       // a code, or claiming the datasheet does not exist).
-      const contradictionRe = /(no tengo (la )?ficha|no puedo envi|ind[ií]came el (c[oó]digo|modelo)|escr[ií]beme el c[oó]digo|nec
+      const contradictionRe = /(no tengo (la )?ficha|no puedo envi|ind[ií]came el (c[oó]digo|modelo)|escr[ií]beme el c[oó]digo|necesito el c[oó]digo)/i;
 
-esito el c[oó]digo)/i;
       const keptReplies = (result.replies || [])
         .filter(reply => compactText(reply).length > 0)
         .filter(reply => !contradictionRe.test(removeAccents(reply)));
