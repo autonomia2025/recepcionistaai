@@ -206,7 +206,7 @@ function buildDocumentedProductReply(match: KnowledgeMatch): string {
 
 // AI-enhanced keyword search: expand query with AI then use ILIKE
 // deno-lint-ignore no-explicit-any
-async function searchKnowledge(
+async function keywordSearchKnowledge(
   supabase: any,
   lovableApiKey: string,
   workshopId: string,
