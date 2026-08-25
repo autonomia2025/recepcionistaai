@@ -200,6 +200,7 @@ function isMenuSelection(messageText: string, lastBotText: string): boolean {
 // "D", "sí ese" or a full sentence all produce the same catalog query.
 interface ConversationState {
   agua: string | null;
+  ambasAguas: boolean;
   motor: string | null;
   uso: string | null;
   specs: string[];
@@ -225,7 +226,7 @@ function buildConversationState(
   history: Array<{ text: string | null; direction: string }>,
   currentText: string
 ): ConversationState {
-  const state: ConversationState = { agua: null, motor: null, uso: null, specs: [], codes: [] };
+  const state: ConversationState = { agua: null, ambasAguas: false, motor: null, uso: null, specs: [], codes: [] };
   const seq = [...history, { text: currentText, direction: 'inbound' }];
   let lastBot = '';
 
@@ -234,8 +235,16 @@ function buildConversationState(
     const resolved = resolveMenuLetter(m.text || '', lastBot);
     const plain = removeAccents(resolved.toLowerCase());
 
-    if (/agua\s+caliente|caliente/.test(plain)) state.agua = 'agua caliente';
-    else if (/agua\s+fria|\bfria\b/.test(plain)) state.agua = 'agua fría';
+    if (/las dos cosas|ambas aguas|agua fria y (agua )?caliente|agua caliente y (agua )?fria|grasa.{0,30}barro|barro.{0,30}grasa/.test(plain)) {
+      state.ambasAguas = true;
+      state.agua = null;
+    } else if (/agua\s+caliente|caliente/.test(plain)) {
+      state.agua = 'agua caliente';
+      state.ambasAguas = false;
+    } else if (/agua\s+fria|\bfria\b/.test(plain)) {
+      state.agua = 'agua fría';
+      state.ambasAguas = false;
+    }
 
     if (/diesel|petroleo/.test(plain)) state.motor = 'motor diésel';
     else if (/bencina|gasolina/.test(plain)) state.motor = 'motor a bencina';
@@ -257,6 +266,7 @@ function buildConversationState(
 // only when it carries its own words. Empty state → behave exactly as before.
 function buildRetrievalQuery(state: ConversationState, currentText: string): string {
   const parts: string[] = [];
+  if (state.ambasAguas) parts.push('agua caliente agua fría ambas familias');
   if (state.agua) parts.push(state.agua);
   if (state.motor) parts.push(state.motor);
   if (state.uso) parts.push(state.uso);
@@ -292,6 +302,30 @@ function stripDeliveryClaims(reply: string): string {
     return DELIVERY_INVITATION_RE.test(plain);
   });
   return compactText(kept.join(' '));
+}
+
+function extractSelectedMenuProductCode(messageText: string, lastBotText: string): string | null {
+  const trimmed = removeAccents((messageText || '').trim()).replace(/[\s.,!¡?¿)]+$/g, '').toUpperCase();
+  if (!/^[A-Z0-9]$/.test(trimmed)) return null;
+  const selectedLine = (lastBotText || '')
+    .split('\n')
+    .find(line => new RegExp(`^\\s*\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+\\S`, 'i').test(removeAccents(line)));
+  if (!selectedLine) return null;
+  return extractProductCodes(selectedLine)[0] || null;
+}
+
+function selectRepresentativeRows(rows: CatalogRow[], count = 3): CatalogRow[] {
+  if (rows.length <= count) return rows;
+  const indexes = count === 3 ? [0, Math.floor((rows.length - 1) / 2), rows.length - 1] : [0, rows.length - 1];
+  return [...new Map(indexes.map(index => [rows[index].sku_normalized, rows[index]])).values()];
+}
+
+function formatRecommendationLine(row: CatalogRow, letter: string): string {
+  const specs = [
+    row.pressure_bar ? `${row.pressure_bar} bar` : null,
+    row.flow_lmin ? `${row.flow_lmin} L/min` : null,
+  ].filter(Boolean).join(' · ');
+  return `${letter}) *${row.sku}*${specs ? ` — ${specs}` : ''}`;
 }
 
 
@@ -754,6 +788,8 @@ serve(async (req) => {
       console.error('Error fetching messages:', messagesError);
     }
     const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
+    const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
+    const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
 
     // ===== RAG: query built from accumulated conversation state =====
     const conversationState = buildConversationState(messages, message_text);
@@ -765,6 +801,9 @@ serve(async (req) => {
     // public.product_catalog by exact SKU, so the same model always quotes the
     // same range regardless of which chunk the RAG happens to return.
     let catalogBlockText = '';
+    let catalogBlockRows: CatalogRow[] = [];
+    let hotWaterBlockRows: CatalogRow[] = [];
+    let coldWaterBlockRows: CatalogRow[] = [];
     let priceBlock = '';
     let catalogSkus: Set<string> = new Set();
     try {
@@ -772,6 +811,7 @@ serve(async (req) => {
 
       if (catalogSkus.size > 0) {
         const requestedCodes = [
+          ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
           ...extractProductCodes(message_text),
           ...conversationState.codes.slice(-3),
         ];
@@ -782,21 +822,35 @@ serve(async (req) => {
             `${priceRows.map(formatCatalogLine).join('\n')}\n\n`;
         }
 
-        const waterType = mapWaterType(conversationState.agua);
         const motorType = mapMotorType(conversationState.motor);
-        if (waterType && motorType) {
-          const blockRows = await fetchCatalogBlock(supabase, workshop_id, waterType, motorType);
-          if (blockRows.length > 0) {
+        const waterType = mapWaterType(conversationState.agua);
+        if (conversationState.ambasAguas && motorType) {
+          [hotWaterBlockRows, coldWaterBlockRows] = await Promise.all([
+            fetchCatalogBlock(supabase, workshop_id, 'AGUA CALIENTE', motorType),
+            fetchCatalogBlock(supabase, workshop_id, 'AGUA FRÍA', motorType),
+          ]);
+          catalogBlockRows = [...hotWaterBlockRows, ...coldWaterBlockRows];
+          if (catalogBlockRows.length > 0) {
             catalogBlockText =
-              `CATÁLOGO OFICIAL — BLOQUE ${waterType} + ${motorType} (${blockRows.length} equipos).\n` +
+              `CATÁLOGO OFICIAL — AMBAS FAMILIAS + ${motorType}.\n` +
+              `AGUA CALIENTE (${hotWaterBlockRows.length} equipos; incluye TODOS):\n${hotWaterBlockRows.map(formatCatalogLine).join('\n')}\n\n` +
+              `AGUA FRÍA (${coldWaterBlockRows.length} equipos; incluye TODOS):\n${coldWaterBlockRows.map(formatCatalogLine).join('\n')}\n\n` +
+              `OBLIGATORIO: muestra 2-3 equipos de CADA familia, en dos listas separadas.\n\n`;
+          }
+        } else if (waterType && motorType) {
+          catalogBlockRows = await fetchCatalogBlock(supabase, workshop_id, waterType, motorType);
+          if (catalogBlockRows.length > 0) {
+            catalogBlockText =
+              `CATÁLOGO OFICIAL — BLOQUE ${waterType} + ${motorType} (${catalogBlockRows.length} equipos; incluye TODOS).\n` +
               `Para este cliente ofrece ÚNICAMENTE códigos de esta lista, con estos precios exactos:\n` +
-              `${blockRows.map(formatCatalogLine).join('\n')}\n\n`;
+              `${catalogBlockRows.map(formatCatalogLine).join('\n')}\n\n`;
           }
         }
         console.log('Catalog layer:', {
           skus: catalogSkus.size,
           priceRows: priceRows.map(r => r.sku),
-          block: catalogBlockText ? `${waterType} + ${motorType}` : null,
+          block: catalogBlockText ? `${conversationState.ambasAguas ? 'AMBAS AGUAS' : waterType} + ${motorType}` : null,
+          blockRows: catalogBlockRows.length,
         });
       }
     } catch (catalogError) {
@@ -1175,19 +1229,57 @@ Criterios:${isChatbotOnly ? '' : `
       };
     }
 
+    // Catalog-driven responses for the two flows where completeness matters.
+    // This avoids asking the model to remember unseen rows from a large block.
+    const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
+    const asksForMoreModels = /\b(dame|muestra|quiero|ver)\s+mas\s+(modelos|opciones|alternativas)\b|\b(otros|otras)\s+(modelos|opciones|alternativas)\b/.test(normalizedCurrent);
+
+    if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
+      const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
+      const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
+      const lines: string[] = [
+        '*Agua caliente*',
+        ...hot.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))),
+        '',
+        '*Agua fría*',
+        ...cold.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + hot.length + index))),
+        '',
+        'Para grasa y barro, mi recomendación es agua caliente: también puede trabajar en frío apagando la caldera. Responde con la letra y te envío su ficha técnica 📄',
+      ];
+      result.replies = [lines.join('\n')];
+      result.intent = 'consulta';
+      result.should_handoff = false;
+      result.reasoning = `Se presentaron ambas familias desde los bloques completos del catálogo (${hotWaterBlockRows.length} calientes y ${coldWaterBlockRows.length} frías).`;
+    } else if (asksForMoreModels && catalogBlockRows.length > 0) {
+      const priorCodes = new Set(
+        messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
+      );
+      const unseenRows = catalogBlockRows.filter(row => !priorCodes.has(row.sku_normalized));
+      const alternatives = selectRepresentativeRows(unseenRows.length > 0 ? unseenRows : catalogBlockRows, 3);
+      result.replies = [
+        `Claro, aquí tienes ${unseenRows.length > 0 ? 'otras' : 'más'} alternativas del mismo grupo:\n\n` +
+        alternatives.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))).join('\n') +
+        '\n\nResponde con la letra y te envío su ficha técnica 📄',
+      ];
+      result.intent = 'consulta';
+      result.should_handoff = false;
+      result.reasoning = `Se seleccionaron alternativas no mostradas desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+    }
+
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
     const falseNegativeRag = directCodeMatch && (
       result.should_handoff ||
       /no tengo (esa )?informaci[oó]n|no tengo.*documentad|no aparece en la documentaci[oó]n|no est[aá] documentad/.test(replyText)
     );
 
-    if (falseNegativeRag) {
+    if (falseNegativeRag && directCodeMatch) {
+      const documentedMatch = directCodeMatch;
       console.log('Correcting AI false-negative handoff because an exact RAG code match exists:', {
-        file: directCodeMatch.file_name,
-        score: directCodeMatch.score,
+        file: documentedMatch.file_name,
+        score: documentedMatch.score,
       });
       result = {
-        replies: [buildDocumentedProductReply(directCodeMatch)],
+        replies: [buildDocumentedProductReply(documentedMatch)],
         intent: 'consulta',
         confidence: 0.93,
         should_handoff: false,
@@ -1306,10 +1398,6 @@ Criterios:${isChatbotOnly ? '' : `
     // Guard evaluated BEFORE any datasheet logic: a single letter/number that
     // matches an option of the bot's last menu is menu navigation, so no SKU
     // extraction, no follow-up memory and no delivery guardrails apply.
-    const lastBotMessageText =
-      ((messages || []) as Array<{ text: string; direction: string }>)
-        .filter(m => m.direction === 'outbound')
-        .slice(-1)[0]?.text || '';
     const menuSelection = isMenuSelection(message_text, lastBotMessageText);
     if (menuSelection) {
       console.log('Menu selection detected → skipping datasheet pipeline:', {
@@ -1318,7 +1406,7 @@ Criterios:${isChatbotOnly ? '' : `
       });
     }
 
-    if (botSettings?.send_pdf_datasheets && !menuSelection) {
+    if (botSettings?.send_pdf_datasheets && (!menuSelection || selectedMenuProductCode)) {
       try {
 
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
@@ -1337,8 +1425,15 @@ Criterios:${isChatbotOnly ? '' : `
 
         // Direct SKU queries should attach immediately. For follow-up requests,
         // recover product context newest-first from the conversation.
-        const currentCodes = extractProductCodes(message_text);
-        const shouldResolve = currentCodes.length > 0 || pdfRequested;
+        const replyText = (result.replies || []).join('\n');
+        const replyClaimsDelivery = DELIVERY_CLAIM_RE.test(removeAccents(replyText)) && !DELIVERY_INVITATION_RE.test(removeAccents(replyText));
+        const replyCodes = replyClaimsDelivery ? extractProductCodes(replyText) : [];
+        const currentCodes = [
+          ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
+          ...extractProductCodes(message_text),
+          ...replyCodes,
+        ].filter((code, index, all) => all.findIndex(other => normalizeProductCode(other) === normalizeProductCode(code)) === index);
+        const shouldResolve = currentCodes.length > 0 || pdfRequested || replyClaimsDelivery;
         if (shouldResolve) {
           const codes = [...currentCodes];
           // Codes recovered from history must not multiply the attachments, so
@@ -1441,19 +1536,15 @@ Criterios:${isChatbotOnly ? '' : `
     // The useful part of the answer is preserved: only the delivery promise is
     // removed and a clarifying line is appended.
     if (pdfRequested && attachments.length === 0 && !menuSelection) {
-      const notice = datasheetAmbiguous
-        ? 'Encontré varias fichas para esa familia de productos. Indícame el *modelo completo* (por ejemplo, incluyendo caudal y terminación) para enviarte el PDF correcto.'
-        : 'Sobre la ficha en PDF: no la tengo cargada en mi documentación, así que no puedo enviártela ni inventar sus datos. Te derivo con un especialista para confirmarla. 🙌';
-
       const kept = (result.replies || [])
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      result.replies = [...kept.slice(0, 2), notice];
-      result.should_handoff = !datasheetAmbiguous;
+      result.replies = kept.slice(0, 2);
+      result.should_handoff = false;
       result.reasoning = datasheetAmbiguous
-        ? 'Hay más de una ficha PDF compatible con el código parcial; se conserva la respuesta y se solicita el modelo completo.'
-        : 'No existe la ficha solicitada: se conserva la información útil y se aclara que el PDF no está disponible.';
+        ? 'No se adjuntó una ficha porque el código era ambiguo; se conservó íntegramente la información útil.'
+        : 'No se pudo preparar el adjunto; se conservó íntegramente la información útil sin derivar.';
     }
 
     // The language model must never claim a delivery that the attachment
@@ -1473,10 +1564,8 @@ Criterios:${isChatbotOnly ? '' : `
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      const notice = 'Sobre la ficha en PDF: no la tengo disponible para adjuntarla en este momento, así que te derivo con un especialista para confirmarla. 🙌';
-
-      result.replies = [...kept.slice(0, 2), notice];
-      result.should_handoff = true;
+      result.replies = kept.slice(0, 2);
+      result.should_handoff = false;
       result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
 
