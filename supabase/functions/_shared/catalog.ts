@@ -99,8 +99,7 @@ export async function fetchCatalogBlock(
     .from('product_catalog')
     .select(CATALOG_COLUMNS)
     .eq('workshop_id', workshopId)
-    .order('price_min', { ascending: true })
-    .limit(60);
+    .order('price_min', { ascending: true });
 
   if (waterType) query = query.eq('water_type', waterType);
   if (motorType) query = query.eq('motor_type', motorType);

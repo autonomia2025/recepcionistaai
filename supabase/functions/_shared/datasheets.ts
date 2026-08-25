@@ -65,6 +65,42 @@ export async function resolvePdfDatasheet(
     const normalizedCode = normalizeProductCode(requestedCode);
     if (normalizedCode.length < 3) continue;
 
+    // The deterministic catalog already stores the canonical datasheet filename.
+    // Resolve that exact mapping first instead of inferring it from RAG chunks or
+    // similarly-prefixed filenames (for example PWPC120-11M vs -11MA/-11MNAC).
+    const { data: catalogRow, error: catalogError } = await supabase
+      .from('product_catalog')
+      .select('datasheet_file')
+      .eq('workshop_id', workshopId)
+      .eq('sku_normalized', normalizedCode)
+      .maybeSingle();
+
+    if (catalogError) {
+      console.error('Datasheet catalog mapping lookup failed:', { requestedCode, error: catalogError });
+    } else if (catalogRow?.datasheet_file) {
+      const { data: mappedDocument, error: mappedError } = await supabase
+        .from('bot_documents')
+        .select('id, file_name, file_type, storage_path, created_at')
+        .eq('workshop_id', workshopId)
+        .eq('file_name', catalogRow.datasheet_file)
+        .not('storage_path', 'is', null)
+        .maybeSingle();
+
+      if (mappedError) {
+        console.error('Mapped datasheet document lookup failed:', {
+          requestedCode,
+          datasheetFile: catalogRow.datasheet_file,
+          error: mappedError,
+        });
+      } else if (mappedDocument && isPdfDocument(mappedDocument)) {
+        return {
+          document: mappedDocument as DatasheetDocument,
+          matchedCode: requestedCode,
+          ambiguous: false,
+        };
+      }
+    }
+
     // Prefer the original PDF inventory itself. Extracted/OCR text may format a
     // SKU differently (spaces, missing separators), while uploaded filenames
     // consistently carry the canonical product code.
