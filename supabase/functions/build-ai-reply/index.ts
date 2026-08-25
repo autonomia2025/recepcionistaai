@@ -790,7 +790,6 @@ serve(async (req) => {
     const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
     const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
-    const resolvedCurrentSelection = removeAccents(resolveMenuLetter(message_text, lastBotMessageText).toLowerCase());
 
     // ===== RAG: query built from accumulated conversation state =====
     const conversationState = buildConversationState(messages, message_text);
@@ -1230,19 +1229,57 @@ Criterios:${isChatbotOnly ? '' : `
       };
     }
 
+    // Catalog-driven responses for the two flows where completeness matters.
+    // This avoids asking the model to remember unseen rows from a large block.
+    const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
+    const asksForMoreModels = /\b(dame|muestra|quiero|ver)\s+mas\s+(modelos|opciones|alternativas)\b|\b(otros|otras)\s+(modelos|opciones|alternativas)\b/.test(normalizedCurrent);
+
+    if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
+      const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
+      const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
+      const lines: string[] = [
+        '*Agua caliente*',
+        ...hot.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))),
+        '',
+        '*Agua fría*',
+        ...cold.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + hot.length + index))),
+        '',
+        'Para grasa y barro, mi recomendación es agua caliente: también puede trabajar en frío apagando la caldera. Responde con la letra y te envío su ficha técnica 📄',
+      ];
+      result.replies = [lines.join('\n')];
+      result.intent = 'consulta';
+      result.should_handoff = false;
+      result.reasoning = `Se presentaron ambas familias desde los bloques completos del catálogo (${hotWaterBlockRows.length} calientes y ${coldWaterBlockRows.length} frías).`;
+    } else if (asksForMoreModels && catalogBlockRows.length > 0) {
+      const priorCodes = new Set(
+        messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
+      );
+      const unseenRows = catalogBlockRows.filter(row => !priorCodes.has(row.sku_normalized));
+      const alternatives = selectRepresentativeRows(unseenRows.length > 0 ? unseenRows : catalogBlockRows, 3);
+      result.replies = [
+        `Claro, aquí tienes ${unseenRows.length > 0 ? 'otras' : 'más'} alternativas del mismo grupo:\n\n` +
+        alternatives.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))).join('\n') +
+        '\n\nResponde con la letra y te envío su ficha técnica 📄',
+      ];
+      result.intent = 'consulta';
+      result.should_handoff = false;
+      result.reasoning = `Se seleccionaron alternativas no mostradas desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+    }
+
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
     const falseNegativeRag = directCodeMatch && (
       result.should_handoff ||
       /no tengo (esa )?informaci[oó]n|no tengo.*documentad|no aparece en la documentaci[oó]n|no est[aá] documentad/.test(replyText)
     );
 
-    if (falseNegativeRag) {
+    if (falseNegativeRag && directCodeMatch) {
+      const documentedMatch = directCodeMatch;
       console.log('Correcting AI false-negative handoff because an exact RAG code match exists:', {
-        file: directCodeMatch.file_name,
-        score: directCodeMatch.score,
+        file: documentedMatch.file_name,
+        score: documentedMatch.score,
       });
       result = {
-        replies: [buildDocumentedProductReply(directCodeMatch)],
+        replies: [buildDocumentedProductReply(documentedMatch)],
         intent: 'consulta',
         confidence: 0.93,
         should_handoff: false,
