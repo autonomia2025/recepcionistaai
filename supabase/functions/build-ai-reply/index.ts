@@ -1241,6 +1241,11 @@ Criterios:${isChatbotOnly ? '' : `
       /\bque\s+(otras|otros)\b/.test(normalizedCurrent) ||
       /\bmas\s+(modelos|opciones|alternativas|equipos)\b/.test(normalizedCurrent);
 
+    // A catalog-driven listing replaces the model's prose entirely. It only
+    // contains codes read from the catalog, so no datasheet is attached (the
+    // customer has not picked a model yet) and the invented-code guard is moot.
+    let catalogDrivenReply = false;
+
     if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
       const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
@@ -1257,6 +1262,7 @@ Criterios:${isChatbotOnly ? '' : `
       result.intent = 'consulta';
       result.should_handoff = false;
       result.reasoning = `Se presentaron ambas familias desde los bloques completos del catálogo (${hotWaterBlockRows.length} calientes y ${coldWaterBlockRows.length} frías).`;
+      catalogDrivenReply = true;
     } else if (asksForMoreModels && catalogBlockRows.length > 0) {
       const priorCodes = new Set(
         messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
@@ -1288,6 +1294,7 @@ Criterios:${isChatbotOnly ? '' : `
       result.intent = 'consulta';
       result.should_handoff = false;
       result.reasoning = `Se entregaron ${alternatives.length} alternativas sin recorte desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+      catalogDrivenReply = true;
     }
 
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
@@ -1430,7 +1437,7 @@ Criterios:${isChatbotOnly ? '' : `
       });
     }
 
-    if (botSettings?.send_pdf_datasheets && (!menuSelection || selectedMenuProductCode)) {
+    if (botSettings?.send_pdf_datasheets && !catalogDrivenReply && (!menuSelection || selectedMenuProductCode)) {
       try {
 
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
@@ -1559,7 +1566,7 @@ Criterios:${isChatbotOnly ? '' : `
     // family code is ambiguous, ask for the exact model instead of guessing.
     // The useful part of the answer is preserved: only the delivery promise is
     // removed and a clarifying line is appended.
-    if (pdfRequested && attachments.length === 0 && !menuSelection) {
+    if (pdfRequested && attachments.length === 0 && !menuSelection && !catalogDrivenReply) {
       const kept = (result.replies || [])
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
@@ -1577,6 +1584,7 @@ Criterios:${isChatbotOnly ? '' : `
     // te llega su ficha") is legitimate and must be preserved verbatim.
     const claimsFileDelivery =
       !menuSelection &&
+      !catalogDrivenReply &&
       attachments.length === 0 &&
       (result.replies || []).some(reply => {
         const plain = removeAccents(reply);
@@ -1597,7 +1605,7 @@ Criterios:${isChatbotOnly ? '' : `
     // A code the model invented is removed together with the sentence that
     // carries it. If nothing verifiable survives, the lead goes to a human
     // instead of receiving a fabricated recommendation.
-    if (catalogSkus.size > 0) {
+    if (catalogSkus.size > 0 && !catalogDrivenReply) {
       const offending = [...new Set(
         (result.replies || []).flatMap(reply => findInventedCodes(reply, catalogSkus))
       )];
@@ -1614,16 +1622,32 @@ Criterios:${isChatbotOnly ? '' : `
           })
           .filter(reply => reply.length > 0);
 
-        const notice =
-          'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
+        // A verified datasheet was already prepared, or the surviving text still
+        // quotes a real catalog code: the answer is trustworthy, so only the
+        // offending sentence is dropped — no handoff, no extra notice.
+        const stillHasVerifiedContent =
+          attachments.length > 0 ||
+          sanitized.some(reply =>
+            extractProductCodes(reply)
+              .map(normalizeProductCode)
+              .some(code => catalogSkus.has(code))
+          );
 
-        const alreadyDerives = /especialista|ejecutivo|vendedor|te conecto|te derivo/i.test(sanitized.join(' '));
-        result.replies = sanitized.length === 0
-          ? [notice]
-          : alreadyDerives ? sanitized.slice(0, 2) : [...sanitized.slice(0, 2), notice];
-        result.should_handoff = true;
-        result.intent = 'humano';
-        result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
+        if (stillHasVerifiedContent && sanitized.length > 0) {
+          result.replies = sanitized.slice(0, 3);
+          result.reasoning = `Se eliminó la mención a códigos inexistentes (${offending.join(', ')}); se conservó la información verificada sin derivar.`;
+        } else {
+          const notice =
+            'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
+
+          const alreadyDerives = /especialista|ejecutivo|vendedor|te conecto|te derivo/i.test(sanitized.join(' '));
+          result.replies = sanitized.length === 0
+            ? [notice]
+            : alreadyDerives ? sanitized.slice(0, 2) : [...sanitized.slice(0, 2), notice];
+          result.should_handoff = true;
+          result.intent = 'humano';
+          result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
+        }
       }
     }
 
