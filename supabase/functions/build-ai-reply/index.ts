@@ -1566,7 +1566,7 @@ Criterios:${isChatbotOnly ? '' : `
     // family code is ambiguous, ask for the exact model instead of guessing.
     // The useful part of the answer is preserved: only the delivery promise is
     // removed and a clarifying line is appended.
-    if (pdfRequested && attachments.length === 0 && !menuSelection) {
+    if (pdfRequested && attachments.length === 0 && !menuSelection && !catalogDrivenReply) {
       const kept = (result.replies || [])
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
