@@ -1262,15 +1262,32 @@ Criterios:${isChatbotOnly ? '' : `
         messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
       );
       const unseenRows = catalogBlockRows.filter(row => !priorCodes.has(row.sku_normalized));
-      const alternatives = selectRepresentativeRows(unseenRows.length > 0 ? unseenRows : catalogBlockRows, 3);
-      result.replies = [
-        `Claro, aquí tienes ${unseenRows.length > 0 ? 'otras' : 'más'} alternativas del mismo grupo:\n\n` +
-        alternatives.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))).join('\n') +
-        '\n\nResponde con la letra y te envío su ficha técnica 📄',
-      ];
+      // No truncation here: the customer explicitly asked for the rest.
+      const alternatives = unseenRows.length > 0 ? unseenRows : catalogBlockRows;
+      const lettered = alternatives.map((row, index) =>
+        formatRecommendationLine(row, String.fromCharCode(65 + (index % 26)))
+      );
+
+      // Split into WhatsApp-sized messages instead of dropping equipment.
+      const chunks: string[] = [];
+      let current: string[] = [];
+      for (const line of lettered) {
+        if (current.join('\n').length + line.length > 900 && current.length > 0) {
+          chunks.push(current.join('\n'));
+          current = [];
+        }
+        current.push(line);
+      }
+      if (current.length > 0) chunks.push(current.join('\n'));
+
+      const header = `Claro, aquí tienes ${unseenRows.length > 0 ? 'todas las' : 'las'} alternativas del mismo grupo (${alternatives.length} equipos):\n\n`;
+      const footer = '\n\nResponde con la letra y te envío su ficha técnica 📄';
+      result.replies = chunks.map((chunk, index) =>
+        `${index === 0 ? header : ''}${chunk}${index === chunks.length - 1 ? footer : ''}`
+      );
       result.intent = 'consulta';
       result.should_handoff = false;
-      result.reasoning = `Se seleccionaron alternativas no mostradas desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+      result.reasoning = `Se entregaron ${alternatives.length} alternativas sin recorte desde el bloque completo de ${catalogBlockRows.length} equipos.`;
     }
 
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
