@@ -1232,7 +1232,14 @@ Criterios:${isChatbotOnly ? '' : `
     // Catalog-driven responses for the two flows where completeness matters.
     // This avoids asking the model to remember unseen rows from a large block.
     const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
-    const asksForMoreModels = /\b(dame|muestra|quiero|ver)\s+mas\s+(modelos|opciones|alternativas)\b|\b(otros|otras)\s+(modelos|opciones|alternativas)\b/.test(normalizedCurrent);
+    // Explicit request for MORE models. The initial recommendation stays at 2-3
+    // options (more than three paralyses the customer); only here the customer
+    // asked to see the rest, so the whole remainder of the block is delivered.
+    const asksForMoreModels =
+      /\b(dame|muestra|muestrame|quiero|ver|hay|tienes|tienen)\b[^.?!]{0,20}\bmas\s+(modelos|opciones|alternativas|equipos|maquinas)\b/.test(normalizedCurrent) ||
+      /\b(otros|otras)\s+(modelos|opciones|alternativas|equipos|maquinas)\b/.test(normalizedCurrent) ||
+      /\bque\s+(otras|otros)\b/.test(normalizedCurrent) ||
+      /\bmas\s+(modelos|opciones|alternativas|equipos)\b/.test(normalizedCurrent);
 
     if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
