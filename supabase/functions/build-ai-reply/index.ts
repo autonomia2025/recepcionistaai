@@ -1294,6 +1294,7 @@ Criterios:${isChatbotOnly ? '' : `
       result.intent = 'consulta';
       result.should_handoff = false;
       result.reasoning = `Se entregaron ${alternatives.length} alternativas sin recorte desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+      catalogDrivenReply = true;
     }
 
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
