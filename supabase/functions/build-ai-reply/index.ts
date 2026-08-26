@@ -1626,7 +1626,11 @@ Criterios:${isChatbotOnly ? '' : `
         // offending sentence is dropped — no handoff, no extra notice.
         const stillHasVerifiedContent =
           attachments.length > 0 ||
-          sanitized.some(reply => extractQuotedCodes(reply).length > 0);
+          sanitized.some(reply =>
+            extractProductCodes(reply)
+              .map(normalizeProductCode)
+              .some(code => catalogSkus.has(code))
+          );
 
         if (stillHasVerifiedContent && sanitized.length > 0) {
           result.replies = sanitized.slice(0, 3);
