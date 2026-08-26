@@ -1604,7 +1604,7 @@ Criterios:${isChatbotOnly ? '' : `
     // A code the model invented is removed together with the sentence that
     // carries it. If nothing verifiable survives, the lead goes to a human
     // instead of receiving a fabricated recommendation.
-    if (catalogSkus.size > 0) {
+    if (catalogSkus.size > 0 && !catalogDrivenReply) {
       const offending = [...new Set(
         (result.replies || []).flatMap(reply => findInventedCodes(reply, catalogSkus))
       )];
@@ -1621,16 +1621,28 @@ Criterios:${isChatbotOnly ? '' : `
           })
           .filter(reply => reply.length > 0);
 
-        const notice =
-          'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
+        // A verified datasheet was already prepared, or the surviving text still
+        // quotes a real catalog code: the answer is trustworthy, so only the
+        // offending sentence is dropped — no handoff, no extra notice.
+        const stillHasVerifiedContent =
+          attachments.length > 0 ||
+          sanitized.some(reply => extractQuotedCodes(reply).length > 0);
 
-        const alreadyDerives = /especialista|ejecutivo|vendedor|te conecto|te derivo/i.test(sanitized.join(' '));
-        result.replies = sanitized.length === 0
-          ? [notice]
-          : alreadyDerives ? sanitized.slice(0, 2) : [...sanitized.slice(0, 2), notice];
-        result.should_handoff = true;
-        result.intent = 'humano';
-        result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
+        if (stillHasVerifiedContent && sanitized.length > 0) {
+          result.replies = sanitized.slice(0, 3);
+          result.reasoning = `Se eliminó la mención a códigos inexistentes (${offending.join(', ')}); se conservó la información verificada sin derivar.`;
+        } else {
+          const notice =
+            'Prefiero no darte un código que no tenga confirmado en catálogo. Te derivo con un especialista para entregarte el modelo y precio exactos. 🙌';
+
+          const alreadyDerives = /especialista|ejecutivo|vendedor|te conecto|te derivo/i.test(sanitized.join(' '));
+          result.replies = sanitized.length === 0
+            ? [notice]
+            : alreadyDerives ? sanitized.slice(0, 2) : [...sanitized.slice(0, 2), notice];
+          result.should_handoff = true;
+          result.intent = 'humano';
+          result.reasoning = `Se eliminaron códigos inexistentes (${offending.join(', ')}) y se derivó a un humano.`;
+        }
       }
     }
 
