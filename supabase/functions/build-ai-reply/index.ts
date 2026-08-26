@@ -1241,6 +1241,11 @@ Criterios:${isChatbotOnly ? '' : `
       /\bque\s+(otras|otros)\b/.test(normalizedCurrent) ||
       /\bmas\s+(modelos|opciones|alternativas|equipos)\b/.test(normalizedCurrent);
 
+    // A catalog-driven listing replaces the model's prose entirely. It only
+    // contains codes read from the catalog, so no datasheet is attached (the
+    // customer has not picked a model yet) and the invented-code guard is moot.
+    let catalogDrivenReply = false;
+
     if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
       const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
