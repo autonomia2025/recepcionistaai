@@ -1437,7 +1437,7 @@ Criterios:${isChatbotOnly ? '' : `
       });
     }
 
-    if (botSettings?.send_pdf_datasheets && (!menuSelection || selectedMenuProductCode)) {
+    if (botSettings?.send_pdf_datasheets && !catalogDrivenReply && (!menuSelection || selectedMenuProductCode)) {
       try {
 
         const lowerCurrent = removeAccents((message_text || '').toLowerCase());
