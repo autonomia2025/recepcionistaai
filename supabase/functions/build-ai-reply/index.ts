@@ -1232,7 +1232,14 @@ Criterios:${isChatbotOnly ? '' : `
     // Catalog-driven responses for the two flows where completeness matters.
     // This avoids asking the model to remember unseen rows from a large block.
     const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
-    const asksForMoreModels = /\b(dame|muestra|quiero|ver)\s+mas\s+(modelos|opciones|alternativas)\b|\b(otros|otras)\s+(modelos|opciones|alternativas)\b/.test(normalizedCurrent);
+    // Explicit request for MORE models. The initial recommendation stays at 2-3
+    // options (more than three paralyses the customer); only here the customer
+    // asked to see the rest, so the whole remainder of the block is delivered.
+    const asksForMoreModels =
+      /\b(dame|muestra|muestrame|quiero|ver|hay|tienes|tienen)\b[^.?!]{0,20}\bmas\s+(modelos|opciones|alternativas|equipos|maquinas)\b/.test(normalizedCurrent) ||
+      /\b(otros|otras)\s+(modelos|opciones|alternativas|equipos|maquinas)\b/.test(normalizedCurrent) ||
+      /\bque\s+(otras|otros)\b/.test(normalizedCurrent) ||
+      /\bmas\s+(modelos|opciones|alternativas|equipos)\b/.test(normalizedCurrent);
 
     if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
@@ -1255,15 +1262,32 @@ Criterios:${isChatbotOnly ? '' : `
         messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
       );
       const unseenRows = catalogBlockRows.filter(row => !priorCodes.has(row.sku_normalized));
-      const alternatives = selectRepresentativeRows(unseenRows.length > 0 ? unseenRows : catalogBlockRows, 3);
-      result.replies = [
-        `Claro, aquí tienes ${unseenRows.length > 0 ? 'otras' : 'más'} alternativas del mismo grupo:\n\n` +
-        alternatives.map((row, index) => formatRecommendationLine(row, String.fromCharCode(65 + index))).join('\n') +
-        '\n\nResponde con la letra y te envío su ficha técnica 📄',
-      ];
+      // No truncation here: the customer explicitly asked for the rest.
+      const alternatives = unseenRows.length > 0 ? unseenRows : catalogBlockRows;
+      const lettered = alternatives.map((row, index) =>
+        formatRecommendationLine(row, String.fromCharCode(65 + (index % 26)))
+      );
+
+      // Split into WhatsApp-sized messages instead of dropping equipment.
+      const chunks: string[] = [];
+      let current: string[] = [];
+      for (const line of lettered) {
+        if (current.join('\n').length + line.length > 900 && current.length > 0) {
+          chunks.push(current.join('\n'));
+          current = [];
+        }
+        current.push(line);
+      }
+      if (current.length > 0) chunks.push(current.join('\n'));
+
+      const header = `Claro, aquí tienes ${unseenRows.length > 0 ? 'todas las' : 'las'} alternativas del mismo grupo (${alternatives.length} equipos):\n\n`;
+      const footer = '\n\nResponde con la letra y te envío su ficha técnica 📄';
+      result.replies = chunks.map((chunk, index) =>
+        `${index === 0 ? header : ''}${chunk}${index === chunks.length - 1 ? footer : ''}`
+      );
       result.intent = 'consulta';
       result.should_handoff = false;
-      result.reasoning = `Se seleccionaron alternativas no mostradas desde el bloque completo de ${catalogBlockRows.length} equipos.`;
+      result.reasoning = `Se entregaron ${alternatives.length} alternativas sin recorte desde el bloque completo de ${catalogBlockRows.length} equipos.`;
     }
 
     const replyText = compactText((result.replies || []).join(' ')).toLowerCase();
