@@ -176,9 +176,9 @@ function compactText(str: string): string {
 // way so the model can simply interpret the chosen option.
 function extractMenuOptions(botText: string): string[] {
   const options = new Set<string>();
-  for (const line of (botText || '').split('\n')) {
-    const match = line.match(/^\s*\*?([A-Za-z0-9])\*?\s*[).:.-]\s+\S/);
-    if (match) options.add(match[1].toUpperCase());
+  const optionRe = /(?:^|\n|\s)\*?([A-Za-z0-9])\*?\s*[).:.-]\s+(?=\*?[A-Za-z0-9])/g;
+  for (const match of (botText || '').matchAll(optionRe)) {
+    options.add(match[1].toUpperCase());
   }
   return [...options];
 }
@@ -190,7 +190,7 @@ function isMenuSelection(messageText: string, lastBotText: string): boolean {
   if (!/^[A-Z0-9]$/.test(trimmed)) return false;
 
   const options = extractMenuOptions(lastBotText);
-  if (options.length < 2) return false;
+  if (options.length < 1) return false;
   return options.includes(trimmed);
 }
 
@@ -307,11 +307,11 @@ function stripDeliveryClaims(reply: string): string {
 function extractSelectedMenuProductCode(messageText: string, lastBotText: string): string | null {
   const trimmed = removeAccents((messageText || '').trim()).replace(/[\s.,!¡?¿)]+$/g, '').toUpperCase();
   if (!/^[A-Z0-9]$/.test(trimmed)) return null;
-  const selectedLine = (lastBotText || '')
-    .split('\n')
-    .find(line => new RegExp(`^\\s*\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+\\S`, 'i').test(removeAccents(line)));
-  if (!selectedLine) return null;
-  return extractProductCodes(selectedLine)[0] || null;
+  const selectedOption = removeAccents(lastBotText || '').match(
+    new RegExp(`(?:^|\\n|\\s)\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+([\\s\\S]*?)(?=(?:\\n|\\s)\\*?[A-Za-z0-9]\\*?\\s*[).:.\\-]\\s+|$)`, 'i')
+  )?.[1];
+  if (!selectedOption) return null;
+  return extractProductCodes(selectedOption)[0] || null;
 }
 
 function selectRepresentativeRows(rows: CatalogRow[], count = 3): CatalogRow[] {
