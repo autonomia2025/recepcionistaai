@@ -1262,6 +1262,7 @@ Criterios:${isChatbotOnly ? '' : `
       result.intent = 'consulta';
       result.should_handoff = false;
       result.reasoning = `Se presentaron ambas familias desde los bloques completos del catálogo (${hotWaterBlockRows.length} calientes y ${coldWaterBlockRows.length} frías).`;
+      catalogDrivenReply = true;
     } else if (asksForMoreModels && catalogBlockRows.length > 0) {
       const priorCodes = new Set(
         messages.flatMap(message => extractProductCodes(message.text)).map(normalizeProductCode)
