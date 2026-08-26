@@ -190,7 +190,7 @@ function isMenuSelection(messageText: string, lastBotText: string): boolean {
   if (!/^[A-Z0-9]$/.test(trimmed)) return false;
 
   const options = extractMenuOptions(lastBotText);
-  if (options.length < 2) return false;
+  if (options.length < 1) return false;
   return options.includes(trimmed);
 }
 
