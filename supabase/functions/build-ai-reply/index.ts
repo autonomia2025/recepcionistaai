@@ -1584,6 +1584,7 @@ Criterios:${isChatbotOnly ? '' : `
     // te llega su ficha") is legitimate and must be preserved verbatim.
     const claimsFileDelivery =
       !menuSelection &&
+      !catalogDrivenReply &&
       attachments.length === 0 &&
       (result.replies || []).some(reply => {
         const plain = removeAccents(reply);
