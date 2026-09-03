@@ -1653,7 +1653,45 @@ Criterios:${isChatbotOnly ? '' : `
 
 
 
+    // ===== Permanent response trace =====
+    // Every turn records what the model produced and what the customer will
+    // actually receive, so any silent rewrite by a guardrail is auditable.
+    const finalReplies = [...(result.replies || [])];
+    const replyWasRewritten = JSON.stringify(originalReplies) !== JSON.stringify(finalReplies);
 
+    console.log('Response trace:', {
+      conversation_id,
+      catalogDrivenReply,
+      attachments: attachments.map(a => a.file_name),
+      rewritten: replyWasRewritten,
+      ai_original: originalReplies,
+      sent_to_customer: finalReplies,
+      reasoning: result.reasoning,
+    });
+
+    try {
+      await supabase.from('health_logs').insert({
+        workshop_id,
+        event_type: 'info',
+        category: 'bot',
+        message: replyWasRewritten
+          ? 'Respuesta de la IA modificada por post-procesamiento'
+          : 'Respuesta de la IA enviada sin modificaciones',
+        metadata: {
+          conversation_id,
+          inbound: message_text,
+          ai_original: originalReplies,
+          sent_to_customer: finalReplies,
+          rewritten: replyWasRewritten,
+          catalog_driven: catalogDrivenReply,
+          attachments: attachments.map(a => a.file_name),
+          should_handoff: result.should_handoff,
+          reasoning: result.reasoning,
+        },
+      });
+    } catch (traceErr) {
+      console.error('Failed to persist response trace:', traceErr);
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -1664,6 +1702,7 @@ Criterios:${isChatbotOnly ? '' : `
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
 
   } catch (error: unknown) {
     console.error('Build AI reply error:', error);
