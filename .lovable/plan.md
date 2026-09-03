@@ -1,68 +1,41 @@
-# Diagnóstico: fichas PDF y respuestas que ignoran el prompt (SOC Ingeniería)
+# Traza real de la conversación con José Luis (3-sep, 17:36–17:38 hora Chile)
 
-No se aplicó ningún cambio. Esto es lo que muestra la evidencia, de más grave a menos grave.
+## Turno por turno (health_logs, categoría `bot`, conversación `c1d1e84f…`)
 
-## Hallazgo 1 (grave, activo hoy) — Una respuesta determinística está pisando al modelo
+| Hora UTC | Entrante | IA original | Enviado | Reescritura | should_handoff |
+|---|---|---|---|---|---|
+| 21:36:11 | "necesito una hidrolavadora monofasica" | Saludo + preguntas de diagnóstico | idéntico | no | false |
+| 21:37:17 | "en lugares distintos" | Carro de transporte + pregunta grasa/barro | idéntico | no | false |
+| 21:37:53 | "agua fria" | **"Gracias por tu mensaje. Un asesor te contactará pronto."** | idéntico | no | **true** |
 
-En la conversación real del 3-sep 20:26–20:30 el bot envió **el mismo bloque de menú (A–F) cinco veces seguidas**, sin importar lo que escribió el cliente:
+Respuestas a tus tres preguntas del último turno:
 
-```text
-20:26:33  cliente: "barro y grasa, enchufe monofásico 220V"  → menú A–F
-20:27:50  cliente: "a"                                        → mismo menú A–F
-20:28:17  cliente: "A"                                        → mismo menú A–F
-20:28:47  cliente: "cuales son los valores"                   → mismo menú A–F
-20:29:48  cliente: "*MH130-10M-I*"                            → mismo menú A–F
-```
+1. **No hubo reemplazo por post-procesamiento.** `rewritten: false`, `catalog_driven: false`, `attachments: []`. La traza registra ese texto ya como `ai_original`, porque la traza se toma después del parseo.
+2. **La IA no marcó handoff.** El modelo sí generó la recomendación correcta (SOC200/15AFBC y SOC250/15AFBA, `should_handoff: false`, confidence 0.98). Se perdió al parsear.
+3. **No le llegó el bloque de catálogo.** Log de la función: `Catalog layer: { skus: 162, priceRows: [], block: null, blockRows: 0 }`. El bloque AGUA FRÍA + ELÉCTRICA 220V con sus 10 equipos **no** se construyó; el modelo respondió solo con RAG (4 fragmentos semánticos + 6 keyword).
 
-La pregunta de precios nunca se respondió. Esto **no** es el modelo ignorando el prompt: es la rama determinística de catálogo (`catalogDrivenReply` en `build-ai-reply/index.ts`, bloque ~1259–1290, con el pie fijo "Responde con la letra y te envío su ficha técnica 📄") que se vuelve a disparar en cada turno porque el estado acumulado sigue cumpliendo la condición y no registra que ese bloque ya se envió ni que el cliente ya eligió opción.
+## Dónde está el string
 
-Efecto secundario: mientras esa rama está activa, se desactivan el pipeline de fichas y los guardrails (`!catalogDrivenReply`), así que en esos turnos **no puede llegar ningún PDF**.
+`supabase/functions/build-ai-reply/index.ts:1225`, dentro del `catch (parseError)` del bloque 1198–1231. Condición exacta que lo dispara: `JSON.parse` del contenido de la IA falla (o falta `replies`) **y** el texto crudo empieza con `{`, por lo que `usableProse` queda nulo y se usa el genérico con `should_handoff: true`.
 
-## Hallazgo 2 (grave) — El texto "no la tengo disponible… te derivo" NO está en el código
+Por qué falló el parseo esta vez: la IA devolvió un JSON válido **con una llave `}` de más al final**. El extractor actual solo recorta prosa cuando el texto **no** empieza con `{`; aquí empezaba con `{`, así que pasó tal cual a `JSON.parse` y reventó.
 
-Búsqueda en todo el repositorio: la frase reportada no existe como string fijo en `build-ai-reply` ni en ninguna función. Tampoco aparece en la tabla de mensajes. Es **texto generado por el modelo**, inducido por dos reglas del propio system prompt:
+## Plan de arreglo (2 fallas independientes)
 
-- línea 952: instrucción de responder "No tengo esa información…" y marcar `should_handoff=true`
-- línea 987: "si el modelo NO aparece en la documentación… deriva con un especialista"
+### Falla A — parseo frágil (causa directa del mensaje genérico)
+En `build-ai-reply/index.ts`, reemplazar el parseo por un extractor robusto:
+- Recortar siempre desde el primer `{` hasta la **última llave que balancea** el objeto (escaneo de llaves respetando strings y escapes), en lugar de asumir que empieza bien formado.
+- Reintento: si el primer intento falla, probar recortes progresivos y, como último recurso, extraer `replies` por regex.
+- Solo si todo falla, usar el fallback — y en ese caso registrarlo en `health_logs` con `layer: 'parse_fallback'` y el crudo, para que sea visible en la traza (hoy aparece como si fuera la respuesta de la IA).
+- Registrar en la traza el `ai_raw` cuando hubo fallback, para no confundir de nuevo el origen.
 
-Cuando el bloque de catálogo/precios no entra completo al contexto, el modelo aplica esas reglas y produce la frase, con la redacción casi idéntica en cada caso. Los guardrails posteriores ya no borran la promesa (eso se arregló), pero tampoco corrigen una negación falsa.
+### Falla B — el bloque de catálogo no se construyó
+El estado acumulado detectó `agua: "agua fría"`, pero `motor` quedó `null` pese a que el cliente dijo "monofásica" en el primer mensaje y "lugares distintos" en el tercero. Sin motorización no se resuelve el bloque (`block: null`), así que el modelo no recibió los 10 equipos.
+- Ampliar la extracción de motorización en `buildConversationState` para reconocer monofásica/220V/trifásica/380V/bencina/diésel a lo largo de **todo** el historial, no solo del mensaje actual.
+- Cuando agua + motor estén definidos, resolver el bloque del catálogo determinístico e inyectarlo en el contexto con todos sus equipos (la recomendación inicial sigue limitada a 2–3 en el prompt).
+- Log explícito del bloque resuelto y su conteo, para verificación.
 
-Los strings fijos que sí existen y pueden sustituir texto son solo dos:
-- `index.ts:1641` "Prefiero no darte un código que no tenga confirmado en catálogo… te derivo" → se dispara si sobreviven códigos que no están en `product_catalog` y no hay adjunto ni código verificado.
-- `index.ts:1544–1546` "Te adjunto además la ficha técnica …" → añadido cuando sí hay adjunto.
-
-## Hallazgo 3 — Los PDFs de PWPC120/11M y NEWEN130/10EF-IN sí resuelven
-
-Consulta directa a la base:
-
-| SKU | datasheet_file | documento en storage |
-|---|---|---|
-| PWPC120/11M | 156_PWPC120-11M.pdf | 1 (OK) |
-| NEWEN130/10EF-IN | 101_NEWEN130-10EF-IN.pdf | 1 (OK) |
-
-El mapeo catálogo → documento → URL firmada está sano. Los envíos reales de hoy lo confirman: `041_MH130-10M-I.pdf`, `103_NEWEN170-13EF-AR.pdf`, `160_PWPC200-14T.pdf`, `142_SOC200-30EF.pdf` salieron sin problema. La falla del cliente no está en la resolución del archivo, sino en los turnos donde el pipeline de adjuntos ni siquiera corre (Hallazgo 1) o donde el modelo niega antes de que corra.
-
-## Hallazgo 4 — La opción C sí muestra las dos familias
-
-En la conversación de hoy el bloque llega con **Agua caliente A–C** y **Agua fría D–F** en el mismo mensaje. Ese bug ya no se reproduce con el código en producción.
-
-## Hallazgo 5 — Versión desplegada: no verificable con certeza
-
-`build-ai-reply` no tiene logs recuperables en la ventana disponible, así que no se puede certificar el hash desplegado. Lo que sí demuestra el comportamiento observado hoy (dos listas correctas, PDFs saliendo, sin promesas falsas) es que los arreglos previos **están activos**. Para eliminar la duda hay que hacer un despliegue explícito y dejar registro con timestamp.
-
-## Post-procesamiento actual, en orden
-
-1. Rama determinística de catálogo → puede **reemplazar por completo** la respuesta del modelo (Hallazgo 1).
-2. Resolución de fichas → decide adjuntos; no toca texto.
-3. Adjunto presente → borra frases contradictorias y recorta a 2 mensajes + línea de entrega.
-4. `pdfRequested` sin adjunto → quita la promesa de envío, conserva lo útil, no deriva.
-5. `claimsFileDelivery` → quita la promesa, conserva lo útil, no deriva.
-6. Validación de códigos contra `product_catalog` → borra la frase con el código inventado; si no queda nada verificable, sustituye por el texto fijo y deriva.
-
-## Qué propongo hacer (pendiente de tu aprobación)
-
-1. Dar estado a la rama determinística: enviar el bloque A–F **una sola vez**; si el cliente ya lo recibió, los turnos siguientes (letra, código, pregunta de precio) pasan al flujo normal con el bloque de precios inyectado.
-2. Reactivar el pipeline de fichas y los guardrails en los turnos posteriores al menú, hoy bloqueados por `!catalogDrivenReply`.
-3. Suavizar las reglas 952/987 del prompt: solo negar y derivar si el código realmente no está en el catálogo determinístico; si está, responder con sus datos y adjuntar.
-4. Añadir un log por turno con: respuesta original de la IA, respuesta final enviada y qué capa la modificó, para tener trazabilidad real de aquí en adelante.
-5. Desplegar explícito y registrar timestamp.
+## Validación antes de cerrar
+1. Replay del flujo de José Luis: monofásica → lugares distintos → agua fría debe entregar equipos del bloque agua fría + 220V, con `block` no nulo y `blockRows = 10` en logs.
+2. Test de parseo con JSON con llave extra, con fences y con prosa envolvente: los tres deben producir la respuesta real de la IA, nunca el genérico.
+3. Confirmar timestamp de despliegue.
