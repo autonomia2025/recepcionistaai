@@ -1721,23 +1721,31 @@ Criterios:${isChatbotOnly ? '' : `
     try {
       await supabase.from('health_logs').insert({
         workshop_id,
-        event_type: 'info',
+        event_type: parseFallbackUsed ? 'error' : 'info',
         category: 'bot',
-        message: replyWasRewritten
-          ? 'Respuesta de la IA modificada por post-procesamiento'
-          : 'Respuesta de la IA enviada sin modificaciones',
+        message: parseFallbackUsed
+          ? 'parse_fallback: no se pudo parsear el JSON de la IA, se envió respuesta de respaldo'
+          : replyWasRewritten
+            ? 'Respuesta de la IA modificada por post-procesamiento'
+            : 'Respuesta de la IA enviada sin modificaciones',
         metadata: {
           conversation_id,
           inbound: message_text,
+          layer: parseFallbackUsed ? 'parse_fallback' : (replyWasRewritten ? 'post_processing' : 'none'),
+          parse_fallback: parseFallbackUsed,
+          ai_raw: parseFallbackUsed ? String(aiContent || '').slice(0, 4000) : undefined,
           ai_original: originalReplies,
           sent_to_customer: finalReplies,
           rewritten: replyWasRewritten,
           catalog_driven: catalogDrivenReply,
+          catalog_block_rows: catalogBlockRows.length,
+          conversation_state: conversationState,
           attachments: attachments.map(a => a.file_name),
           should_handoff: result.should_handoff,
           reasoning: result.reasoning,
         },
       });
+
     } catch (traceErr) {
       console.error('Failed to persist response trace:', traceErr);
     }
