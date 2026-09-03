@@ -1246,7 +1246,14 @@ Criterios:${isChatbotOnly ? '' : `
     // customer has not picked a model yet) and the invented-code guard is moot.
     let catalogDrivenReply = false;
 
-    if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
+    // The dual-family block is a one-shot presentation. Once the customer has
+    // received it, every later turn (a letter, a code, a price question) must
+    // reach the normal pipeline instead of replaying the same menu forever.
+    const dualBlockAlreadySent = (messages || []).some((m: { direction: string; text: string }) =>
+      m.direction === 'outbound' && /\*agua caliente\*/i.test(m.text || '') && /agua fr[ií]a/i.test(m.text || '')
+    );
+
+    if (conversationState.ambasAguas && !dualBlockAlreadySent && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
       const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
       const lines: string[] = [
