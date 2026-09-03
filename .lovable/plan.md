@@ -1,51 +1,68 @@
-# Cerrar y validar los 3 bugs de SOC Ingeniería
+# Diagnóstico: fichas PDF y respuestas que ignoran el prompt (SOC Ingeniería)
 
-## Estado confirmado
+No se aplicó ningún cambio. Esto es lo que muestra la evidencia, de más grave a menos grave.
 
-- **Catálogo agua fría + 220V:** existen **10 equipos** en `product_catalog`.
-- **Bloque que recibe el bot:** `fetchCatalogBlock` no tiene límite y entrega los **10 equipos**; el texto de contexto también incluye los 10.
-- **Causa del BUG 2:** después de generar la respuesta, `selectRepresentativeRows(..., 3)` reduce la salida visible a solo **3 modelos**. Por eso el catálogo está completo internamente, pero el cliente no ve todas las alternativas.
-- **PDFs:** `PWPC120/11M` y `NEWEN130/10EF-IN` tienen un archivo canónico en catálogo y un documento `ready` con ruta de almacenamiento válida.
-- **Configuración:** el envío de fichas está activado para SOC Ingeniería.
-- **Despliegue anterior:** el código local contiene los arreglos, pero no hay logs recientes de `build-ai-reply` que permitan certificar de forma independiente qué versión está activa. Para eliminar la ambigüedad, se hará un despliegue explícito después del ajuste.
+## Hallazgo 1 (grave, activo hoy) — Una respuesta determinística está pisando al modelo
 
-## Implementación
+En la conversación real del 3-sep 20:26–20:30 el bot envió **el mismo bloque de menú (A–F) cinco veces seguidas**, sin importar lo que escribió el cliente:
 
-1. **Eliminar el recorte del flujo “más modelos”**
-   - Mantener la consulta completa de los 10 equipos.
-   - Excluir los códigos ya mostrados en el historial.
-   - Entregar todos los modelos restantes del bloque, no una muestra de 3.
-   - Si la lista requiere varios mensajes, dividirla sin perder equipos ni derivar a una persona.
+```text
+20:26:33  cliente: "barro y grasa, enchufe monofásico 220V"  → menú A–F
+20:27:50  cliente: "a"                                        → mismo menú A–F
+20:28:17  cliente: "A"                                        → mismo menú A–F
+20:28:47  cliente: "cuales son los valores"                   → mismo menú A–F
+20:29:48  cliente: "*MH130-10M-I*"                            → mismo menú A–F
+```
 
-2. **Mantener los arreglos de BUG 1 y BUG 3**
-   - Resolver cada PDF primero mediante `product_catalog.datasheet_file`.
-   - Si un PDF no puede prepararse, conservar la respuesta útil y omitir solo la promesa de adjunto, sin derivación automática.
-   - Para opción C, construir dos listas separadas: agua caliente y agua fría.
+La pregunta de precios nunca se respondió. Esto **no** es el modelo ignorando el prompt: es la rama determinística de catálogo (`catalogDrivenReply` en `build-ai-reply/index.ts`, bloque ~1259–1290, con el pie fijo "Responde con la letra y te envío su ficha técnica 📄") que se vuelve a disparar en cada turno porque el estado acumulado sigue cumpliendo la condición y no registra que ese bloque ya se envió ni que el cliente ya eligió opción.
 
-3. **Desplegar de forma explícita**
-   - Desplegar `build-ai-reply` junto con sus módulos compartidos actualizados.
-   - Confirmar que la función desplegada responde y registrar la versión/resultado del despliegue.
+Efecto secundario: mientras esa rama está activa, se desactivan el pipeline de fichas y los guardrails (`!catalogDrivenReply`), así que en esos turnos **no puede llegar ningún PDF**.
 
-## Validación con resultados visibles
+## Hallazgo 2 (grave) — El texto "no la tengo disponible… te derivo" NO está en el código
 
-Ejecutar y mostrar la salida real de estos cuatro flujos:
+Búsqueda en todo el repositorio: la frase reportada no existe como string fijo en `build-ai-reply` ni en ninguna función. Tampoco aparece en la tabla de mensajes. Es **texto generado por el modelo**, inducido por dos reglas del propio system prompt:
 
-1. **Agua fría + 220V → “dame más modelos”**
-   - Mostrar cantidad del catálogo, cantidad del bloque interno y todos los modelos entregados al cliente.
-   - Criterio: 10 en catálogo, 10 en bloque y ninguna alternativa disponible omitida por un límite artificial.
+- línea 952: instrucción de responder "No tengo esa información…" y marcar `should_handoff=true`
+- línea 987: "si el modelo NO aparece en la documentación… deriva con un especialista"
 
-2. **Opción C: grasa y barro**
-   - Mostrar la respuesta completa.
-   - Criterio: dos listas separadas, una de agua caliente y otra de agua fría, con códigos válidos del catálogo.
+Cuando el bloque de catálogo/precios no entra completo al contexto, el modelo aplica esas reglas y produce la frase, con la redacción casi idéntica en cada caso. Los guardrails posteriores ya no borran la promesa (eso se arregló), pero tampoco corrigen una negación falsa.
 
-3. **Ficha `PWPC120/11M`**
-   - Mostrar texto, `attachments[]`, nombre del PDF y estado de handoff.
-   - Criterio: adjunta `156_PWPC120-11M.pdf`, conserva la respuesta útil y no deriva.
+Los strings fijos que sí existen y pueden sustituir texto son solo dos:
+- `index.ts:1641` "Prefiero no darte un código que no tenga confirmado en catálogo… te derivo" → se dispara si sobreviven códigos que no están en `product_catalog` y no hay adjunto ni código verificado.
+- `index.ts:1544–1546` "Te adjunto además la ficha técnica …" → añadido cuando sí hay adjunto.
 
-4. **Ficha `NEWEN130/10EF-IN`**
-   - Mostrar texto, `attachments[]`, nombre del PDF y estado de handoff.
-   - Criterio: adjunta `101_NEWEN130-10EF-IN.pdf`, conserva la respuesta útil y no deriva.
+## Hallazgo 3 — Los PDFs de PWPC120/11M y NEWEN130/10EF-IN sí resuelven
 
-## Entrega
+Consulta directa a la base:
 
-Presentar una tabla con: flujo, entrada, equipos en catálogo, equipos en bloque, respuesta completa, adjuntos, handoff y resultado **OK / Parcial / Falla**. No se dará por cerrado solo con una validación estática.
+| SKU | datasheet_file | documento en storage |
+|---|---|---|
+| PWPC120/11M | 156_PWPC120-11M.pdf | 1 (OK) |
+| NEWEN130/10EF-IN | 101_NEWEN130-10EF-IN.pdf | 1 (OK) |
+
+El mapeo catálogo → documento → URL firmada está sano. Los envíos reales de hoy lo confirman: `041_MH130-10M-I.pdf`, `103_NEWEN170-13EF-AR.pdf`, `160_PWPC200-14T.pdf`, `142_SOC200-30EF.pdf` salieron sin problema. La falla del cliente no está en la resolución del archivo, sino en los turnos donde el pipeline de adjuntos ni siquiera corre (Hallazgo 1) o donde el modelo niega antes de que corra.
+
+## Hallazgo 4 — La opción C sí muestra las dos familias
+
+En la conversación de hoy el bloque llega con **Agua caliente A–C** y **Agua fría D–F** en el mismo mensaje. Ese bug ya no se reproduce con el código en producción.
+
+## Hallazgo 5 — Versión desplegada: no verificable con certeza
+
+`build-ai-reply` no tiene logs recuperables en la ventana disponible, así que no se puede certificar el hash desplegado. Lo que sí demuestra el comportamiento observado hoy (dos listas correctas, PDFs saliendo, sin promesas falsas) es que los arreglos previos **están activos**. Para eliminar la duda hay que hacer un despliegue explícito y dejar registro con timestamp.
+
+## Post-procesamiento actual, en orden
+
+1. Rama determinística de catálogo → puede **reemplazar por completo** la respuesta del modelo (Hallazgo 1).
+2. Resolución de fichas → decide adjuntos; no toca texto.
+3. Adjunto presente → borra frases contradictorias y recorta a 2 mensajes + línea de entrega.
+4. `pdfRequested` sin adjunto → quita la promesa de envío, conserva lo útil, no deriva.
+5. `claimsFileDelivery` → quita la promesa, conserva lo útil, no deriva.
+6. Validación de códigos contra `product_catalog` → borra la frase con el código inventado; si no queda nada verificable, sustituye por el texto fijo y deriva.
+
+## Qué propongo hacer (pendiente de tu aprobación)
+
+1. Dar estado a la rama determinística: enviar el bloque A–F **una sola vez**; si el cliente ya lo recibió, los turnos siguientes (letra, código, pregunta de precio) pasan al flujo normal con el bloque de precios inyectado.
+2. Reactivar el pipeline de fichas y los guardrails en los turnos posteriores al menú, hoy bloqueados por `!catalogDrivenReply`.
+3. Suavizar las reglas 952/987 del prompt: solo negar y derivar si el código realmente no está en el catálogo determinístico; si está, responder con sus datos y adjuntar.
+4. Añadir un log por turno con: respuesta original de la IA, respuesta final enviada y qué capa la modificó, para tener trazabilidad real de aquí en adelante.
+5. Desplegar explícito y registrar timestamp.
