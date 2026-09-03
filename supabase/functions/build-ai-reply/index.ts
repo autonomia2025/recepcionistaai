@@ -949,7 +949,8 @@ ${fullBookingUrl && workshop.booking_mode === 'with_scheduling' ? `LINK DE AGEND
 REGLA CRÍTICA ANTI-INVENCIÓN (PRIORIDAD MÁXIMA):
 - ESTÁ ESTRICTAMENTE PROHIBIDO inventar, suponer o "deducir" productos, categorías, marcas, modelos, precios, stocks, características técnicas o servicios que NO aparezcan literalmente en el bloque "DOCUMENTACIÓN DE REFERENCIA" o en "SERVICIOS DISPONIBLES".
 - NO digas frases como "tenemos varios modelos", "manejamos las principales marcas", "contamos con un amplio catálogo" si no hay datos concretos en el contexto. Eso es ALUCINAR.
-- Si el cliente pregunta por un producto/categoría/precio/marca específico y NO está en el contexto, responde EXACTAMENTE algo como: "No tengo esa información específica documentada en este momento, déjame conectarte con un ejecutivo que podrá ayudarte mejor 👤" y marca should_handoff=true e intent="humano".
+- Si el cliente pregunta por un código/modelo que SÍ aparece en "PRECIOS OFICIALES" o "CATÁLOGO OFICIAL — BLOQUE ...", RESPONDE con esos datos: está confirmado en catálogo, no derives ni digas que no lo tienes. La falta de ficha PDF NO es motivo para negar ni derivar: el sistema adjunta el archivo aparte cuando existe.
+- Solo si el producto/categoría/precio/marca NO está en esos bloques ni en la DOCUMENTACIÓN DE REFERENCIA responde: "No tengo esa información específica documentada en este momento, déjame conectarte con un ejecutivo que podrá ayudarte mejor 👤" y marca should_handoff=true e intent="humano".
 - Es 100x mejor decir "no tengo esa información, te derivo con un ejecutivo" que inventar un dato falso. La honestidad construye confianza, la invención destruye la marca.
 - Si el contexto SÍ tiene la información, úsala literalmente (no la "embellezcas" con datos extra que no aparecen).
 
@@ -984,7 +985,7 @@ REGLAS OPERATIVAS OBLIGATORIAS (tienen prioridad sobre cualquier instrucción an
 2. El menú de opciones solo se usa cuando el mensaje es un saludo genérico o el cliente no indica qué necesita.
 3. NUNCA pidas un código que el cliente ya entregó en este mensaje o en el historial reciente.
 4. NUNCA digas "escríbeme el código para enviarte la ficha" si el cliente ya especificó el producto.
-5. Si el producto/modelo NO aparece en la DOCUMENTACIÓN DE REFERENCIA: dilo explícitamente ("no lo tengo en mi documentación"), NO inventes datos, y deriva con un especialista (should_handoff: true). Nunca digas "tengo la información" si no está documentada.
+5. Antes de negar, revisa SIEMPRE los bloques "PRECIOS OFICIALES" y "CATÁLOGO OFICIAL — BLOQUE ...": si el código está ahí, responde con sus datos (specs y rango de precio) aunque no haya ficha PDF ni texto extra. Solo si el código NO aparece en esos bloques ni en la DOCUMENTACIÓN DE REFERENCIA dices "no lo tengo en mi documentación" y derivas (should_handoff: true). Nunca inventes datos.
 6. Si el cliente pide varias fichas o modelos en un mismo mensaje, respóndelos todos, no solo el primero.
 7. Nunca prometas enviar un archivo: el sistema adjunta los PDF automáticamente cuando existen.
 8. Si el cliente hace una pregunta puntual (presión, caudal, potencia, precio, horario, disponibilidad), RESPÓNDELA en texto con el dato documentado. El PDF es un complemento, nunca reemplaza la respuesta.
@@ -1229,6 +1230,10 @@ Criterios:${isChatbotOnly ? '' : `
       };
     }
 
+    // Snapshot of what the model actually produced, before any guardrail runs.
+    const originalReplies = [...(result.replies || [])];
+
+
     // Catalog-driven responses for the two flows where completeness matters.
     // This avoids asking the model to remember unseen rows from a large block.
     const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
@@ -1246,7 +1251,14 @@ Criterios:${isChatbotOnly ? '' : `
     // customer has not picked a model yet) and the invented-code guard is moot.
     let catalogDrivenReply = false;
 
-    if (conversationState.ambasAguas && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
+    // The dual-family block is a one-shot presentation. Once the customer has
+    // received it, every later turn (a letter, a code, a price question) must
+    // reach the normal pipeline instead of replaying the same menu forever.
+    const dualBlockAlreadySent = (messages || []).some((m: { direction: string; text: string }) =>
+      m.direction === 'outbound' && /\*agua caliente\*/i.test(m.text || '') && /agua fr[ií]a/i.test(m.text || '')
+    );
+
+    if (conversationState.ambasAguas && !dualBlockAlreadySent && hotWaterBlockRows.length > 0 && coldWaterBlockRows.length > 0) {
       const hot = selectRepresentativeRows(hotWaterBlockRows, 3);
       const cold = selectRepresentativeRows(coldWaterBlockRows, 3);
       const lines: string[] = [
@@ -1653,7 +1665,45 @@ Criterios:${isChatbotOnly ? '' : `
 
 
 
+    // ===== Permanent response trace =====
+    // Every turn records what the model produced and what the customer will
+    // actually receive, so any silent rewrite by a guardrail is auditable.
+    const finalReplies = [...(result.replies || [])];
+    const replyWasRewritten = JSON.stringify(originalReplies) !== JSON.stringify(finalReplies);
 
+    console.log('Response trace:', {
+      conversation_id,
+      catalogDrivenReply,
+      attachments: attachments.map(a => a.file_name),
+      rewritten: replyWasRewritten,
+      ai_original: originalReplies,
+      sent_to_customer: finalReplies,
+      reasoning: result.reasoning,
+    });
+
+    try {
+      await supabase.from('health_logs').insert({
+        workshop_id,
+        event_type: 'info',
+        category: 'bot',
+        message: replyWasRewritten
+          ? 'Respuesta de la IA modificada por post-procesamiento'
+          : 'Respuesta de la IA enviada sin modificaciones',
+        metadata: {
+          conversation_id,
+          inbound: message_text,
+          ai_original: originalReplies,
+          sent_to_customer: finalReplies,
+          rewritten: replyWasRewritten,
+          catalog_driven: catalogDrivenReply,
+          attachments: attachments.map(a => a.file_name),
+          should_handoff: result.should_handoff,
+          reasoning: result.reasoning,
+        },
+      });
+    } catch (traceErr) {
+      console.error('Failed to persist response trace:', traceErr);
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -1664,6 +1714,7 @@ Criterios:${isChatbotOnly ? '' : `
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
 
   } catch (error: unknown) {
     console.error('Build AI reply error:', error);
