@@ -1229,6 +1229,10 @@ Criterios:${isChatbotOnly ? '' : `
       };
     }
 
+    // Snapshot of what the model actually produced, before any guardrail runs.
+    const originalReplies = [...(result.replies || [])];
+
+
     // Catalog-driven responses for the two flows where completeness matters.
     // This avoids asking the model to remember unseen rows from a large block.
     const normalizedCurrent = removeAccents((message_text || '').toLowerCase());
