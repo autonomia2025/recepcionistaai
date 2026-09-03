@@ -246,10 +246,12 @@ function buildConversationState(
       state.ambasAguas = false;
     }
 
+    // Every attribute persists once stated: the state is never reset between turns.
     if (/diesel|petroleo/.test(plain)) state.motor = 'motor diésel';
     else if (/bencina|gasolina/.test(plain)) state.motor = 'motor a bencina';
-    else if (/\b380\b/.test(plain)) state.motor = 'eléctrica 380V trifásica';
-    else if (/\b220\b/.test(plain)) state.motor = 'eléctrica 220V monofásica';
+    else if (/trifasic|\b380\s?v?\b/.test(plain)) state.motor = 'eléctrica 380V trifásica';
+    else if (/monofasic|\b220\s?v?\b/.test(plain)) state.motor = 'eléctrica 220V monofásica';
+
 
     for (const u of USE_CASES) if (plain.includes(u)) state.uso = u;
 
@@ -1195,29 +1197,63 @@ Criterios:${isChatbotOnly ? '' : `
       throw new Error('Empty AI response');
     }
 
-    // Parse AI response
+    // Parse AI response. Models occasionally emit a trailing brace, code fences
+    // or wrapping prose, so we scan for the first balanced JSON object instead of
+    // trusting the raw string.
+    function extractBalancedJson(raw: string): string | null {
+      const start = raw.indexOf('{');
+      if (start === -1) return null;
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let i = start; i < raw.length; i++) {
+        const ch = raw[i];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === '\\') escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') inString = true;
+        else if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) return raw.slice(start, i + 1);
+        }
+      }
+      return null;
+    }
+
     let result: AIReplyResult;
+    let parseFallbackUsed = false;
     try {
       let jsonContent = aiContent.trim();
       if (jsonContent.startsWith('```')) {
         jsonContent = jsonContent.replace(/```json?\n?/g, '').replace(/```\n?$/g, '').trim();
       }
-      // Some responses wrap the JSON in prose; keep only the JSON object.
-      if (!jsonContent.startsWith('{')) {
-        const first = jsonContent.indexOf('{');
-        const last = jsonContent.lastIndexOf('}');
-        if (first !== -1 && last > first) jsonContent = jsonContent.slice(first, last + 1);
+      const balanced = extractBalancedJson(jsonContent);
+      if (balanced) jsonContent = balanced;
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(jsonContent);
+      } catch {
+        // Last resort: pull the replies array out by regex.
+        const repliesRaw = jsonContent.match(/"replies"\s*:\s*(\[[\s\S]*?\])\s*(?:,\s*"|\})/);
+        if (!repliesRaw) throw new Error('Unparseable AI JSON');
+        parsed = { replies: JSON.parse(repliesRaw[1]) };
       }
-      const parsed = JSON.parse(jsonContent);
+
       if (parsed.reply && !parsed.replies) {
         parsed.replies = [parsed.reply];
       }
       if (!Array.isArray(parsed.replies) || parsed.replies.length === 0) {
         throw new Error('Missing replies array');
       }
-      result = parsed;
+      result = parsed as unknown as AIReplyResult;
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiContent);
+      parseFallbackUsed = true;
       // Prefer the model's own prose over a generic handoff message.
       const prose = compactText(String(aiContent || '').replace(/```[a-z]*|```/g, '')).trim();
       const usableProse = prose && !prose.startsWith('{') && prose.length > 8 ? prose.slice(0, 900) : null;
@@ -1232,6 +1268,7 @@ Criterios:${isChatbotOnly ? '' : `
 
     // Snapshot of what the model actually produced, before any guardrail runs.
     const originalReplies = [...(result.replies || [])];
+
 
 
     // Catalog-driven responses for the two flows where completeness matters.
@@ -1684,23 +1721,31 @@ Criterios:${isChatbotOnly ? '' : `
     try {
       await supabase.from('health_logs').insert({
         workshop_id,
-        event_type: 'info',
+        event_type: parseFallbackUsed ? 'error' : 'info',
         category: 'bot',
-        message: replyWasRewritten
-          ? 'Respuesta de la IA modificada por post-procesamiento'
-          : 'Respuesta de la IA enviada sin modificaciones',
+        message: parseFallbackUsed
+          ? 'parse_fallback: no se pudo parsear el JSON de la IA, se envió respuesta de respaldo'
+          : replyWasRewritten
+            ? 'Respuesta de la IA modificada por post-procesamiento'
+            : 'Respuesta de la IA enviada sin modificaciones',
         metadata: {
           conversation_id,
           inbound: message_text,
+          layer: parseFallbackUsed ? 'parse_fallback' : (replyWasRewritten ? 'post_processing' : 'none'),
+          parse_fallback: parseFallbackUsed,
+          ai_raw: parseFallbackUsed ? String(aiContent || '').slice(0, 4000) : undefined,
           ai_original: originalReplies,
           sent_to_customer: finalReplies,
           rewritten: replyWasRewritten,
           catalog_driven: catalogDrivenReply,
+          catalog_block_rows: catalogBlockRows.length,
+          conversation_state: conversationState,
           attachments: attachments.map(a => a.file_name),
           should_handoff: result.should_handoff,
           reasoning: result.reasoning,
         },
       });
+
     } catch (traceErr) {
       console.error('Failed to persist response trace:', traceErr);
     }
