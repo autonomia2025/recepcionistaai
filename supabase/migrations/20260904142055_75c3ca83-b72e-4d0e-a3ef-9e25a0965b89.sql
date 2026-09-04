@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS bot_state jsonb NOT NULL DEFAULT '{}'::jsonb;

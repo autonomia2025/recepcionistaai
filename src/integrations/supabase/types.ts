@@ -836,6 +836,7 @@ export type Database = {
           ai_summary: string | null
           assigned_to_user_id: string | null
           bot_paused: boolean | null
+          bot_state: Json
           contact_id: string
           created_at: string
           id: string
@@ -849,6 +850,7 @@ export type Database = {
           ai_summary?: string | null
           assigned_to_user_id?: string | null
           bot_paused?: boolean | null
+          bot_state?: Json
           contact_id: string
           created_at?: string
           id?: string
@@ -862,6 +864,7 @@ export type Database = {
           ai_summary?: string | null
           assigned_to_user_id?: string | null
           bot_paused?: boolean | null
+          bot_state?: Json
           contact_id?: string
           created_at?: string
           id?: string
