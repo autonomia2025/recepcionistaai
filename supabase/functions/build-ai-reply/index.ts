@@ -840,7 +840,14 @@ serve(async (req) => {
       console.error('Error fetching messages:', messagesError);
     }
     const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
-    const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
+    // The lettered menu is not always the very last outbound message (the bot
+    // may have answered a follow-up question in between), so the most recent
+    // outbound message that actually carries options is used as the menu.
+    const outboundTexts = messages.filter(m => m.direction === 'outbound').map(m => m.text || '');
+    const lastBotMessageText =
+      [...outboundTexts].reverse().slice(0, 6).find(text => extractMenuOptions(text).length >= 2)
+      || outboundTexts.slice(-1)[0]
+      || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
 
     // ===== RAG: query built from the PERSISTED conversation state =====
