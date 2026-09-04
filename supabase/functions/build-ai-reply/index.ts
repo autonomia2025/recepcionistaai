@@ -1575,17 +1575,15 @@ Criterios:${isChatbotOnly ? '' : `
           pdfRequestRe.test(lowerCurrent) ||
           (shortConfirmRe.test((message_text || '').trim()) && botOfferedFile);
 
-        // Direct SKU queries should attach immediately. For follow-up requests,
-        // recover product context newest-first from the conversation.
-        const replyText = (result.replies || []).join('\n');
-        const replyClaimsDelivery = DELIVERY_CLAIM_RE.test(removeAccents(replyText)) && !DELIVERY_INVITATION_RE.test(removeAccents(replyText));
-        const replyCodes = replyClaimsDelivery ? extractProductCodes(replyText) : [];
+        // Attachments are triggered ONLY by the customer: a code written by them,
+        // a menu option they selected, or an explicit request for the datasheet.
+        // The bot's own reply is never a source of codes — an invitation such as
+        // "¿te dejo la ficha de alguna?" used to attach every listed model.
         const currentCodes = [
           ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
           ...extractProductCodes(message_text),
-          ...replyCodes,
         ].filter((code, index, all) => all.findIndex(other => normalizeProductCode(other) === normalizeProductCode(code)) === index);
-        const shouldResolve = currentCodes.length > 0 || pdfRequested || replyClaimsDelivery;
+        const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
           // Codes recovered from history must not multiply the attachments, so
