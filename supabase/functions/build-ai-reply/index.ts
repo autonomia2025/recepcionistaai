@@ -785,9 +785,10 @@ serve(async (req) => {
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('workshop_id, contact_id, assigned_to_user_id')
+      .select('workshop_id, contact_id, assigned_to_user_id, bot_state')
       .eq('id', conversation_id)
       .maybeSingle();
+
 
     if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
