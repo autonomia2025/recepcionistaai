@@ -1654,15 +1654,34 @@ Criterios:${isChatbotOnly ? '' : `
     }
 
 
-    const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
+    // Never narrate storage file names ("041_MH130-10M-I.pdf"): resolve the
+    // commercial SKU from the deterministic catalog and fall back to the file
+    // name stripped of its numeric prefix and extension.
+    let datasheetNames: string[] = [];
+    if (attachments.length > 0) {
+      const { data: catalogSkus } = await supabase
+        .from('product_catalog')
+        .select('sku, datasheet_file')
+        .eq('workshop_id', workshop_id)
+        .in('datasheet_file', attachments.map(a => a.file_name));
 
-    // The PDF is a COMPLEMENT, never a replacement: the customer's actual
-    // question (pressure, price, availability…) must still be answered in text
-    // and the attachment confirmation is appended as an extra message.
+      const skuByFile = new Map<string, string>(
+        ((catalogSkus || []) as Array<{ sku: string; datasheet_file: string }>)
+          .map(row => [row.datasheet_file, row.sku]),
+      );
+
+      datasheetNames = attachments.map(a =>
+        `*${skuByFile.get(a.file_name) || a.file_name.replace(/\.pdf$/i, '').replace(/^\d+[_-]/, '')}*`
+      );
+    }
+
+    // The PDF is a COMPLEMENT, never a replacement: the recommendation with
+    // lettered options must stay intact and the delivery confirmation goes as a
+    // separate extra message.
     if (attachments.length > 0) {
       const deliveryLine = attachments.length === 1
-        ? `Te adjunto además la ficha técnica ${datasheetNames[0]} en PDF. 📄`
-        : `Te adjunto además ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`;
+        ? `Te adjunto además la ficha técnica de la ${datasheetNames[0]} en PDF. 📄`
+        : `Te adjunto además las fichas técnicas de ${datasheetNames.join(' y ')} en PDF. 📄`;
 
       // Drop only the sentences that contradict the delivery (asking again for
       // a code, or claiming the datasheet does not exist).
@@ -1673,7 +1692,7 @@ Criterios:${isChatbotOnly ? '' : `
         .filter(reply => !contradictionRe.test(removeAccents(reply)));
 
       result.replies = keptReplies.length > 0
-        ? [...keptReplies.slice(0, 2), deliveryLine]
+        ? [...keptReplies, deliveryLine]
         : [deliveryLine];
       result.should_handoff = false;
       result.intent = 'consulta';
