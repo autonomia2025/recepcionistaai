@@ -1605,10 +1605,10 @@ Criterios:${isChatbotOnly ? '' : `
             }
           }
 
-          // A single message can legitimately ask for several models, so every
-          // requested code is resolved instead of only the first one.
+          // Several datasheets only when the customer named several models in
+          // their own message. Otherwise the budget is a single document.
           const resolution = codes.length > 0
-            ? await resolvePdfDatasheets(supabase, workshop_id, codes, 3)
+            ? await resolvePdfDatasheets(supabase, workshop_id, codes, Math.min(codes.length, 3))
             : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
 
           resolvedDatasheets = resolution.documents;
