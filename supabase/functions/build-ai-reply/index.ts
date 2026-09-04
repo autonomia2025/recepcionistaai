@@ -222,7 +222,18 @@ const USE_CASES = [
   'packing', 'corrales', 'piso industrial', 'pisos industriales', 'camiones', 'camion',
   'maquinaria', 'bodega', 'bodegas', 'agricola', 'lecheria', 'planta', 'faenadora',
   'minera', 'mineria', 'construccion', 'autos', 'lavado de autos', 'establo', 'galpon',
+  'sala de ordena', 'ordena',
 ];
+
+// Customer input is allowed into persistent state only when it has the real SOC
+// model shape: letters + digits and at least one slash or hyphen. This prevents
+// ordinary quantities such as "120 vacas" from becoming fake product codes.
+function extractSocProductCodes(text: string): string[] {
+  const candidates = removeAccents(text || '').toUpperCase().match(
+    /\b[A-Z]{2,10}[A-Z0-9]*\d[A-Z0-9]*(?:[\/-][A-Z0-9]+)+\b/g,
+  ) || [];
+  return [...new Set(candidates)];
+}
 
 function resolveMenuLetter(text: string, lastBotText: string): string {
   const trimmed = normalizeMenuPick(text);
@@ -277,7 +288,7 @@ function buildConversationState(
     const resolved = resolveMenuLetter(m.text || '', lastBot);
     const plain = removeAccents(resolved.toLowerCase());
 
-    const HOT_USE_RE = /grasa|grasas|engrasad|aceite|aceites|desengras|hollin|motor(es)?\s+sucios?|cocina|alimento|sanitiz/;
+    const HOT_USE_RE = /grasa|grasas|engrasad|aceite|aceites|desengras|hollin|motor(es)?\s+sucios?|cocina|alimento|sanitiz|ordena|lech(e|eria)|vacas?/;
     const COLD_USE_RE = /barro|lodo|polvo|tierra|fachada|vereda|patio|auto(s|movil)?\b|camion|maquinaria\s+agricola/;
 
     if (/las dos cosas|ambas aguas|agua fria y (agua )?caliente|agua caliente y (agua )?fria|grasa.{0,30}barro|barro.{0,30}grasa/.test(plain)) {
@@ -318,7 +329,7 @@ function buildConversationState(
     const specs = resolved.match(/\b\d{2,4}\s?(bar|psi|l\/min|lpm|hp|kw)\b/gi);
     if (specs) for (const s of specs) if (!state.specs.includes(s)) state.specs.push(s);
 
-    for (const c of extractProductCodes(resolved)) if (!state.codes.includes(c)) state.codes.push(c);
+    for (const c of extractSocProductCodes(resolved)) if (!state.codes.includes(c)) state.codes.push(c);
   }
 
   return state;
@@ -357,13 +368,20 @@ const DELIVERY_INVITATION_RE = /(te\s+parece\s+si|quieres\s+que\s+te|te\s+gustar
 // Split a reply into sentences so a single offending clause can be removed
 // without discarding the rest of the recommendation.
 function stripDeliveryClaims(reply: string): string {
-  const sentences = (reply || '').split(/(?<=[.!?🙌📄👍])\s+|\n+/);
-  const kept = sentences.filter(sentence => {
-    const plain = removeAccents(sentence);
-    if (!DELIVERY_CLAIM_RE.test(plain)) return true;
-    return DELIVERY_INVITATION_RE.test(plain);
-  });
-  return compactText(kept.join(' '));
+  // Keep separators as tokens. Removing one sentence must never reconstruct or
+  // compact the complete answer, because that destroys lettered WhatsApp lists.
+  const parts = (reply || '').split(/(\n+|(?<=[.!?🙌📄👍])\s+)/);
+  const cleaned = parts.map(part => {
+    if (/^(\n+|\s+)$/.test(part)) return part;
+    const plain = removeAccents(part);
+    if (!DELIVERY_CLAIM_RE.test(plain)) return part;
+    return DELIVERY_INVITATION_RE.test(plain) ? part : '';
+  }).join('');
+
+  return cleaned
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function extractSelectedMenuProductCode(messageText: string, lastBotText: string): string | null {
@@ -904,7 +922,7 @@ serve(async (req) => {
       if (catalogSkus.size > 0) {
         const requestedCodes = [
           ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
-          ...extractProductCodes(message_text),
+          ...extractSocProductCodes(message_text),
           ...conversationState.codes.slice(-3),
         ];
         const priceRows: CatalogRow[] = await fetchCatalogBySkus(supabase, workshop_id, requestedCodes);
