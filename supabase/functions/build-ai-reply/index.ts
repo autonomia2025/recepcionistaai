@@ -222,6 +222,36 @@ function resolveMenuLetter(text: string, lastBotText: string): string {
   return line ? `${text} ${line}` : (text || '');
 }
 
+// Persisted state: what the customer already defined is stored on the
+// conversation row, so it survives no matter how short the message window is.
+function sanitizeStoredState(raw: unknown): ConversationState {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const asStrArray = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-10) : [];
+  return {
+    agua: typeof s.agua === 'string' ? s.agua : null,
+    ambasAguas: s.ambasAguas === true,
+    motor: typeof s.motor === 'string' ? s.motor : null,
+    uso: typeof s.uso === 'string' ? s.uso : null,
+    specs: asStrArray(s.specs),
+    codes: asStrArray(s.codes),
+  };
+}
+
+// New information always wins; missing information never erases what was stored.
+function mergeConversationState(stored: ConversationState, fresh: ConversationState): ConversationState {
+  const merged: ConversationState = {
+    agua: fresh.ambasAguas ? null : (fresh.agua ?? stored.agua),
+    ambasAguas: fresh.ambasAguas || (fresh.agua ? false : stored.ambasAguas),
+    motor: fresh.motor ?? stored.motor,
+    uso: fresh.uso ?? stored.uso,
+    specs: [...new Set([...stored.specs, ...fresh.specs])].slice(-10),
+    codes: [...new Set([...stored.codes, ...fresh.codes])].slice(-10),
+  };
+  if (merged.ambasAguas) merged.agua = null;
+  return merged;
+}
+
 function buildConversationState(
   history: Array<{ text: string | null; direction: string }>,
   currentText: string
@@ -229,6 +259,7 @@ function buildConversationState(
   const state: ConversationState = { agua: null, ambasAguas: false, motor: null, uso: null, specs: [], codes: [] };
   const seq = [...history, { text: currentText, direction: 'inbound' }];
   let lastBot = '';
+
 
   for (const m of seq) {
     if (m.direction !== 'inbound') { lastBot = m.text || ''; continue; }
