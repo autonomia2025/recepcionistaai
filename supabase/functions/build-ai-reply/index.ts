@@ -913,8 +913,11 @@ serve(async (req) => {
           if (catalogBlockRows.length > 0) {
             catalogBlockText =
               `CATÁLOGO OFICIAL — BLOQUE ${waterType} + ${motorType} (${catalogBlockRows.length} equipos; incluye TODOS).\n` +
+              `El diagnóstico YA está completo: ${waterType} + ${motorType}. NO vuelvas a preguntar qué van a lavar, ni el tipo de agua, ni la motorización.\n` +
+              `OBLIGATORIO en esta respuesta: recomienda 2-3 equipos de esta lista con su precio. Si el cliente pide más modelos, entrega TODOS los restantes.\n` +
               `Para este cliente ofrece ÚNICAMENTE códigos de esta lista, con estos precios exactos:\n` +
               `${catalogBlockRows.map(formatCatalogLine).join('\n')}\n\n`;
+
           }
         }
         console.log('Catalog layer:', {
