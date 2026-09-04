@@ -266,6 +266,9 @@ function buildConversationState(
     const resolved = resolveMenuLetter(m.text || '', lastBot);
     const plain = removeAccents(resolved.toLowerCase());
 
+    const HOT_USE_RE = /grasa|grasas|engrasad|aceite|aceites|desengras|hollin|motor(es)?\s+sucios?|cocina|alimento|sanitiz/;
+    const COLD_USE_RE = /barro|lodo|polvo|tierra|fachada|vereda|patio|auto(s|movil)?\b|camion|maquinaria\s+agricola/;
+
     if (/las dos cosas|ambas aguas|agua fria y (agua )?caliente|agua caliente y (agua )?fria|grasa.{0,30}barro|barro.{0,30}grasa/.test(plain)) {
       state.ambasAguas = true;
       state.agua = null;
@@ -275,7 +278,22 @@ function buildConversationState(
     } else if (/agua\s+fria|\bfria\b/.test(plain)) {
       state.agua = 'agua fría';
       state.ambasAguas = false;
+    } else {
+      // Inference from the stated use: grease implies hot water, mud/dust implies cold.
+      const hot = HOT_USE_RE.test(plain);
+      const cold = COLD_USE_RE.test(plain);
+      if (hot && cold) {
+        state.ambasAguas = true;
+        state.agua = null;
+      } else if (hot) {
+        state.agua = 'agua caliente';
+        state.ambasAguas = false;
+      } else if (cold) {
+        state.agua = 'agua fría';
+        state.ambasAguas = false;
+      }
     }
+
 
     // Every attribute persists once stated: the state is never reset between turns.
     if (/diesel|petroleo/.test(plain)) state.motor = 'motor diésel';
