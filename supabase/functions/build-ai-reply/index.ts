@@ -256,7 +256,9 @@ function sanitizeStoredState(raw: unknown): ConversationState {
     motor: typeof s.motor === 'string' ? s.motor : null,
     uso: typeof s.uso === 'string' ? s.uso : null,
     specs: asStrArray(s.specs),
-    codes: asStrArray(s.codes),
+    // Also cleans state written by older deployments (for example
+    // "tenemos120" and "120vacas") before it can affect catalog retrieval.
+    codes: asStrArray(s.codes).flatMap(extractSocProductCodes),
   };
 }
 
@@ -1620,7 +1622,7 @@ Criterios:${isChatbotOnly ? '' : `
         // "¿te dejo la ficha de alguna?" used to attach every listed model.
         const currentCodes = [
           ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
-          ...extractProductCodes(message_text),
+          ...extractSocProductCodes(message_text),
         ].filter((code, index, all) => all.findIndex(other => normalizeProductCode(other) === normalizeProductCode(code)) === index);
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
@@ -1792,10 +1794,14 @@ Criterios:${isChatbotOnly ? '' : `
 
         const sanitized = (result.replies || [])
           .map(reply => {
-            const sentences = reply.split(/(?<=[.!?🙌📄👍])\s+|\n+/);
-            return compactText(
-              sentences.filter(s => findInventedCodes(s, catalogSkus).length === 0).join(' ')
-            );
+            const parts = reply.split(/(\n+|(?<=[.!?🙌📄👍])\s+)/);
+            return parts.map(part => {
+              if (/^(\n+|\s+)$/.test(part)) return part;
+              return findInventedCodes(part, catalogSkus).length === 0 ? part : '';
+            }).join('')
+              .replace(/[ \t]+\n/g, '\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
           })
           .filter(reply => reply.length > 0);
 
