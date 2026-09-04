@@ -373,7 +373,10 @@ function extractSelectedMenuProductCode(messageText: string, lastBotText: string
     new RegExp(`(?:^|\\n|\\s)\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+([\\s\\S]*?)(?=(?:\\n|\\s)\\*?[A-Za-z0-9]\\*?\\s*[).:.\\-]\\s+|$)`, 'i')
   )?.[1];
   if (!selectedOption) return null;
-  return extractProductCodes(selectedOption)[0] || null;
+  // Keep only the SKU part of the option line: the specs that follow ("— 120 bar
+  // · 11 L/min") merge into bogus codes such as "PWSB120/11M120".
+  const skuPart = selectedOption.split(/[—–\n]|\s-\s/)[0];
+  return extractProductCodes(skuPart)[0] || extractProductCodes(selectedOption)[0] || null;
 }
 
 function selectRepresentativeRows(rows: CatalogRow[], count = 3): CatalogRow[] {
