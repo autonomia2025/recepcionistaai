@@ -1,41 +1,46 @@
-# Traza real de la conversación con José Luis (3-sep, 17:36–17:38 hora Chile)
+# Por qué el bot perdió consistencia con José Luis (3-sep, 22:33–22:41 UTC)
 
-## Turno por turno (health_logs, categoría `bot`, conversación `c1d1e84f…`)
+## Lo que muestra la traza, turno por turno
 
-| Hora UTC | Entrante | IA original | Enviado | Reescritura | should_handoff |
-|---|---|---|---|---|---|
-| 21:36:11 | "necesito una hidrolavadora monofasica" | Saludo + preguntas de diagnóstico | idéntico | no | false |
-| 21:37:17 | "en lugares distintos" | Carro de transporte + pregunta grasa/barro | idéntico | no | false |
-| 21:37:53 | "agua fria" | **"Gracias por tu mensaje. Un asesor te contactará pronto."** | idéntico | no | **true** |
+| Entrante | Estado acumulado | Bloque catálogo | Qué pasó |
+|---|---|---|---|
+| "hidrolavadora monofasica" | motor: 220V | 0 filas | OK, pregunta de diagnóstico |
+| "mover" | motor: 220V | 0 filas | Recomienda 3 equipos reales + 3 PDFs |
+| "valores" | **motor: null** | 0 filas | Precios OK, pero **re-adjunta las mismas 3 fichas** |
+| "debo sacra grasa" | **todo null** | 0 filas | IA inventa PWP100/10AC220 y PWP150/11AC220 → guardrail los borra y **deriva**, dejando "tengo estas opciones que incluyen caldera:" sin ninguna opción |
+| "si envia fichas" | **todo null** | 0 filas | IA inventa PW-C23P 1207, Polo Baby 120/10, Polo Compac 150/15 → **el guardrail no los detecta**, se envían al cliente y **no llega ninguna ficha** |
 
-Respuestas a tus tres preguntas del último turno:
+Ninguno de esos tres nombres existe en `product_catalog`. En cambio sí existen 7 equipos reales de AGUA CALIENTE + ELÉCTRICA 220V, que era exactamente la respuesta correcta.
 
-1. **No hubo reemplazo por post-procesamiento.** `rewritten: false`, `catalog_driven: false`, `attachments: []`. La traza registra ese texto ya como `ai_original`, porque la traza se toma después del parseo.
-2. **La IA no marcó handoff.** El modelo sí generó la recomendación correcta (SOC200/15AFBC y SOC250/15AFBA, `should_handoff: false`, confidence 0.98). Se perdió al parsear.
-3. **No le llegó el bloque de catálogo.** Log de la función: `Catalog layer: { skus: 162, priceRows: [], block: null, blockRows: 0 }`. El bloque AGUA FRÍA + ELÉCTRICA 220V con sus 10 equipos **no** se construyó; el modelo respondió solo con RAG (4 fragmentos semánticos + 6 keyword).
+## Las 4 causas
 
-## Dónde está el string
+1. **El estado se pierde por la ventana de historial.** `buildConversationState` sí acumula, pero solo recibe los últimos 10 mensajes (`index.ts:787`). Como el bot manda 3-4 mensajes por turno, el primer mensaje del cliente ("monofasica") salió de la ventana al tercer turno y `motor` volvió a `null`.
+2. **El tipo de agua nunca se registró.** Solo se leen mensajes `inbound`. El cliente dijo "debo sacar grasa" (que implica agua caliente) y fue el bot quien concluyó agua caliente; el estado no lee las conclusiones del bot ni mapea "grasa" → agua caliente. Sin agua + motor, `catalogBlockRows` quedó en 0 en los 5 turnos: **el modelo nunca vio el catálogo determinístico** y respondió de memoria → inventó.
+3. **El validador de códigos no reconoce nombres con espacios.** `findInventedCodes` detecta patrones tipo `PWP100/10AC220`, pero no "Polo Baby 120/10" ni "PW-C23P 1207", así que pasaron sin filtro.
+4. **El guardrail deja texto huérfano.** Al borrar la frase con los códigos quedó "Para 220V tengo estas opciones que incluyen caldera:" seguida de la derivación: incoherente. Y en el turno de "valores" se re-adjuntaron fichas ya enviadas.
 
-`supabase/functions/build-ai-reply/index.ts:1225`, dentro del `catch (parseError)` del bloque 1198–1231. Condición exacta que lo dispara: `JSON.parse` del contenido de la IA falla (o falta `replies`) **y** el texto crudo empieza con `{`, por lo que `usableProse` queda nulo y se usa el genérico con `should_handoff: true`.
+## Plan de arreglo
 
-Por qué falló el parseo esta vez: la IA devolvió un JSON válido **con una llave `}` de más al final**. El extractor actual solo recorta prosa cuando el texto **no** empieza con `{`; aquí empezaba con `{`, así que pasó tal cual a `JSON.parse` y reventó.
+### 1. Estado que no se pierde (causa 1)
+- Subir la ventana de historial a los últimos 40 mensajes, o mejor: traer los últimos 20 **inbound** más los últimos 10 mensajes en orden, para que el diagnóstico inicial nunca se caiga de la ventana.
+- Persistir el estado resuelto en la conversación (columna JSON en `conversations`) y usarlo como base, fusionando lo nuevo de cada turno.
 
-## Plan de arreglo (2 fallas independientes)
+### 2. Inferir agua desde el uso y desde las conclusiones del bot (causa 2)
+- Mapear señales de uso a familia de agua: grasa/aceite/motor → agua caliente; barro/polvo/tierra/fachada → agua fría; ambos → ambas familias.
+- Leer también los mensajes `outbound` para capturar confirmaciones del propio bot ("necesitas agua caliente"), sin sobrescribir lo que el cliente dijo explícitamente.
+- Log explícito del bloque resuelto y su conteo en cada turno.
 
-### Falla A — parseo frágil (causa directa del mensaje genérico)
-En `build-ai-reply/index.ts`, reemplazar el parseo por un extractor robusto:
-- Recortar siempre desde el primer `{` hasta la **última llave que balancea** el objeto (escaneo de llaves respetando strings y escapes), en lugar de asumir que empieza bien formado.
-- Reintento: si el primer intento falla, probar recortes progresivos y, como último recurso, extraer `replies` por regex.
-- Solo si todo falla, usar el fallback — y en ese caso registrarlo en `health_logs` con `layer: 'parse_fallback'` y el crudo, para que sea visible en la traza (hoy aparece como si fuera la respuesta de la IA).
-- Registrar en la traza el `ai_raw` cuando hubo fallback, para no confundir de nuevo el origen.
+### 3. Validación de códigos más amplia (causa 3)
+- Extender `findInventedCodes` para detectar también nombres de modelo con espacios y guiones (patrón: palabra + número/número) y validarlos contra `product_catalog` por SKU y por nombre normalizado.
+- Si el modelo nombra un equipo no verificable, reemplazarlo por equipos reales del bloque en vez de solo borrarlo.
 
-### Falla B — el bloque de catálogo no se construyó
-El estado acumulado detectó `agua: "agua fría"`, pero `motor` quedó `null` pese a que el cliente dijo "monofásica" en el primer mensaje y "lugares distintos" en el tercero. Sin motorización no se resuelve el bloque (`block: null`), así que el modelo no recibió los 10 equipos.
-- Ampliar la extracción de motorización en `buildConversationState` para reconocer monofásica/220V/trifásica/380V/bencina/diésel a lo largo de **todo** el historial, no solo del mensaje actual.
-- Cuando agua + motor estén definidos, resolver el bloque del catálogo determinístico e inyectarlo en el contexto con todos sus equipos (la recomendación inicial sigue limitada a 2–3 en el prompt).
-- Log explícito del bloque resuelto y su conteo, para verificación.
+### 4. Respuesta coherente al sanear (causa 4)
+- Si al eliminar códigos queda una frase introductoria sin lista ("tengo estas opciones:"), eliminar también esa frase.
+- Cuando hay bloque de catálogo disponible, sustituir los códigos inventados por 2-3 equipos reales del bloque en vez de derivar.
+- No re-adjuntar fichas ya enviadas en la conversación: llevar registro de PDFs entregados.
 
 ## Validación antes de cerrar
-1. Replay del flujo de José Luis: monofásica → lugares distintos → agua fría debe entregar equipos del bloque agua fría + 220V, con `block` no nulo y `blockRows = 10` en logs.
-2. Test de parseo con JSON con llave extra, con fences y con prosa envolvente: los tres deben producir la respuesta real de la IA, nunca el genérico.
-3. Confirmar timestamp de despliegue.
+1. Replay del flujo de José Luis: al decir "debo sacar grasa" el estado debe quedar agua caliente + 220V, `catalog_block_rows: 7`, y la respuesta debe listar equipos reales.
+2. "si envía fichas" debe entregar PDFs reales de esos equipos, sin códigos inventados.
+3. Un turno con 15+ mensajes previos debe conservar la motorización del primer mensaje.
+4. Verificar que no se repiten adjuntos ya enviados y confirmar timestamp de despliegue.
