@@ -222,6 +222,36 @@ function resolveMenuLetter(text: string, lastBotText: string): string {
   return line ? `${text} ${line}` : (text || '');
 }
 
+// Persisted state: what the customer already defined is stored on the
+// conversation row, so it survives no matter how short the message window is.
+function sanitizeStoredState(raw: unknown): ConversationState {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const asStrArray = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-10) : [];
+  return {
+    agua: typeof s.agua === 'string' ? s.agua : null,
+    ambasAguas: s.ambasAguas === true,
+    motor: typeof s.motor === 'string' ? s.motor : null,
+    uso: typeof s.uso === 'string' ? s.uso : null,
+    specs: asStrArray(s.specs),
+    codes: asStrArray(s.codes),
+  };
+}
+
+// New information always wins; missing information never erases what was stored.
+function mergeConversationState(stored: ConversationState, fresh: ConversationState): ConversationState {
+  const merged: ConversationState = {
+    agua: fresh.ambasAguas ? null : (fresh.agua ?? stored.agua),
+    ambasAguas: fresh.ambasAguas || (fresh.agua ? false : stored.ambasAguas),
+    motor: fresh.motor ?? stored.motor,
+    uso: fresh.uso ?? stored.uso,
+    specs: [...new Set([...stored.specs, ...fresh.specs])].slice(-10),
+    codes: [...new Set([...stored.codes, ...fresh.codes])].slice(-10),
+  };
+  if (merged.ambasAguas) merged.agua = null;
+  return merged;
+}
+
 function buildConversationState(
   history: Array<{ text: string | null; direction: string }>,
   currentText: string
@@ -229,6 +259,7 @@ function buildConversationState(
   const state: ConversationState = { agua: null, ambasAguas: false, motor: null, uso: null, specs: [], codes: [] };
   const seq = [...history, { text: currentText, direction: 'inbound' }];
   let lastBot = '';
+
 
   for (const m of seq) {
     if (m.direction !== 'inbound') { lastBot = m.text || ''; continue; }
@@ -754,9 +785,10 @@ serve(async (req) => {
     // Validate conversation belongs to workshop if it exists
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('workshop_id, contact_id, assigned_to_user_id')
+      .select('workshop_id, contact_id, assigned_to_user_id, bot_state')
       .eq('id', conversation_id)
       .maybeSingle();
+
 
     if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
@@ -793,10 +825,29 @@ serve(async (req) => {
     const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
 
-    // ===== RAG: query built from accumulated conversation state =====
-    const conversationState = buildConversationState(messages, message_text);
+    // ===== RAG: query built from the PERSISTED conversation state =====
+    // The state lives on conversations.bot_state: it is read from there, merged
+    // with whatever this turn adds, and written back. It no longer depends on
+    // rebuilding everything from a truncated message window.
+    const storedState = sanitizeStoredState((conversation as any)?.bot_state);
+    const freshState = buildConversationState(messages, message_text);
+    const conversationState = mergeConversationState(storedState, freshState);
+    const stateChanged = JSON.stringify(storedState) !== JSON.stringify(conversationState);
+    if (stateChanged) {
+      const { error: stateError } = await supabase
+        .from('conversations')
+        .update({ bot_state: conversationState })
+        .eq('id', conversation_id);
+      if (stateError) console.error('Failed to persist bot_state:', stateError);
+    }
     const retrievalQuery = buildRetrievalQuery(conversationState, message_text);
-    console.log('Conversation state:', conversationState, '→ retrieval query:', retrievalQuery);
+    console.log('Conversation state:', {
+      stored: storedState,
+      fresh: freshState,
+      merged: conversationState,
+      persisted: stateChanged,
+    }, '→ retrieval query:', retrievalQuery);
+
 
     // ===== Deterministic catalog (single source of truth for prices) =====
     // Prices NEVER come from semantic retrieval: they are read straight from
