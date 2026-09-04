@@ -341,7 +341,7 @@ function buildRetrievalQuery(state: ConversationState, currentText: string): str
 const DELIVERY_CLAIM_RE = /(te\s+(la\s+|lo\s+|los\s+|las\s+)?(adjunto|envio|env[ií]o|mando|dejo|comparto|paso)\b|aqui\s+(va|te\s+va|tienes)\s+(la|el|tu)\s+(ficha|pdf|archivo|documento)|adjunto\s+(la|el|las|los)\s+(ficha|pdf|archivo|documento)|(ficha|pdf|archivo|documento)\s+adjunt[oa]|ya\s+te\s+(la|lo)\s+(envie|mande|adjunte)|procede\s+a\s+enviar)/i;
 
 // Invitations / conditional offers: not a delivery claim.
-const DELIVERY_INVITATION_RE = /(copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
+const DELIVERY_INVITATION_RE = /(te\s+parece\s+si|quieres\s+que\s+te|te\s+gustaria\s+que|si\s+quieres\s+te|copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
 
 // Split a reply into sentences so a single offending clause can be removed
 // without discarding the rest of the recommendation.
@@ -1709,7 +1709,7 @@ Criterios:${isChatbotOnly ? '' : `
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      result.replies = kept.slice(0, 2);
+      result.replies = kept;
       result.should_handoff = false;
       result.reasoning = datasheetAmbiguous
         ? 'No se adjuntó una ficha porque el código era ambiguo; se conservó íntegramente la información útil.'
@@ -1734,7 +1734,7 @@ Criterios:${isChatbotOnly ? '' : `
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      result.replies = kept.slice(0, 2);
+      result.replies = kept;
       result.should_handoff = false;
       result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
