@@ -825,10 +825,29 @@ serve(async (req) => {
     const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
 
-    // ===== RAG: query built from accumulated conversation state =====
-    const conversationState = buildConversationState(messages, message_text);
+    // ===== RAG: query built from the PERSISTED conversation state =====
+    // The state lives on conversations.bot_state: it is read from there, merged
+    // with whatever this turn adds, and written back. It no longer depends on
+    // rebuilding everything from a truncated message window.
+    const storedState = sanitizeStoredState((conversation as any)?.bot_state);
+    const freshState = buildConversationState(messages, message_text);
+    const conversationState = mergeConversationState(storedState, freshState);
+    const stateChanged = JSON.stringify(storedState) !== JSON.stringify(conversationState);
+    if (stateChanged) {
+      const { error: stateError } = await supabase
+        .from('conversations')
+        .update({ bot_state: conversationState })
+        .eq('id', conversation_id);
+      if (stateError) console.error('Failed to persist bot_state:', stateError);
+    }
     const retrievalQuery = buildRetrievalQuery(conversationState, message_text);
-    console.log('Conversation state:', conversationState, '→ retrieval query:', retrievalQuery);
+    console.log('Conversation state:', {
+      stored: storedState,
+      fresh: freshState,
+      merged: conversationState,
+      persisted: stateChanged,
+    }, '→ retrieval query:', retrievalQuery);
+
 
     // ===== Deterministic catalog (single source of truth for prices) =====
     // Prices NEVER come from semantic retrieval: they are read straight from
