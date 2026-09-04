@@ -174,6 +174,19 @@ function compactText(str: string): string {
 // code or a datasheet follow-up. Detecting it early keeps the whole PDF
 // pipeline (SKU extraction, history recovery, delivery guardrails) out of the
 // way so the model can simply interpret the chosen option.
+// Customers rarely answer with a bare letter: "la B", "opción b", "el numero 2"
+// all select an option of the lettered menu.
+const MENU_PICK_PREFIX_RE = /^(?:(?:me\s+)?(?:quedo\s+con|llevo|elijo|prefiero|quiero|dame|mandame|enviame)\s+)?(?:la|el|las|los)?\s*(?:opcion|alternativa|numero|letra)?\s*/;
+
+function normalizeMenuPick(messageText: string): string | null {
+  const plain = removeAccents((messageText || '').trim().toLowerCase())
+    .replace(/[.,!\u00a1?\u00bf)]+$/g, '')
+    .replace(/\s+(porfa|por favor|please|gracias)$/g, '')
+    .trim();
+  const stripped = plain.replace(MENU_PICK_PREFIX_RE, '').trim().toUpperCase();
+  return /^[A-Z0-9]$/.test(stripped) ? stripped : null;
+}
+
 function extractMenuOptions(botText: string): string[] {
   const options = new Set<string>();
   const optionRe = /(?:^|\n|\s)\*?([A-Za-z0-9])\*?\s*[).:.-]\s+(?=\*?[A-Za-z0-9])/g;
@@ -184,10 +197,8 @@ function extractMenuOptions(botText: string): string[] {
 }
 
 function isMenuSelection(messageText: string, lastBotText: string): boolean {
-  const trimmed = removeAccents((messageText || '').trim())
-    .replace(/[\s.,!¡?¿)]+$/g, '')
-    .toUpperCase();
-  if (!/^[A-Z0-9]$/.test(trimmed)) return false;
+  const trimmed = normalizeMenuPick(messageText);
+  if (!trimmed) return false;
 
   const options = extractMenuOptions(lastBotText);
   if (options.length < 1) return false;
@@ -214,8 +225,8 @@ const USE_CASES = [
 ];
 
 function resolveMenuLetter(text: string, lastBotText: string): string {
-  const trimmed = removeAccents((text || '').trim()).replace(/[\s.,!¡?¿)]+$/g, '').toUpperCase();
-  if (!/^[A-Z0-9]$/.test(trimmed)) return text || '';
+  const trimmed = normalizeMenuPick(text);
+  if (!trimmed) return text || '';
   const line = (lastBotText || '')
     .split('\n')
     .find(l => new RegExp(`^\\s*\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+\\S`, 'i').test(removeAccents(l)));
@@ -356,13 +367,16 @@ function stripDeliveryClaims(reply: string): string {
 }
 
 function extractSelectedMenuProductCode(messageText: string, lastBotText: string): string | null {
-  const trimmed = removeAccents((messageText || '').trim()).replace(/[\s.,!¡?¿)]+$/g, '').toUpperCase();
-  if (!/^[A-Z0-9]$/.test(trimmed)) return null;
+  const trimmed = normalizeMenuPick(messageText);
+  if (!trimmed) return null;
   const selectedOption = removeAccents(lastBotText || '').match(
     new RegExp(`(?:^|\\n|\\s)\\*?${trimmed}\\*?\\s*[).:.\\-]\\s+([\\s\\S]*?)(?=(?:\\n|\\s)\\*?[A-Za-z0-9]\\*?\\s*[).:.\\-]\\s+|$)`, 'i')
   )?.[1];
   if (!selectedOption) return null;
-  return extractProductCodes(selectedOption)[0] || null;
+  // Keep only the SKU part of the option line: the specs that follow ("— 120 bar
+  // · 11 L/min") merge into bogus codes such as "PWSB120/11M120".
+  const skuPart = selectedOption.split(/[—–\n]|\s-\s/)[0];
+  return extractProductCodes(skuPart)[0] || extractProductCodes(selectedOption)[0] || null;
 }
 
 function selectRepresentativeRows(rows: CatalogRow[], count = 3): CatalogRow[] {
@@ -840,7 +854,14 @@ serve(async (req) => {
       console.error('Error fetching messages:', messagesError);
     }
     const messages = ((messageRows || []) as Array<{ text: string; direction: string; created_at: string }>).reverse();
-    const lastBotMessageText = messages.filter(m => m.direction === 'outbound').slice(-1)[0]?.text || '';
+    // The lettered menu is not always the very last outbound message (the bot
+    // may have answered a follow-up question in between), so the most recent
+    // outbound message that actually carries options is used as the menu.
+    const outboundTexts = messages.filter(m => m.direction === 'outbound').map(m => m.text || '');
+    const lastBotMessageText =
+      [...outboundTexts].reverse().slice(0, 6).find(text => extractMenuOptions(text).length >= 2)
+      || outboundTexts.slice(-1)[0]
+      || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
 
     // ===== RAG: query built from the PERSISTED conversation state =====
