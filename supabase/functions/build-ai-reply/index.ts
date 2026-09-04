@@ -341,7 +341,7 @@ function buildRetrievalQuery(state: ConversationState, currentText: string): str
 const DELIVERY_CLAIM_RE = /(te\s+(la\s+|lo\s+|los\s+|las\s+)?(adjunto|envio|env[ií]o|mando|dejo|comparto|paso)\b|aqui\s+(va|te\s+va|tienes)\s+(la|el|tu)\s+(ficha|pdf|archivo|documento)|adjunto\s+(la|el|las|los)\s+(ficha|pdf|archivo|documento)|(ficha|pdf|archivo|documento)\s+adjunt[oa]|ya\s+te\s+(la|lo)\s+(envie|mande|adjunte)|procede\s+a\s+enviar)/i;
 
 // Invitations / conditional offers: not a delivery claim.
-const DELIVERY_INVITATION_RE = /(copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
+const DELIVERY_INVITATION_RE = /(te\s+parece\s+si|quieres\s+que\s+te|te\s+gustaria\s+que|si\s+quieres\s+te|copia\s+y\s+pega|escribeme|escribe\s+el|env[ií]ame\s+el|ind[ií]came\s+el|si\s+(la|lo)\s+(necesitas|quieres|requieres)|puedes\s+pedir|pidemela|te\s+llega|te\s+la\s+hago\s+llegar|con\s+gusto\s+te\s+la)/i;
 
 // Split a reply into sentences so a single offending clause can be removed
 // without discarding the rest of the recommendation.
@@ -1575,17 +1575,15 @@ Criterios:${isChatbotOnly ? '' : `
           pdfRequestRe.test(lowerCurrent) ||
           (shortConfirmRe.test((message_text || '').trim()) && botOfferedFile);
 
-        // Direct SKU queries should attach immediately. For follow-up requests,
-        // recover product context newest-first from the conversation.
-        const replyText = (result.replies || []).join('\n');
-        const replyClaimsDelivery = DELIVERY_CLAIM_RE.test(removeAccents(replyText)) && !DELIVERY_INVITATION_RE.test(removeAccents(replyText));
-        const replyCodes = replyClaimsDelivery ? extractProductCodes(replyText) : [];
+        // Attachments are triggered ONLY by the customer: a code written by them,
+        // a menu option they selected, or an explicit request for the datasheet.
+        // The bot's own reply is never a source of codes — an invitation such as
+        // "¿te dejo la ficha de alguna?" used to attach every listed model.
         const currentCodes = [
           ...(selectedMenuProductCode ? [selectedMenuProductCode] : []),
           ...extractProductCodes(message_text),
-          ...replyCodes,
         ].filter((code, index, all) => all.findIndex(other => normalizeProductCode(other) === normalizeProductCode(code)) === index);
-        const shouldResolve = currentCodes.length > 0 || pdfRequested || replyClaimsDelivery;
+        const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
           // Codes recovered from history must not multiply the attachments, so
@@ -1607,10 +1605,10 @@ Criterios:${isChatbotOnly ? '' : `
             }
           }
 
-          // A single message can legitimately ask for several models, so every
-          // requested code is resolved instead of only the first one.
+          // Several datasheets only when the customer named several models in
+          // their own message. Otherwise the budget is a single document.
           const resolution = codes.length > 0
-            ? await resolvePdfDatasheets(supabase, workshop_id, codes, 3)
+            ? await resolvePdfDatasheets(supabase, workshop_id, codes, Math.min(codes.length, 3))
             : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
 
           resolvedDatasheets = resolution.documents;
@@ -1656,15 +1654,34 @@ Criterios:${isChatbotOnly ? '' : `
     }
 
 
-    const datasheetNames = attachments.map(a => `*${a.file_name.replace(/\.pdf$/i, '')}*`);
+    // Never narrate storage file names ("041_MH130-10M-I.pdf"): resolve the
+    // commercial SKU from the deterministic catalog and fall back to the file
+    // name stripped of its numeric prefix and extension.
+    let datasheetNames: string[] = [];
+    if (attachments.length > 0) {
+      const { data: catalogSkus } = await supabase
+        .from('product_catalog')
+        .select('sku, datasheet_file')
+        .eq('workshop_id', workshop_id)
+        .in('datasheet_file', attachments.map(a => a.file_name));
 
-    // The PDF is a COMPLEMENT, never a replacement: the customer's actual
-    // question (pressure, price, availability…) must still be answered in text
-    // and the attachment confirmation is appended as an extra message.
+      const skuByFile = new Map<string, string>(
+        ((catalogSkus || []) as Array<{ sku: string; datasheet_file: string }>)
+          .map(row => [row.datasheet_file, row.sku]),
+      );
+
+      datasheetNames = attachments.map(a =>
+        `*${skuByFile.get(a.file_name) || a.file_name.replace(/\.pdf$/i, '').replace(/^\d+[_-]/, '')}*`
+      );
+    }
+
+    // The PDF is a COMPLEMENT, never a replacement: the recommendation with
+    // lettered options must stay intact and the delivery confirmation goes as a
+    // separate extra message.
     if (attachments.length > 0) {
       const deliveryLine = attachments.length === 1
-        ? `Te adjunto además la ficha técnica ${datasheetNames[0]} en PDF. 📄`
-        : `Te adjunto además ${attachments.length} fichas técnicas en PDF: ${datasheetNames.join(', ')}. 📄`;
+        ? `Te adjunto además la ficha técnica de la ${datasheetNames[0]} en PDF. 📄`
+        : `Te adjunto además las fichas técnicas de ${datasheetNames.join(' y ')} en PDF. 📄`;
 
       // Drop only the sentences that contradict the delivery (asking again for
       // a code, or claiming the datasheet does not exist).
@@ -1675,7 +1692,7 @@ Criterios:${isChatbotOnly ? '' : `
         .filter(reply => !contradictionRe.test(removeAccents(reply)));
 
       result.replies = keptReplies.length > 0
-        ? [...keptReplies.slice(0, 2), deliveryLine]
+        ? [...keptReplies, deliveryLine]
         : [deliveryLine];
       result.should_handoff = false;
       result.intent = 'consulta';
@@ -1692,7 +1709,7 @@ Criterios:${isChatbotOnly ? '' : `
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      result.replies = kept.slice(0, 2);
+      result.replies = kept;
       result.should_handoff = false;
       result.reasoning = datasheetAmbiguous
         ? 'No se adjuntó una ficha porque el código era ambiguo; se conservó íntegramente la información útil.'
@@ -1717,7 +1734,7 @@ Criterios:${isChatbotOnly ? '' : `
         .map(stripDeliveryClaims)
         .filter(reply => compactText(reply).length > 0);
 
-      result.replies = kept.slice(0, 2);
+      result.replies = kept;
       result.should_handoff = false;
       result.reasoning = 'Se removió la promesa de envío (no había adjunto preparado) conservando la recomendación de la IA.';
     }
