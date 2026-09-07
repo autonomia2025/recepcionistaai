@@ -235,6 +235,12 @@ function extractSocProductCodes(text: string): string[] {
   return [...new Set(candidates)];
 }
 
+function isPluralDatasheetRequest(text: string): boolean {
+  const plain = removeAccents((text || '').toLowerCase());
+  return /\b(fichas|pdfs|archivos|adjuntos|documentos|catalogos|folletos|brochures|especificaciones|hojas tecnicas)\b/.test(plain) ||
+    /\b(enviame|mandame|pasame|comparte|envia|manda)\s+(las|los|esas|esos|todas|todos)\b/.test(plain);
+}
+
 function resolveMenuLetter(text: string, lastBotText: string): string {
   const trimmed = normalizeMenuPick(text);
   if (!trimmed) return text || '';
@@ -1627,30 +1633,35 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
-          // Codes recovered from history must not multiply the attachments, so
-          // they are resolved separately with a single-document budget while the
-          // current message keeps the full multi-attachment budget.
+          // A plural request ("las fichas", "envíamelas") refers to the last
+          // option list. Recover only real SOC-shaped SKUs from that list; never
+          // treat specs such as "100 bar" or "7 L/min" as product codes.
           const historyDerivedCodes: string[] = [];
+          const pluralPdfRequest = isPluralDatasheetRequest(message_text);
           if (pdfRequested && currentCodes.length === 0) {
             for (const historyMessage of [...historyRows].reverse()) {
-              const historyCodes = extractProductCodes(historyMessage.text);
-              // Long enumerations of alternatives are ambiguous context, but a
-              // message carrying a couple of codes still identifies the product.
-              if (historyCodes.length === 0 || historyCodes.length > 3) continue;
-              for (const code of historyCodes) {
+              const historyCodes = extractSocProductCodes(historyMessage.text);
+              if (historyCodes.length === 0) continue;
+
+              // Singular requests may recover one unambiguous model only. If the
+              // nearest relevant message is a list, do not choose one arbitrarily.
+              if (!pluralPdfRequest && historyCodes.length !== 1) break;
+
+              for (const code of historyCodes.slice(0, pluralPdfRequest ? 3 : 1)) {
                 if (!historyDerivedCodes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
                   historyDerivedCodes.push(code);
                 }
               }
-              if (historyDerivedCodes.length >= 6) break;
+              break;
             }
           }
 
-          // Several datasheets only when the customer named several models in
-          // their own message. Otherwise the budget is a single document.
+          // Several datasheets are allowed when the customer named several models
+          // or explicitly requested the fichas (plural) for the last shown list.
+          const historyBudget = pluralPdfRequest ? Math.min(historyDerivedCodes.length, 3) : 1;
           const resolution = codes.length > 0
             ? await resolvePdfDatasheets(supabase, workshop_id, codes, Math.min(codes.length, 3))
-            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
+            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, historyBudget);
 
           resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
@@ -1659,8 +1670,12 @@ Criterios:${isChatbotOnly ? '' : `
             codes,
             historyDerivedCodes,
             resolved: resolvedDatasheets.map(doc => doc.file_name),
+            unresolvedCodes: (codes.length > 0 ? codes : historyDerivedCodes).filter(code =>
+              !resolvedDatasheets.some(doc => normalizeProductCode(doc.file_name).includes(normalizeProductCode(code)))
+            ),
             ambiguous: datasheetAmbiguous,
             pdfRequested,
+            pluralPdfRequest,
           });
 
         }
