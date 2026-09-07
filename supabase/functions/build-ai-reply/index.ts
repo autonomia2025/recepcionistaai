@@ -235,6 +235,12 @@ function extractSocProductCodes(text: string): string[] {
   return [...new Set(candidates)];
 }
 
+function isPluralDatasheetRequest(text: string): boolean {
+  const plain = removeAccents((text || '').toLowerCase());
+  return /\b(fichas|pdfs|archivos|adjuntos|documentos|catalogos|folletos|brochures|especificaciones|hojas tecnicas)\b/.test(plain) ||
+    /\b(enviame|mandame|pasame|comparte|envia|manda)\s+(las|los|esas|esos|todas|todos)\b/.test(plain);
+}
+
 function resolveMenuLetter(text: string, lastBotText: string): string {
   const trimmed = normalizeMenuPick(text);
   if (!trimmed) return text || '';
@@ -879,7 +885,7 @@ serve(async (req) => {
     // outbound message that actually carries options is used as the menu.
     const outboundTexts = messages.filter(m => m.direction === 'outbound').map(m => m.text || '');
     const lastBotMessageText =
-      [...outboundTexts].reverse().slice(0, 6).find(text => extractMenuOptions(text).length >= 2)
+      [...outboundTexts].reverse().find(text => extractMenuOptions(text).length >= 2)
       || outboundTexts.slice(-1)[0]
       || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
@@ -1627,30 +1633,37 @@ Criterios:${isChatbotOnly ? '' : `
         const shouldResolve = currentCodes.length > 0 || pdfRequested;
         if (shouldResolve) {
           const codes = [...currentCodes];
-          // Codes recovered from history must not multiply the attachments, so
-          // they are resolved separately with a single-document budget while the
-          // current message keeps the full multi-attachment budget.
+          // A plural request ("las fichas", "envíamelas") refers to the last
+          // option list. Recover only real SOC-shaped SKUs from that list; never
+          // treat specs such as "100 bar" or "7 L/min" as product codes.
           const historyDerivedCodes: string[] = [];
+          const pluralPdfRequest = isPluralDatasheetRequest(message_text);
           if (pdfRequested && currentCodes.length === 0) {
-            for (const historyMessage of [...historyRows].reverse()) {
-              const historyCodes = extractProductCodes(historyMessage.text);
-              // Long enumerations of alternatives are ambiguous context, but a
-              // message carrying a couple of codes still identifies the product.
-              if (historyCodes.length === 0 || historyCodes.length > 3) continue;
-              for (const code of historyCodes) {
-                if (!historyDerivedCodes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
-                  historyDerivedCodes.push(code);
-                }
-              }
-              if (historyDerivedCodes.length >= 6) break;
+            const recentCodeGroups = [...historyRows].reverse()
+              .map(historyMessage => extractSocProductCodes(historyMessage.text))
+              .filter(historyCodes => historyCodes.length > 0);
+
+            if (pluralPdfRequest) {
+              // Replies can be split into several WhatsApp messages. Prefer the
+              // nearest message containing the complete A/B/C or price list,
+              // rather than stopping at a trailing sentence that names only two.
+              const completeGroup = recentCodeGroups.find(historyCodes => historyCodes.length >= 3);
+              const sourceCodes = completeGroup || recentCodeGroups[0] || [];
+              historyDerivedCodes.push(...sourceCodes.slice(0, 3));
+            } else {
+              // A singular request can recover one unambiguous model only. If the
+              // nearest relevant message is a list, do not choose one arbitrarily.
+              const nearestCodes = recentCodeGroups[0] || [];
+              if (nearestCodes.length === 1) historyDerivedCodes.push(nearestCodes[0]);
             }
           }
 
-          // Several datasheets only when the customer named several models in
-          // their own message. Otherwise the budget is a single document.
+          // Several datasheets are allowed when the customer named several models
+          // or explicitly requested the fichas (plural) for the last shown list.
+          const historyBudget = pluralPdfRequest ? Math.min(historyDerivedCodes.length, 3) : 1;
           const resolution = codes.length > 0
             ? await resolvePdfDatasheets(supabase, workshop_id, codes, Math.min(codes.length, 3))
-            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, 1);
+            : await resolvePdfDatasheets(supabase, workshop_id, historyDerivedCodes, historyBudget);
 
           resolvedDatasheets = resolution.documents;
           datasheetAmbiguous = resolution.ambiguous;
@@ -1659,8 +1672,12 @@ Criterios:${isChatbotOnly ? '' : `
             codes,
             historyDerivedCodes,
             resolved: resolvedDatasheets.map(doc => doc.file_name),
+            unresolvedCodes: (codes.length > 0 ? codes : historyDerivedCodes).filter(code =>
+              !resolvedDatasheets.some(doc => normalizeProductCode(doc.file_name).includes(normalizeProductCode(code)))
+            ),
             ambiguous: datasheetAmbiguous,
             pdfRequested,
+            pluralPdfRequest,
           });
 
         }
