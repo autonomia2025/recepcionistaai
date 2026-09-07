@@ -1639,20 +1639,22 @@ Criterios:${isChatbotOnly ? '' : `
           const historyDerivedCodes: string[] = [];
           const pluralPdfRequest = isPluralDatasheetRequest(message_text);
           if (pdfRequested && currentCodes.length === 0) {
-            for (const historyMessage of [...historyRows].reverse()) {
-              const historyCodes = extractSocProductCodes(historyMessage.text);
-              if (historyCodes.length === 0) continue;
+            const recentCodeGroups = [...historyRows].reverse()
+              .map(historyMessage => extractSocProductCodes(historyMessage.text))
+              .filter(historyCodes => historyCodes.length > 0);
 
-              // Singular requests may recover one unambiguous model only. If the
+            if (pluralPdfRequest) {
+              // Replies can be split into several WhatsApp messages. Prefer the
+              // nearest message containing the complete A/B/C or price list,
+              // rather than stopping at a trailing sentence that names only two.
+              const completeGroup = recentCodeGroups.find(historyCodes => historyCodes.length >= 3);
+              const sourceCodes = completeGroup || recentCodeGroups[0] || [];
+              historyDerivedCodes.push(...sourceCodes.slice(0, 3));
+            } else {
+              // A singular request can recover one unambiguous model only. If the
               // nearest relevant message is a list, do not choose one arbitrarily.
-              if (!pluralPdfRequest && historyCodes.length !== 1) break;
-
-              for (const code of historyCodes.slice(0, pluralPdfRequest ? 3 : 1)) {
-                if (!historyDerivedCodes.some(existing => normalizeProductCode(existing) === normalizeProductCode(code))) {
-                  historyDerivedCodes.push(code);
-                }
-              }
-              break;
+              const nearestCodes = recentCodeGroups[0] || [];
+              if (nearestCodes.length === 1) historyDerivedCodes.push(nearestCodes[0]);
             }
           }
 
