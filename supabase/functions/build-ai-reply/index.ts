@@ -885,7 +885,7 @@ serve(async (req) => {
     // outbound message that actually carries options is used as the menu.
     const outboundTexts = messages.filter(m => m.direction === 'outbound').map(m => m.text || '');
     const lastBotMessageText =
-      [...outboundTexts].reverse().slice(0, 6).find(text => extractMenuOptions(text).length >= 2)
+      [...outboundTexts].reverse().find(text => extractMenuOptions(text).length >= 2)
       || outboundTexts.slice(-1)[0]
       || '';
     const selectedMenuProductCode = extractSelectedMenuProductCode(message_text, lastBotMessageText);
