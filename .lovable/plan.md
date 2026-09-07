@@ -1,47 +1,48 @@
-# Corregir la conversación de JT y recuperar el formato ordenado
+# Corregir definitivamente el envío de fichas de José Luis
 
 ## Diagnóstico confirmado
 
-En la conversación real de JT (13:36–13:37):
+En la conversación real de José Luis del **7-sep-2026, 14:50–14:59 UTC** ocurrió esto:
 
-- La IA generó correctamente tres opciones reales, cada una en su propia línea: A, B y C.
-- No hubo error de la IA ni derivación: `should_handoff` quedó en `false`.
-- Una capa posterior eliminó la pregunta “¿Te mando la ficha de alguna...?” porque la confundió con una promesa de envío.
-- Al hacer esa limpieza, `stripDeliveryClaims` usó una compactación que reemplazó todos los saltos de línea por espacios. Por eso WhatsApp recibió A/B/C pegadas dentro de un párrafo, aunque la respuesta original estaba ordenada.
-- El estado persistido también quedó contaminado: interpretó “tenemos 120 vacas” como los códigos `tenemos120` y `120vacas`; además no guardó el uso “sala de ordeña” ni la inferencia de agua caliente. Por eso `catalog_block_rows` fue 0, aunque la IA alcanzó a recomendar modelos reales.
+- El bot ofreció tres equipos reales: `PWP100/7M`, `NEWEN100/12EF-AR` y `PWPC130/10M`.
+- José Luis respondió **“los precios y fichas”**, una solicitud explícita de las tres fichas.
+- El sistema detectó la intención de pedir fichas, pero terminó con `attachments: []` y registró: **“No se pudo preparar el adjunto”**.
+- Los tres PDF sí existen, están procesados y tienen archivo disponible. La configuración de envío de fichas también está activa.
+- Por lo tanto, el problema no está en los archivos ni en Kapso: se corta **antes del envío**, al intentar recuperar los modelos desde el mensaje anterior.
 
-## Cambios
+### Causa exacta
 
-1. **Conservar el formato al limpiar una frase**
-   - Quitar únicamente la frase que promete un adjunto inexistente.
-   - Mantener exactamente los saltos de línea, letras, negritas y separación entre introducción, lista A/B/C y cierre.
-   - No volver a pasar la respuesta completa por una compactación que aplaste el formato.
+La recuperación revisa el mensaje anterior con un extractor demasiado amplio. Además de los tres códigos, interpreta medidas del texto como posibles códigos —por ejemplo `100 bar` o `7 L/min`—. Como obtiene más de tres candidatos, descarta **todo el mensaje** por considerarlo ambiguo. Así pierde justamente `PWP100/7M`, `NEWEN100/12EF-AR` y `PWPC130/10M`, aunque estaban claramente presentados como opciones.
 
-2. **Distinguir una pregunta de una entrega real**
-   - Tratar “¿Te mando la ficha de alguna?”, “¿Quieres que te envíe...?” y equivalentes como invitaciones, no como afirmaciones de que el archivo ya fue enviado.
-   - Mantener la regla central: ningún PDF sale hasta que el cliente elija o lo pida.
+Además, la regla actual limita a una sola ficha cuando el cliente no vuelve a escribir cada código. Esto no representa correctamente una petición plural como **“los precios y fichas”** referida a las tres opciones recién mostradas.
 
-3. **Evitar códigos falsos en frases normales**
-   - Impedir que cantidades seguidas de palabras comunes —por ejemplo “120 vacas”— entren al estado como modelos.
-   - Conservar la detección de códigos reales del catálogo y de códigos con barras o guiones.
+## Corrección
 
-4. **Persistir correctamente el caso de uso**
-   - Reconocer “sala de ordeña”, “ordeña” y contexto lechero como uso.
-   - Inferir agua caliente cuando el uso implica grasa/proteína/residuos orgánicos, manteniendo 220V monofásica.
-   - Así el bloque determinístico debe contener los 7 equipos reales de agua caliente + 220V, en vez de depender de que la IA los encuentre por casualidad.
+1. **Recuperar únicamente códigos SOC válidos del historial**
+   - Usar el extractor estricto que exige el formato real de producto con letras, números y `/` o `-`.
+   - No considerar presión, caudal, voltaje ni cantidades como códigos.
 
-## Validación
+2. **Vincular la petición con la lista mostrada**
+   - Cuando el cliente diga “las fichas”, “fichas de esas”, “envíamelas” o equivalente plural, tomar los códigos de la última lista de opciones enviada por el bot.
+   - Mantener el orden A/B/C de esa lista.
 
-1. Repetir la conversación de JT turno por turno con historial real.
-2. Confirmar estado: uso de sala de ordeña, agua caliente y 220V monofásica; sin `tenemos120` ni `120vacas` como códigos.
-3. Confirmar `catalog_block_rows: 7` al llegar al turno de las 120 vacas.
-4. Confirmar que WhatsApp recibe una lista visualmente ordenada:
+3. **Aplicar correctamente singular y plural**
+   - “La ficha”, una selección como “la B” o un código concreto: enviar solo ese PDF.
+   - “Las fichas” después de una lista: enviar los PDF de las opciones mostradas, con el límite de seguridad existente de tres archivos.
+   - Una petición ambigua sin lista ni código: no adivinar modelos.
 
-```text
-A) MODELO...
-B) MODELO...
-C) MODELO...
-```
+4. **Trazabilidad del resultado**
+   - Registrar códigos recuperados, archivos resueltos y, si alguno falla, la razón concreta por cada código.
+   - Mantener intacta la respuesta útil y añadir la confirmación de entrega en un mensaje separado.
 
-5. Confirmar que en ese turno salen 0 PDFs y que al responder con una letra sale únicamente la ficha correspondiente.
-6. Desplegar la función y reportar el timestamp UTC.
+## Validación y despliegue
+
+1. Reproducir el flujo exacto de José Luis: agua fría + 220V → lista A/B/C → “los precios y fichas”.
+2. Confirmar que se preparan exactamente los tres PDF existentes:
+   - `PWP100/7M`
+   - `NEWEN100/12EF-AR`
+   - `PWPC130/10M`
+3. Validar “la B” → solo `NEWEN100/12EF-AR`.
+4. Validar “la ficha” sin selección clara → no enviar un archivo arbitrario.
+5. Confirmar que la lista y los precios conservan sus saltos de línea y que los adjuntos son mensajes separados.
+6. Desplegar `build-ai-reply`, ejecutar las pruebas sobre la versión desplegada y reportar resultados con timestamp UTC.
