@@ -713,6 +713,118 @@ export type Database = {
           },
         ]
       }
+      commercial_settings: {
+        Row: {
+          address: string | null
+          business_closes_at: string
+          business_days: number[]
+          business_opens_at: string
+          created_at: string
+          default_delivery_terms: string
+          default_payment_terms: string
+          discount_approval_threshold: number
+          email: string | null
+          legal_footer: string
+          legal_name: string | null
+          logo_path: string | null
+          lost_reasons: string[]
+          next_quote_number: number
+          phones: string[]
+          primary_color: string
+          quote_number_includes_year: boolean
+          quote_number_padding: number
+          quote_prefix: string
+          quote_validity_days: number
+          secondary_color: string
+          tax_id: string | null
+          timezone: string
+          unquoted_lead_alert_hours: number
+          updated_at: string
+          vat_rate: number
+          workshop_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_closes_at?: string
+          business_days?: number[]
+          business_opens_at?: string
+          created_at?: string
+          default_delivery_terms?: string
+          default_payment_terms?: string
+          discount_approval_threshold?: number
+          email?: string | null
+          legal_footer?: string
+          legal_name?: string | null
+          logo_path?: string | null
+          lost_reasons?: string[]
+          next_quote_number?: number
+          phones?: string[]
+          primary_color?: string
+          quote_number_includes_year?: boolean
+          quote_number_padding?: number
+          quote_prefix?: string
+          quote_validity_days?: number
+          secondary_color?: string
+          tax_id?: string | null
+          timezone?: string
+          unquoted_lead_alert_hours?: number
+          updated_at?: string
+          vat_rate?: number
+          workshop_id: string
+        }
+        Update: {
+          address?: string | null
+          business_closes_at?: string
+          business_days?: number[]
+          business_opens_at?: string
+          created_at?: string
+          default_delivery_terms?: string
+          default_payment_terms?: string
+          discount_approval_threshold?: number
+          email?: string | null
+          legal_footer?: string
+          legal_name?: string | null
+          logo_path?: string | null
+          lost_reasons?: string[]
+          next_quote_number?: number
+          phones?: string[]
+          primary_color?: string
+          quote_number_includes_year?: boolean
+          quote_number_padding?: number
+          quote_prefix?: string
+          quote_validity_days?: number
+          secondary_color?: string
+          tax_id?: string | null
+          timezone?: string
+          unquoted_lead_alert_hours?: number
+          updated_at?: string
+          vat_rate?: number
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           archived: boolean | null
@@ -2208,6 +2320,61 @@ export type Database = {
           },
         ]
       }
+      sales_playbook_docs: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_requests: {
         Row: {
           address: string | null
@@ -2706,159 +2873,6 @@ export type Database = {
           },
         ]
       }
-      commercial_settings: {
-        Row: {
-          address: string | null
-          business_closes_at: string
-          business_days: number[]
-          business_opens_at: string
-          created_at: string
-          default_delivery_terms: string
-          default_payment_terms: string
-          discount_approval_threshold: number
-          email: string | null
-          legal_footer: string
-          legal_name: string | null
-          logo_path: string | null
-          lost_reasons: string[]
-          next_quote_number: number
-          phones: string[]
-          primary_color: string
-          quote_number_includes_year: boolean
-          quote_number_padding: number
-          quote_prefix: string
-          quote_validity_days: number
-          secondary_color: string
-          tax_id: string | null
-          timezone: string
-          unquoted_lead_alert_hours: number
-          updated_at: string
-          vat_rate: number
-          workshop_id: string
-        }
-        Insert: {
-          address?: string | null
-          business_closes_at?: string
-          business_days?: number[]
-          business_opens_at?: string
-          created_at?: string
-          default_delivery_terms?: string
-          default_payment_terms?: string
-          discount_approval_threshold?: number
-          email?: string | null
-          legal_footer?: string
-          legal_name?: string | null
-          logo_path?: string | null
-          lost_reasons?: string[]
-          next_quote_number?: number
-          phones?: string[]
-          primary_color?: string
-          quote_number_includes_year?: boolean
-          quote_number_padding?: number
-          quote_prefix?: string
-          quote_validity_days?: number
-          secondary_color?: string
-          tax_id?: string | null
-          timezone?: string
-          unquoted_lead_alert_hours?: number
-          updated_at?: string
-          vat_rate?: number
-          workshop_id: string
-        }
-        Update: {
-          address?: string | null
-          business_closes_at?: string
-          business_days?: number[]
-          business_opens_at?: string
-          created_at?: string
-          default_delivery_terms?: string
-          default_payment_terms?: string
-          discount_approval_threshold?: number
-          email?: string | null
-          legal_footer?: string
-          legal_name?: string | null
-          logo_path?: string | null
-          lost_reasons?: string[]
-          next_quote_number?: number
-          phones?: string[]
-          primary_color?: string
-          quote_number_includes_year?: boolean
-          quote_number_padding?: number
-          quote_prefix?: string
-          quote_validity_days?: number
-          secondary_color?: string
-          tax_id?: string | null
-          timezone?: string
-          unquoted_lead_alert_hours?: number
-          updated_at?: string
-          vat_rate?: number
-          workshop_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "commercial_settings_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: true
-            referencedRelation: "workshops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commercial_settings_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: true
-            referencedRelation: "workshops_safe"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sales_playbook_docs: {
-        Row: {
-          category: string
-          content: string
-          created_at: string
-          id: string
-          is_active: boolean
-          title: string
-          updated_at: string
-          workshop_id: string
-        }
-        Insert: {
-          category?: string
-          content?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          title: string
-          updated_at?: string
-          workshop_id: string
-        }
-        Update: {
-          category?: string
-          content?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          title?: string
-          updated_at?: string
-          workshop_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: false
-            referencedRelation: "workshops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: false
-            referencedRelation: "workshops_safe"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workshop_zones: {
         Row: {
           aliases: string[]
@@ -2904,7 +2918,21 @@ export type Database = {
             foreignKeyName: "workshop_zones_workshop_id_fkey"
             columns: ["workshop_id"]
             isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workshop_zones_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
             referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workshop_zones_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -2934,7 +2962,6 @@ export type Database = {
           gmail_connected: boolean | null
           gmail_connected_at: string | null
           gmail_email: string | null
-          gmail_refresh_token: string | null
           id: string
           instagram_access_token: string | null
           instagram_connected: boolean | null
@@ -2961,8 +2988,6 @@ export type Database = {
           whatsapp_phone_number_id: string | null
           whatsapp_provider: string
           whatsapp_verify_token: string | null
-          zone_detection_enabled: boolean
-          zone_notification_emails: Json | null
         }
         Insert: {
           address?: string | null
@@ -2988,7 +3013,6 @@ export type Database = {
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
-          gmail_refresh_token?: string | null
           id?: string
           instagram_access_token?: string | null
           instagram_connected?: boolean | null
@@ -3015,8 +3039,6 @@ export type Database = {
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string
           whatsapp_verify_token?: string | null
-          zone_detection_enabled?: boolean
-          zone_notification_emails?: Json | null
         }
         Update: {
           address?: string | null
@@ -3042,7 +3064,6 @@ export type Database = {
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
-          gmail_refresh_token?: string | null
           id?: string
           instagram_access_token?: string | null
           instagram_connected?: boolean | null
@@ -3069,8 +3090,6 @@ export type Database = {
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string
           whatsapp_verify_token?: string | null
-          zone_detection_enabled?: boolean
-          zone_notification_emails?: Json | null
         }
         Relationships: []
       }
@@ -3147,8 +3166,6 @@ export type Database = {
           whatsapp_connected_at: string | null
           whatsapp_phone_number_id: string | null
           whatsapp_provider: string | null
-          zone_detection_enabled: boolean | null
-          zone_notification_emails: Json | null
         }
         Insert: {
           address?: string | null
@@ -3197,8 +3214,6 @@ export type Database = {
           whatsapp_connected_at?: string | null
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string | null
-          zone_detection_enabled?: boolean | null
-          zone_notification_emails?: Json | null
         }
         Update: {
           address?: string | null
@@ -3247,14 +3262,51 @@ export type Database = {
           whatsapp_connected_at?: string | null
           whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string | null
-          zone_detection_enabled?: boolean | null
-          zone_notification_emails?: Json | null
         }
         Relationships: []
       }
     }
     Functions: {
       accept_invite: { Args: { invite_token: string }; Returns: Json }
+      apply_safe_column_grants: { Args: { _table: string }; Returns: string[] }
+      ensure_commercial_settings: {
+        Args: { _workshop_id: string }
+        Returns: {
+          address: string | null
+          business_closes_at: string
+          business_days: number[]
+          business_opens_at: string
+          created_at: string
+          default_delivery_terms: string
+          default_payment_terms: string
+          discount_approval_threshold: number
+          email: string | null
+          legal_footer: string
+          legal_name: string | null
+          logo_path: string | null
+          lost_reasons: string[]
+          next_quote_number: number
+          phones: string[]
+          primary_color: string
+          quote_number_includes_year: boolean
+          quote_number_padding: number
+          quote_prefix: string
+          quote_validity_days: number
+          secondary_color: string
+          tax_id: string | null
+          timezone: string
+          unquoted_lead_alert_hours: number
+          updated_at: string
+          vat_rate: number
+          workshop_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commercial_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_churn_risk: { Args: { p_workshop_id: string }; Returns: string }
       get_conversation_messages: {
         Args: { _conversation_id: string }
@@ -3317,18 +3369,7 @@ export type Database = {
         }[]
       }
       get_superadmin_kpis: { Args: never; Returns: Json }
-      ensure_commercial_settings: {
-        Args: { _workshop_id: string }
-        Returns: Database["public"]["Tables"]["commercial_settings"]["Row"]
-      }
       get_user_workshop_id: { Args: { _user_id: string }; Returns: string }
-      is_valid_rut: { Args: { _rut: string }; Returns: boolean }
-      invoke_scheduled_task: { Args: { _task: string }; Returns: number }
-      verify_cron_secret: { Args: { _token: string }; Returns: boolean }
-      has_feature: {
-        Args: { _feature: string; _workshop_id: string }
-        Returns: boolean
-      }
       get_workshop_credential_status: {
         Args: { _workshop_id: string }
         Returns: {
@@ -3371,6 +3412,10 @@ export type Database = {
         }[]
       }
       get_workshop_stats: { Args: { p_workshop_id: string }; Returns: Json }
+      has_feature: {
+        Args: { _feature: string; _workshop_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3378,11 +3423,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_scheduled_task: { Args: { _task: string }; Returns: number }
+      is_credential_column: { Args: { _column_name: string }; Returns: boolean }
       is_number_blocked: {
         Args: { _phone: string; _workshop_id: string }
         Returns: boolean
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       match_bot_knowledge: {
         Args: {
@@ -3398,6 +3446,8 @@ export type Database = {
           similarity: number
         }[]
       }
+      rebuild_workshops_safe_view: { Args: never; Returns: undefined }
+      verify_cron_secret: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
       app_role: "SUPERADMIN" | "ADMIN" | "STAFF"
