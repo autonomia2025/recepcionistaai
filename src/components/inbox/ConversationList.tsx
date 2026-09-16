@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -73,15 +74,16 @@ export function ConversationList({
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
       const { data } = await supabase
-        .from('workshops')
-        .select('zone_detection_enabled')
+        .from('workshops_safe')
+        .select('features')
         .eq('id', profile.workshop_id)
         .maybeSingle();
       return data;
     },
     enabled: !!profile?.workshop_id && isAdminLike,
   });
-  const zoneDetectionEnabled = !!(workshopFlags as any)?.zone_detection_enabled;
+  const zoneDetectionEnabled = (workshopFlags as any)?.features?.zones === true;
+  const { labelOf } = useWorkshopZones();
 
   const filteredConversations = conversations
     .filter((conv) => (staffZone ? conv.contacts.zone === staffZone : true))
@@ -195,7 +197,7 @@ export function ConversationList({
                         )}
                         {zoneDetectionEnabled && conv.contacts.zone && (
                           <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200/50">
-                            📍 {conv.contacts.zone === 'puerto_montt' ? 'Pto. Montt' : conv.contacts.zone === 'talca' ? 'Talca' : 'Santiago'}
+                            📍 {labelOf(conv.contacts.zone)}
                           </span>
                         )}
                       </div>

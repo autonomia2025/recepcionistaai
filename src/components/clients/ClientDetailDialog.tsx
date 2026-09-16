@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkshopMode } from '@/hooks/useWorkshopMode';
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -240,13 +242,8 @@ function QuoteSentCheckbox({ contactId, initialValue }: { contactId: string; ini
   );
 }
 
-const ZONE_OPTIONS = [
-  { value: 'santiago', label: '📍 Santiago' },
-  { value: 'talca', label: '📍 Talca' },
-  { value: 'puerto_montt', label: '📍 Puerto Montt' },
-];
-
 function ZoneSelector({ contactId, initialValue }: { contactId: string; initialValue: string | null }) {
+  const { zones: workshopZones, labelOf } = useWorkshopZones();
   const [zone, setZone] = useState<string | null>(initialValue);
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
@@ -263,7 +260,7 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
       setZone(value);
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      toast.success(value ? `Zona actualizada a ${ZONE_OPTIONS.find(z => z.value === value)?.label}` : 'Zona removida');
+      toast.success(value ? `Zona actualizada a ${labelOf(value)}` : 'Zona removida');
     } catch {
       toast.error('Error al actualizar zona');
     } finally {
@@ -273,16 +270,16 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
 
   return (
     <div className="flex flex-wrap gap-2">
-      {ZONE_OPTIONS.map(opt => (
+      {workshopZones.map(opt => (
         <Button
-          key={opt.value}
-          variant={zone === opt.value ? 'default' : 'outline'}
+          key={opt.key}
+          variant={zone === opt.key ? 'default' : 'outline'}
           size="sm"
           disabled={loading}
-          onClick={() => handleChange(zone === opt.value ? 'none' : opt.value)}
+          onClick={() => handleChange(zone === opt.key ? 'none' : opt.key)}
           className="text-xs"
         >
-          {opt.label}
+          📍 {opt.label}
         </Button>
       ))}
       {!zone && <span className="text-xs text-muted-foreground self-center">Sin asignar</span>}
@@ -294,7 +291,8 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
   const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
-  const isSOC = profile?.workshop_id === '610fb257-a649-4115-b944-21f31e7952db';
+  const { features } = useWorkshopFeatures();
+  const zonesEnabled = features.zones;
   const queryClient = useQueryClient();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -620,7 +618,7 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
         )}
 
         {/* Zone - only for SOC Ingenieria */}
-        {isSOC && (
+        {zonesEnabled && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">

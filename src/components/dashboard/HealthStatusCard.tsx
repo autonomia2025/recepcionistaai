@@ -20,7 +20,7 @@ export function HealthStatusCard({ workshopId }: HealthStatusCardProps) {
     queryFn: async () => {
       // Workshop info
       const { data: workshop } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('gmail_connected, whatsapp_connected, email_reminders_enabled')
         .eq('id', workshopId)
         .single();

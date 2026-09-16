@@ -47,15 +47,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-const ZONE_TABS = ['all', 'talca', 'puerto_montt', 'santiago'];
-const ZONE_LABELS: Record<string, string> = {
-  all: 'Total',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-  santiago: 'Santiago',
-};
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 interface Contact {
   id: string;
@@ -151,9 +144,11 @@ export default function ClientsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
-  const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
+  const { features } = useWorkshopFeatures();
+  const { zones: workshopZones, labelOf } = useWorkshopZones();
+  const zoneTabs = ['all', ...workshopZones.map(zone => zone.key)];
   const isStaffWithZone = profile?.role === 'STAFF' && !!profile?.zone;
-  const showZoneTabs = isSOC && isAdmin;
+  const showZoneTabs = features.zones && isAdmin;
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
 
   // For STAFF with zone, force zone filter silently
@@ -772,15 +767,15 @@ export default function ClientsPage() {
       {showZoneTabs ? (
         <Tabs defaultValue="all" value={zoneFilter} onValueChange={setZoneFilter}>
           <TabsList className="w-full justify-start mb-4">
-            {ZONE_TABS.map(zone => (
+            {zoneTabs.map(zone => (
               <TabsTrigger key={zone} value={zone} className="gap-1.5">
                 {zone !== 'all' && <MapPin className="w-3.5 h-3.5" />}
-                {ZONE_LABELS[zone]}
+                {zone === 'all' ? 'Total' : labelOf(zone)}
                 <span className="ml-1 text-xs text-muted-foreground">({getZoneCount(zone)})</span>
               </TabsTrigger>
             ))}
           </TabsList>
-          {ZONE_TABS.map(zone => (
+          {zoneTabs.map(zone => (
             <TabsContent key={zone} value={zone}>
               {renderClientsList(getZoneContacts(zone))}
             </TabsContent>

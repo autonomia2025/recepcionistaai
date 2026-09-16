@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -19,8 +19,6 @@ interface Workshop {
   name: string;
   whatsapp_phone_number_id?: string | null;
   whatsapp_business_account_id?: string | null;
-  whatsapp_access_token?: string | null;
-  whatsapp_verify_token?: string | null;
   whatsapp_connected?: boolean;
   whatsapp_connected_at?: string | null;
 }
@@ -34,20 +32,34 @@ interface WhatsAppConfigDialogProps {
 export function WhatsAppConfigDialog({ workshop, open, onOpenChange }: WhatsAppConfigDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [phoneNumberId, setPhoneNumberId] = useState(workshop?.whatsapp_phone_number_id || '');
   const [businessAccountId, setBusinessAccountId] = useState(workshop?.whatsapp_business_account_id || '');
-  const [accessToken, setAccessToken] = useState(workshop?.whatsapp_access_token || '');
+  const [accessToken, setAccessToken] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Meta Webhook URL (único para todos los talleres)
   const metaWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
 
+  const credentialStatusKey = ['workshop-credential-status', workshop?.id];
+  const { data: credentialStatus } = useQuery({
+    queryKey: credentialStatusKey,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_workshop_credential_status', {
+        _workshop_id: workshop!.id,
+      });
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+    enabled: open && !!workshop?.id,
+  });
+  const tokenConfigured = !!credentialStatus?.whatsapp_token_configured;
+
   useEffect(() => {
     if (workshop) {
       setPhoneNumberId(workshop.whatsapp_phone_number_id || '');
       setBusinessAccountId(workshop.whatsapp_business_account_id || '');
-      setAccessToken(workshop.whatsapp_access_token || '');
+      setAccessToken('');
     }
   }, [workshop?.id]);
 
@@ -57,21 +69,42 @@ export function WhatsAppConfigDialog({ workshop, open, onOpenChange }: WhatsAppC
       const phoneId = phoneNumberId.trim();
       const businessId = businessAccountId.trim();
       const token = accessToken.trim();
-      
+
+      // The saved token is never loaded into the form, so an empty field keeps it.
       const { error } = await supabase
         .from('workshops')
         .update({
           whatsapp_phone_number_id: phoneId || null,
           whatsapp_business_account_id: businessId || null,
-          whatsapp_access_token: token || null,
+          ...(token ? { whatsapp_access_token: token } : {}),
         })
         .eq('id', workshop.id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
+      setAccessToken('');
       queryClient.invalidateQueries({ queryKey: ['admin-workshops'] });
+      queryClient.invalidateQueries({ queryKey: credentialStatusKey });
       toast({ title: 'Guardado', description: 'Credenciales guardadas correctamente' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const clearTokenMutation = useMutation({
+    mutationFn: async () => {
+      if (!workshop) throw new Error('No workshop selected');
+      const { error } = await supabase
+        .from('workshops')
+        .update({ whatsapp_access_token: null })
+        .eq('id', workshop.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: credentialStatusKey });
+      toast({ title: 'Token eliminado', description: 'Se usará el token global' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -168,7 +201,21 @@ export function WhatsAppConfigDialog({ workshop, open, onOpenChange }: WhatsAppC
             </div>
             <div className="space-y-2">
               <Label htmlFor="accessToken">Access Token (opcional si usas token global)</Label>
-              <Input id="accessToken" type="password" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} placeholder="Token de acceso permanente" />
+              <Input
+                id="accessToken"
+                type="password"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                placeholder={tokenConfigured ? 'Token guardado. Escribe uno nuevo solo para reemplazarlo' : 'Token de acceso permanente'}
+              />
+              {tokenConfigured && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Hay un token guardado para este workshop.</span>
+                  <Button variant="ghost" size="sm" onClick={() => clearTokenMutation.mutate()} disabled={clearTokenMutation.isPending}>
+                    Quitar token guardado
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -176,7 +223,7 @@ export function WhatsAppConfigDialog({ workshop, open, onOpenChange }: WhatsAppC
           <div className="space-y-3 p-4 bg-muted rounded-lg">
             <h4 className="font-medium text-sm">Configuración en Meta</h4>
             <p className="text-xs text-muted-foreground">Configura este webhook en tu App de Meta (developers.facebook.com):</p>
-            
+
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Callback URL</Label>
               <div className="flex items-center gap-2">

@@ -12,18 +12,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const ZONE_LABELS: Record<string, string> = {
-  santiago: 'Santiago',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-};
-
-const ZONE_BADGE: Record<string, string> = {
-  santiago: 'bg-blue-100 text-blue-700 border-blue-300',
-  talca: 'bg-green-100 text-green-700 border-green-300',
-  puerto_montt: 'bg-violet-100 text-violet-700 border-violet-300',
-};
+import { useWorkshopZones, zoneBadgeClass } from '@/hooks/useWorkshopZones';
 
 const HOURS_48 = 48 * 60 * 60 * 1000;
 
@@ -34,6 +23,7 @@ const monthOf = (iso: string) => iso.slice(0, 7); // YYYY-MM
 
 export default function SalesControlPage() {
   const { profile } = useAuth();
+  const { zones: workshopZones, labelOf, colorOf } = useWorkshopZones();
   const { data: requests = [], isLoading } = useServiceRequests();
 
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -145,8 +135,8 @@ export default function SalesControlPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold truncate">{s.full_name}</div>
                       {s.zone && (
-                        <Badge variant="outline" className={cn('text-xs mt-0.5', ZONE_BADGE[s.zone])}>
-                          {ZONE_LABELS[s.zone] || s.zone}
+                        <Badge variant="outline" className={cn('text-xs mt-0.5', zoneBadgeClass(colorOf(s.zone)))}>
+                          {labelOf(s.zone)}
                         </Badge>
                       )}
                     </div>
@@ -205,9 +195,9 @@ export default function SalesControlPage() {
             <SelectTrigger className="w-40"><SelectValue placeholder="Zona" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las zonas</SelectItem>
-              <SelectItem value="santiago">Santiago</SelectItem>
-              <SelectItem value="talca">Talca</SelectItem>
-              <SelectItem value="puerto_montt">Puerto Montt</SelectItem>
+              {workshopZones.map(zone => (
+                <SelectItem key={zone.key} value={zone.key}>{zone.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -272,8 +262,8 @@ export default function SalesControlPage() {
                         <TableCell className="font-medium">{r.contacts?.name || '—'}</TableCell>
                         <TableCell>
                           {zone ? (
-                            <Badge variant="outline" className={cn('text-xs', ZONE_BADGE[zone])}>
-                              {ZONE_LABELS[zone] || zone}
+                            <Badge variant="outline" className={cn('text-xs', zoneBadgeClass(colorOf(zone)))}>
+                              {labelOf(zone)}
                             </Badge>
                           ) : '—'}
                         </TableCell>

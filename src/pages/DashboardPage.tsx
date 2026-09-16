@@ -8,12 +8,7 @@ import { ZoneMetrics } from '@/components/dashboard/ZoneMetrics';
 import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components/metrics/metricDefinitions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
-
-const ZONE_LABELS: Record<string, string> = {
-  santiago: 'Santiago',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-};
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 function MetricSkeleton() {
   return (
@@ -32,6 +27,7 @@ function MetricSkeleton() {
 export default function DashboardPage() {
   const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
+  const { labelOf } = useWorkshopZones();
 
   const staffZone = profile?.role === 'STAFF' ? profile?.zone : null;
 
@@ -143,10 +139,10 @@ export default function DashboardPage() {
           {workshopMode?.name
             ? <> Trabajas en <span className="font-semibold">{workshopMode.name}</span></>
             : <> Tu cuenta aún no está asociada a un negocio.</>}
-          {profile.zone && ZONE_LABELS[profile.zone] && <> · Zona <span className="font-semibold">{ZONE_LABELS[profile.zone]}</span></>}
+          {profile.zone && <> · Zona <span className="font-semibold">{labelOf(profile.zone)}</span></>}
           {staffZone && (
             <div className="mt-1 text-xs text-muted-foreground">
-              Estás viendo solo las métricas de tu zona: <span className="font-semibold text-foreground">{ZONE_LABELS[staffZone] || staffZone}</span>
+              Estás viendo solo las métricas de tu zona: <span className="font-semibold text-foreground">{labelOf(staffZone)}</span>
             </div>
           )}
         </div>

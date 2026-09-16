@@ -23,20 +23,14 @@ import {
 } from '@/components/ui/select';
 import { UserPlus, Copy, Check, Link } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
 interface InviteDialogProps {
   disabled?: boolean;
 }
-
-const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-
-const ZONE_OPTIONS = [
-  { value: 'santiago', label: 'Santiago' },
-  { value: 'talca', label: 'Talca' },
-  { value: 'puerto_montt', label: 'Puerto Montt' },
-];
 
 export function InviteDialog({ disabled }: InviteDialogProps) {
   const { profile } = useAuth();
@@ -52,8 +46,9 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sent' | 'failed'>('idle');
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  const isSOC = profile?.workshop_id === SOC_WORKSHOP_ID;
-  const showZoneSelector = isSOC && role === 'STAFF';
+  const { features } = useWorkshopFeatures();
+  const { zones: workshopZones } = useWorkshopZones();
+  const showZoneSelector = features.zones && role === 'STAFF';
 
   const sendInviteEmail = async (link: string) => {
     setSendingEmail(true);
@@ -216,8 +211,8 @@ export function InviteDialog({ disabled }: InviteDialogProps) {
                     <SelectValue placeholder="Selecciona una zona" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ZONE_OPTIONS.map(z => (
-                      <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                    {workshopZones.map(z => (
+                      <SelectItem key={z.key} value={z.key}>{z.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

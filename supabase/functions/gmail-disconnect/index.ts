@@ -88,10 +88,9 @@ Deno.serve(async (req) => {
     // Update workshop status
     await adminSupabase
       .from('workshops')
-      .update({ 
+      .update({
         gmail_connected: false,
-        gmail_email: null,
-        gmail_refresh_token: null
+        gmail_email: null
       })
       .eq('id', profile.workshop_id)
 

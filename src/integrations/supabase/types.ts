@@ -2706,6 +2706,56 @@ export type Database = {
           },
         ]
       }
+      workshop_zones: {
+        Row: {
+          aliases: string[]
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          notification_email: string | null
+          sort_order: number
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          aliases?: string[]
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          label: string
+          notification_email?: string | null
+          sort_order?: number
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          aliases?: string[]
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string
+          notification_email?: string | null
+          sort_order?: number
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workshop_zones_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workshops: {
         Row: {
           address: string | null
@@ -2727,6 +2777,7 @@ export type Database = {
           email_reminders_enabled: boolean | null
           email_sender_name: string | null
           email_use_branding: boolean | null
+          features: Json
           gmail_connected: boolean | null
           gmail_connected_at: string | null
           gmail_email: string | null
@@ -2780,6 +2831,7 @@ export type Database = {
           email_reminders_enabled?: boolean | null
           email_sender_name?: string | null
           email_use_branding?: boolean | null
+          features?: Json
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
@@ -2833,6 +2885,7 @@ export type Database = {
           email_reminders_enabled?: boolean | null
           email_sender_name?: string | null
           email_use_branding?: boolean | null
+          features?: Json
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
@@ -2914,21 +2967,34 @@ export type Database = {
           email_reminders_enabled: boolean | null
           email_sender_name: string | null
           email_use_branding: boolean | null
+          features: Json | null
           gmail_connected: boolean | null
           gmail_connected_at: string | null
           gmail_email: string | null
           id: string | null
           instagram_connected: boolean | null
           instagram_connected_at: string | null
+          instagram_page_id: string | null
           is_active: boolean | null
+          max_storage_bytes: number | null
           name: string | null
           phone: string | null
           slug: string | null
+          twilio_phone_number: string | null
+          twilio_phone_sid: string | null
           web_chat_allowed_domains: string[] | null
           web_chat_enabled: boolean | null
+          web_chat_position: string | null
+          web_chat_primary_color: string | null
+          web_chat_title: string | null
+          web_chat_welcome_message: string | null
+          web_chat_z_index: string | null
+          whatsapp_business_account_id: string | null
           whatsapp_connected: boolean | null
           whatsapp_connected_at: string | null
+          whatsapp_phone_number_id: string | null
           whatsapp_provider: string | null
+          zone_detection_enabled: boolean | null
           zone_notification_emails: Json | null
         }
         Insert: {
@@ -2951,21 +3017,34 @@ export type Database = {
           email_reminders_enabled?: boolean | null
           email_sender_name?: string | null
           email_use_branding?: boolean | null
+          features?: Json | null
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
           id?: string | null
           instagram_connected?: boolean | null
           instagram_connected_at?: string | null
+          instagram_page_id?: string | null
           is_active?: boolean | null
+          max_storage_bytes?: number | null
           name?: string | null
           phone?: string | null
           slug?: string | null
+          twilio_phone_number?: string | null
+          twilio_phone_sid?: string | null
           web_chat_allowed_domains?: string[] | null
           web_chat_enabled?: boolean | null
+          web_chat_position?: string | null
+          web_chat_primary_color?: string | null
+          web_chat_title?: string | null
+          web_chat_welcome_message?: string | null
+          web_chat_z_index?: string | null
+          whatsapp_business_account_id?: string | null
           whatsapp_connected?: boolean | null
           whatsapp_connected_at?: string | null
+          whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string | null
+          zone_detection_enabled?: boolean | null
           zone_notification_emails?: Json | null
         }
         Update: {
@@ -2988,21 +3067,34 @@ export type Database = {
           email_reminders_enabled?: boolean | null
           email_sender_name?: string | null
           email_use_branding?: boolean | null
+          features?: Json | null
           gmail_connected?: boolean | null
           gmail_connected_at?: string | null
           gmail_email?: string | null
           id?: string | null
           instagram_connected?: boolean | null
           instagram_connected_at?: string | null
+          instagram_page_id?: string | null
           is_active?: boolean | null
+          max_storage_bytes?: number | null
           name?: string | null
           phone?: string | null
           slug?: string | null
+          twilio_phone_number?: string | null
+          twilio_phone_sid?: string | null
           web_chat_allowed_domains?: string[] | null
           web_chat_enabled?: boolean | null
+          web_chat_position?: string | null
+          web_chat_primary_color?: string | null
+          web_chat_title?: string | null
+          web_chat_welcome_message?: string | null
+          web_chat_z_index?: string | null
+          whatsapp_business_account_id?: string | null
           whatsapp_connected?: boolean | null
           whatsapp_connected_at?: string | null
+          whatsapp_phone_number_id?: string | null
           whatsapp_provider?: string | null
+          zone_detection_enabled?: boolean | null
           zone_notification_emails?: Json | null
         }
         Relationships: []
@@ -3073,6 +3165,17 @@ export type Database = {
       }
       get_superadmin_kpis: { Args: never; Returns: Json }
       get_user_workshop_id: { Args: { _user_id: string }; Returns: string }
+      has_feature: {
+        Args: { _feature: string; _workshop_id: string }
+        Returns: boolean
+      }
+      get_workshop_credential_status: {
+        Args: { _workshop_id: string }
+        Returns: {
+          instagram_token_configured: boolean
+          whatsapp_token_configured: boolean
+        }[]
+      }
       get_workshop_health_status: {
         Args: { p_workshop_id: string }
         Returns: Json

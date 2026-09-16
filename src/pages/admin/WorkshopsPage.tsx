@@ -57,8 +57,6 @@ interface Workshop {
   created_at: string;
   whatsapp_phone_number_id: string | null;
   whatsapp_business_account_id: string | null;
-  whatsapp_access_token: string | null;
-  whatsapp_verify_token: string | null;
   whatsapp_connected: boolean;
   whatsapp_connected_at: string | null;
   whatsapp_provider: 'meta' | 'twilio' | 'ycloud' | 'kapso';
@@ -70,7 +68,6 @@ interface Workshop {
   category: string | null;
   instagram_connected?: boolean;
   instagram_page_id?: string | null;
-  instagram_access_token?: string | null;
   instagram_connected_at?: string | null;
   web_chat_enabled?: boolean;
   web_chat_allowed_domains?: string[];
@@ -204,7 +201,7 @@ export default function AdminWorkshopsPage() {
     queryKey: ['admin-workshops'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -392,7 +389,7 @@ export default function AdminWorkshopsPage() {
       const { data: workshop, error: workshopError } = await supabase
         .from('workshops')
         .insert(workshopData)
-        .select()
+        .select('id')
         .single();
 
       if (workshopError) throw workshopError;

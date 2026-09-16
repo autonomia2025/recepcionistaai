@@ -49,13 +49,13 @@ export const useWorkshop = () => {
       if (!profile?.workshop_id) return null;
 
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('*')
         .eq('id', profile.workshop_id)
         .single();
 
       if (error) throw error;
-      return data;
+      return data as Workshop | null;
     },
     enabled: !!profile?.workshop_id,
   });

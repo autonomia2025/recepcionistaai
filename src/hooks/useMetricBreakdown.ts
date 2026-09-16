@@ -251,7 +251,7 @@ async function fetchMetricData(
       
       if (!isAdmin && workshopId) {
         const { data: workshopData } = await supabase
-          .from('workshops')
+          .from('workshops_safe')
           .select('booking_mode')
           .eq('id', workshopId)
           .single();

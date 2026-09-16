@@ -33,8 +33,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get user profile with refresh token
-    const { data: profile, error: profileError } = await supabase
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    // Refresh tokens are not readable by end-user roles, so they are read with the service role
+    const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('google_refresh_token')
       .eq('id', user.id)
@@ -59,10 +64,6 @@ Deno.serve(async (req) => {
     }
 
     // Use service role to update profile (clear Google data)
-    const adminSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
 
     const { error: updateError } = await adminSupabase
       .from('profiles')

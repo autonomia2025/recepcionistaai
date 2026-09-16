@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseFeatures } from "../_shared/features.ts";
+import { fetchWorkshopZones, zoneEmail as zoneEmailFor } from "../_shared/zones.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,7 +79,7 @@ Deno.serve(async (req) => {
         email_notifications_handoff, email_notifications_hot_lead,
         email_notifications_appointment, email_notifications_quotation,
         booking_mode, email_primary_color, email_logo_url,
-        zone_notification_emails
+        features
       `)
       .eq('id', workshop_id)
       .single();
@@ -174,14 +176,13 @@ Deno.serve(async (req) => {
     // Get admin email: 1) zone-specific (SOC Ingenieria), 2) explicit setting, 3) connected Gmail, 4) first admin profile
     let adminEmail = workshop.admin_notification_email;
 
-    // For SOC Ingenieria hot_lead notifications, route to zone-specific email
-    const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-    if (workshop_id === SOC_WORKSHOP_ID && notification_type === 'hot_lead' && extra_data?.zone) {
-      const zoneEmails = (workshop as any).zone_notification_emails as Record<string, string> | null;
-      const zoneEmail = zoneEmails?.[extra_data.zone as string];
-      if (zoneEmail) {
-        adminEmail = zoneEmail;
-        console.log(`Routing hot_lead to zone email: ${extra_data.zone} -> ${zoneEmail}`);
+    // Zone routing for hot leads, only for workshops with the zones feature on
+    if (parseFeatures((workshop as any).features).zones && notification_type === 'hot_lead' && extra_data?.zone) {
+      const zones = await fetchWorkshopZones(supabase, workshop_id);
+      const configuredEmail = zoneEmailFor(zones, extra_data.zone as string);
+      if (configuredEmail) {
+        adminEmail = configuredEmail;
+        console.log(`Routing hot_lead to zone email: ${extra_data.zone} -> ${configuredEmail}`);
       }
     }
 

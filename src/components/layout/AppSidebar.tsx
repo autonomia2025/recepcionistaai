@@ -7,6 +7,7 @@ import { useWorkshopMode } from '@/hooks/useWorkshopMode';
 import { Button } from '@/components/ui/button';
 import { useEffect, useMemo, useState } from 'react';
 import { UserSettingsDialog } from './UserSettingsDialog';
+import { useWorkshopZones, zoneSidebarClass } from '@/hooks/useWorkshopZones';
 const superadminNavItems = [{
   to: '/admin/workshops',
   icon: Building2,
@@ -62,6 +63,7 @@ export const AppSidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const isSuperAdmin = profile?.role === 'SUPERADMIN';
+  const { labelOf, colorOf } = useWorkshopZones();
   const isImpersonating = !!impersonatedWorkshopId;
   const showLandingButton = (!isSuperAdmin || isImpersonating) && profile?.role === 'ADMIN' && workshopMode?.booking_mode === 'with_scheduling';
 
@@ -243,13 +245,9 @@ export const AppSidebar = () => {
               <div className="mt-1.5">
                 <span className={cn(
                   "inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                  profile.zone === 'santiago' && 'bg-blue-500/20 text-blue-200 border border-blue-400/30',
-                  profile.zone === 'talca' && 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
-                  profile.zone === 'puerto_montt' && 'bg-violet-500/20 text-violet-200 border border-violet-400/30',
+                  zoneSidebarClass(colorOf(profile.zone)),
                 )}>
-                  {profile.zone === 'santiago' && 'Santiago'}
-                  {profile.zone === 'talca' && 'Talca'}
-                  {profile.zone === 'puerto_montt' && 'Puerto Montt'}
+                  {labelOf(profile.zone)}
                 </span>
               </div>
             )}

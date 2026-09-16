@@ -120,7 +120,7 @@ export default function BotSettingsPage() {
     queryFn: async () => {
       if (!profile?.workshop_id) return null;
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('max_storage_bytes')
         .eq('id', profile.workshop_id)
         .maybeSingle();

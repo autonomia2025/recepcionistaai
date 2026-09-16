@@ -22,17 +22,12 @@ interface InviteData {
   zone: string | null;
 }
 
-const ZONE_LABELS: Record<string, string> = {
-  santiago: 'Santiago',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-};
+// This page is public: there is no session yet, so the zone label is derived
+// from the invite key instead of read from workshop_zones.
+const zoneLabel = (key: string) =>
+  key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 
-const ZONE_STYLES: Record<string, string> = {
-  santiago: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-300',
-  talca: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-300',
-  puerto_montt: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-300',
-};
+const ZONE_BADGE_CLASS = 'bg-primary/10 text-primary border-primary/30';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -139,7 +134,7 @@ export default function AcceptInvitePage() {
         await refreshProfile();
         toast({
           title: '¡Bienvenido al equipo!',
-          description: `Te has unido a ${result?.workshop_name || 'el negocio'}${invite.zone ? ` · Zona ${ZONE_LABELS[invite.zone] || invite.zone}` : ''}`,
+          description: `Te has unido a ${result?.workshop_name || 'el negocio'}${invite.zone ? ` · Zona ${zoneLabel(invite.zone)}` : ''}`,
         });
         navigate('/dashboard');
         return;
@@ -265,9 +260,9 @@ export default function AcceptInvitePage() {
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <Badge variant="secondary">{invite.role}</Badge>
                 {invite.zone && (
-                  <Badge variant="outline" className={cn('gap-1', ZONE_STYLES[invite.zone])}>
+                  <Badge variant="outline" className={cn('gap-1', ZONE_BADGE_CLASS)}>
                     <MapPin className="h-3 w-3" />
-                    Zona {ZONE_LABELS[invite.zone] || invite.zone}
+                    Zona {zoneLabel(invite.zone)}
                   </Badge>
                 )}
               </div>
@@ -349,9 +344,9 @@ export default function AcceptInvitePage() {
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <Badge variant="secondary">{invite?.role}</Badge>
               {invite?.zone && (
-                <Badge variant="outline" className={cn('gap-1', ZONE_STYLES[invite.zone])}>
+                <Badge variant="outline" className={cn('gap-1', ZONE_BADGE_CLASS)}>
                   <MapPin className="h-3 w-3" />
-                  Zona {ZONE_LABELS[invite.zone] || invite.zone}
+                  Zona {zoneLabel(invite.zone)}
                 </Badge>
               )}
             </div>

@@ -5,24 +5,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MetricCard } from '@/components/metrics';
 import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components/metrics/metricDefinitions';
-
-const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-
-const ZONE_LABELS: Record<string, string> = {
-  all: 'Total',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-  santiago: 'Santiago',
-};
-
-const ZONE_TABS = ['all', 'talca', 'puerto_montt', 'santiago'];
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 interface ZoneMetricsProps {
   workshopId: string;
 }
 
 export function ZoneMetrics({ workshopId }: ZoneMetricsProps) {
-  const isSOC = workshopId === SOC_WORKSHOP_ID;
+  const { features, isLoading: featuresLoading } = useWorkshopFeatures(workshopId);
+  const zonesEnabled = features.zones;
+  const { zones: zoneRows, labelOf } = useWorkshopZones(workshopId);
+  const zoneTabs = ['all', ...zoneRows.map(zone => zone.key)];
 
   const { data, isLoading } = useQuery({
     queryKey: ['zone-metrics-full', workshopId],
@@ -36,7 +30,7 @@ export function ZoneMetrics({ workshopId }: ZoneMetricsProps) {
         supabase.from('contacts').select('zone').eq('workshop_id', workshopId).not('closed_at', 'is', null),
       ]);
 
-      const zones = ['all', 'talca', 'puerto_montt', 'santiago'];
+      const zones = zoneTabs;
 
       const getZone = (item: any): string | null => {
         return item?.contacts?.zone || null;
@@ -78,10 +72,10 @@ export function ZoneMetrics({ workshopId }: ZoneMetricsProps) {
 
       return { metrics, sinZona };
     },
-    enabled: isSOC,
+    enabled: zonesEnabled,
   });
 
-  if (!isSOC) return null;
+  if (featuresLoading || !zonesEnabled) return null;
 
   if (isLoading) {
     return (
@@ -119,15 +113,15 @@ export function ZoneMetrics({ workshopId }: ZoneMetricsProps) {
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-4">
-          {ZONE_TABS.map(zone => (
+          {zoneTabs.map(zone => (
             <TabsTrigger key={zone} value={zone} className="gap-1.5">
               {zone !== 'all' && <MapPin className="w-3 h-3" />}
-              {ZONE_LABELS[zone]}
+              {zone === 'all' ? 'Total' : labelOf(zone)}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {ZONE_TABS.map(zone => {
+        {zoneTabs.map(zone => {
           const m = data?.metrics[zone];
           if (!m) return null;
 

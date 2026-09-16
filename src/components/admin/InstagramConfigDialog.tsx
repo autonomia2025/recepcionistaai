@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Instagram, Copy, Check, ExternalLink, Unlink } from 'lucide-react';
@@ -19,7 +19,6 @@ interface Workshop {
   name: string;
   instagram_connected?: boolean;
   instagram_page_id?: string;
-  instagram_access_token?: string;
   instagram_connected_at?: string;
 }
 
@@ -41,22 +40,36 @@ export function InstagramConfigDialog({
   const instagramWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/instagram-webhook`;
   const verifyToken = 'instagram_webhook_verify';
 
+  const { data: credentialStatus } = useQuery({
+    queryKey: ['workshop-credential-status', workshop?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_workshop_credential_status', {
+        _workshop_id: workshop!.id,
+      });
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+    enabled: open && !!workshop?.id,
+  });
+  const tokenConfigured = !!credentialStatus?.instagram_token_configured;
+
   useEffect(() => {
     if (workshop) {
       setPageId(workshop.instagram_page_id || '');
-      setAccessToken(workshop.instagram_access_token || '');
+      setAccessToken('');
     }
   }, [workshop]);
 
   const verifyMutation = useMutation({
     mutationFn: async () => {
       if (!workshop) throw new Error('No workshop selected');
-      
+      const token = accessToken.trim();
+
       const { data, error } = await supabase.functions.invoke('verify-instagram', {
         body: {
           workshop_id: workshop.id,
           page_id: pageId,
-          access_token: accessToken,
+          ...(token ? { access_token: token } : {}),
         },
       });
 
@@ -76,7 +89,7 @@ export function InstagramConfigDialog({
   const disconnectMutation = useMutation({
     mutationFn: async () => {
       if (!workshop) throw new Error('No workshop selected');
-      
+
       const { error } = await supabase
         .from('workshops')
         .update({
@@ -209,7 +222,7 @@ export function InstagramConfigDialog({
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="Token de acceso de la app"
+              placeholder={tokenConfigured ? 'Token guardado. Escribe uno nuevo solo para reemplazarlo' : 'Token de acceso de la app'}
             />
             <p className="text-xs text-muted-foreground">
               Token con permiso instagram_manage_messages
@@ -248,7 +261,7 @@ export function InstagramConfigDialog({
           </Button>
           <Button
             onClick={() => verifyMutation.mutate()}
-            disabled={!pageId || !accessToken || verifyMutation.isPending}
+            disabled={!pageId || (!accessToken.trim() && !tokenConfigured) || verifyMutation.isPending}
           >
             {verifyMutation.isPending ? 'Verificando...' : 'Conectar'}
           </Button>

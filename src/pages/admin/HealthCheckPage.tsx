@@ -230,7 +230,7 @@ export default function HealthCheckPage() {
     queryKey: ['health-check-workshops'],
     queryFn: async () => {
       const { data: workshopsData, error: workshopsError } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select(`
           id, name, 
           gmail_connected, gmail_email,

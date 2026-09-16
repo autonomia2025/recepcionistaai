@@ -121,8 +121,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get user profile with Google tokens
-    const { data: profile, error: profileError } = await supabase
+    // Refresh tokens are not readable by end-user roles, so they are read with the service role
+    const profileReader = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+    const { data: profile, error: profileError } = await profileReader
       .from('profiles')
       .select('google_calendar_connected, google_refresh_token, google_calendar_id, workshop_id')
       .eq('id', user.id)

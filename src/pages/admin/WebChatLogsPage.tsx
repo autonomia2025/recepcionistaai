@@ -64,7 +64,7 @@ export default function WebChatLogsPage() {
     queryKey: ['workshops-for-logs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('id, name')
         .eq('web_chat_enabled', true)
         .order('name');

@@ -59,7 +59,7 @@ export default function StatsPage() {
 
       // Get workshops with provider info
       const { data: workshops, error: wsError } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('id, name, is_active, whatsapp_provider');
 
       if (wsError) throw wsError;

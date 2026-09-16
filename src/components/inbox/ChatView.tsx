@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -134,20 +135,21 @@ export function ChatView({ conversation }: ChatViewProps) {
   const isAdminLike = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const [isUpdatingZone, setIsUpdatingZone] = useState(false);
 
-  // Fetch workshop's zone_detection_enabled flag
+  // Fetch workshop's feature flags
   const { data: workshopFlags } = useQuery({
     queryKey: ['workshop-zone-flag', conversation.workshop_id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('workshops')
-        .select('zone_detection_enabled')
+        .from('workshops_safe')
+        .select('features')
         .eq('id', conversation.workshop_id)
         .maybeSingle();
       return data;
     },
     enabled: !!conversation.workshop_id && isAdminLike,
   });
-  const zoneDetectionEnabled = !!(workshopFlags as any)?.zone_detection_enabled;
+  const zoneDetectionEnabled = (workshopFlags as any)?.features?.zones === true;
+  const { zones: workshopZones } = useWorkshopZones(conversation.workshop_id);
 
   const handleZoneChange = async (newZone: string) => {
     setIsUpdatingZone(true);
@@ -541,9 +543,9 @@ export function ChatView({ conversation }: ChatViewProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin zona</SelectItem>
-                  <SelectItem value="talca">📍 Talca</SelectItem>
-                  <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
-                  <SelectItem value="santiago">📍 Santiago</SelectItem>
+                  {workshopZones.map(zone => (
+                    <SelectItem key={zone.key} value={zone.key}>📍 {zone.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}

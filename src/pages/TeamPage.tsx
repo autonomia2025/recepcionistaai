@@ -24,16 +24,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-
-const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-const ZONE_LABELS: Record<string, string> = {
-  santiago: 'Santiago',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-};
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 
 export default function TeamPage() {
   const { profile } = useAuth();
+  const { labelOf } = useWorkshopZones();
   const { data: seatInfo } = useSeatInfo();
   const { data: subscription } = useSubscription();
   const queryClient = useQueryClient();
@@ -174,7 +169,7 @@ export default function TeamPage() {
                     {(invite as any).zone && (
                       <Badge variant="outline" className="text-xs gap-1">
                         <MapPin className="w-3 h-3" />
-                        {ZONE_LABELS[(invite as any).zone] || (invite as any).zone}
+                        {labelOf((invite as any).zone)}
                       </Badge>
                     )}
                     <Button
@@ -219,7 +214,7 @@ export default function TeamPage() {
                   {member.role === 'STAFF' && (member as any).zone && (
                     <Badge variant="secondary" className="gap-1">
                       <MapPin className="w-3 h-3" />
-                      {ZONE_LABELS[(member as any).zone] || (member as any).zone}
+                      {labelOf((member as any).zone)}
                     </Badge>
                   )}
                   <StatusBadge status={member.status} />

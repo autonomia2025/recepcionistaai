@@ -45,7 +45,7 @@ export default function CobranzasPage() {
     queryKey: ['cobranzas-workshops'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('id, name, city, is_active')
         .order('name', { ascending: true });
       if (error) throw error;

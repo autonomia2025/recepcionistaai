@@ -76,7 +76,7 @@ export function useLandingWizard() {
       if (!workshopId) return null;
 
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('slug')
         .eq('id', workshopId)
         .single();

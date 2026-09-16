@@ -17,7 +17,7 @@ export const SuperAdminHealthSummary = () => {
         queryKey: ['superadmin-health-summary'],
         queryFn: async () => {
             const { data: workshops, error } = await supabase
-                .from('workshops')
+                .from('workshops_safe')
                 .select('id, whatsapp_connected')
                 .eq('is_active', true);
 

@@ -17,6 +17,13 @@ import {
   mapMotorType,
   mapWaterType,
 } from "../_shared/catalog.ts";
+import { parseFeatures } from "../_shared/features.ts";
+import {
+  detectZoneFromText,
+  fetchWorkshopZones,
+  zoneKeys,
+  type WorkshopZone,
+} from "../_shared/zones.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,7 +56,7 @@ interface AIReplyResult {
   should_handoff: boolean;
   should_send_booking_link: boolean;
   reasoning?: string;
-  detected_zone?: 'talca' | 'puerto_montt' | 'santiago' | null;
+  detected_zone?: string | null;
 }
 
 interface KnowledgeMatch {
@@ -809,7 +816,7 @@ serve(async (req) => {
     // Get workshop info
     const { data: workshop, error: workshopError } = await supabase
       .from('workshops')
-      .select('id, name, booking_url, slug, phone, address, city, booking_mode, zone_detection_enabled')
+      .select('id, name, booking_url, slug, phone, address, city, booking_mode, features')
       .eq('id', workshop_id)
       .single();
 
@@ -865,7 +872,12 @@ serve(async (req) => {
         .maybeSingle();
       if (c) contactRecord = c as { id: string; zone: string | null };
     }
-    const zoneDetectionEnabled = !!(workshop as any).zone_detection_enabled;
+    const zoneDetectionEnabled = parseFeatures((workshop as any).features).zones;
+    const workshopZones: WorkshopZone[] = zoneDetectionEnabled
+      ? await fetchWorkshopZones(supabase, workshop_id)
+      : [];
+    const zoneKeyList = zoneKeys(workshopZones);
+    const zoneKeyUnion = zoneKeyList.map(key => `"${key}"`).join(' | ');
     const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
 
     // Conversation history (last 10 messages, oldest first)
@@ -1057,7 +1069,7 @@ INFORMACIÓN DEL NEGOCIO:
 - Dirección: ${workshop.address || 'Consultar'}
 - Ciudad: ${workshop.city || 'Chile'}
 - Teléfono: ${workshop.phone || 'Consultar'}
-${workshop.id === '610fb257-a649-4115-b944-21f31e7952db' ? '- Zonas de operación: Talca, Puerto Montt, Santiago' : ''}
+${zoneDetectionEnabled ? '- Zonas de operación: Talca, Puerto Montt, Santiago' : ''}
 ${settings.business_description ? `- Descripción: ${settings.business_description}` : ''}
 
 SERVICIOS DISPONIBLES:
@@ -1082,11 +1094,11 @@ REGLA SOBRE ARCHIVOS ADJUNTOS:
 ${zoneDetectionEnabled ? `ZONA DEL CLIENTE (REGLA CRÍTICA):
 ${needsZone
   ? `- El contacto AÚN NO tiene zona asignada. ANTES de cotizar, agendar o derivar al equipo, DEBES preguntar de forma natural desde qué ciudad o comuna escribe.
-- Zonas válidas: *Talca / Maule*, *Puerto Montt / Los Lagos*, *Santiago / RM*.
+- Zonas válidas: ${workshopZones.map(zone => `*${zone.label}*`).join(', ')}.
 - Hazlo en el saludo o apenas el cliente mencione su necesidad. Solo una vez, no insistas si ya la mencionó.
 - Si el cliente menciona una ciudad o comuna, asóciala a la zona más cercana.`
   : `- El contacto ya tiene zona asignada: *${contactRecord?.zone}*. NO vuelvas a preguntarla. Personaliza la respuesta según esa zona cuando sea relevante.`}
-- Si en este mensaje el cliente menciona explícitamente una ciudad/comuna, devuelve también el campo "detected_zone" en el JSON ("talca" | "puerto_montt" | "santiago" | null). Si no la menciona, usa null.` : ''}
+- Si en este mensaje el cliente menciona explícitamente una ciudad/comuna, devuelve también el campo "detected_zone" en el JSON (${zoneKeyUnion} | null). Si no la menciona, usa null.` : ''}
 ${ragContext}`;
 
     const isChatbotOnly = workshop.booking_mode === 'chatbot_only';
@@ -1261,7 +1273,7 @@ Analiza el mensaje y responde con este JSON exacto:
   "should_handoff": false,
   "should_send_booking_link": false,
   "reasoning": "Breve explicación técnica de por qué se eligió esta respuesta y este intent"${zoneDetectionEnabled ? `,
-  "detected_zone": ${needsZone ? '"talca" | "puerto_montt" | "santiago" | null' : 'null'}` : ''}
+  "detected_zone": ${needsZone ? `${zoneKeyUnion} | null` : 'null'}` : ''}
 }
 
 REGLAS DE FORMATO:
@@ -1498,19 +1510,13 @@ Criterios:${isChatbotOnly ? '' : `
 
     // ===== Zone detection & auto-assignment =====
     if (zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
-      let detectedZone: 'talca' | 'puerto_montt' | 'santiago' | null = null;
+      let detectedZone: string | null = null;
       const aiZone = (result as any).detected_zone;
-      if (aiZone === 'talca' || aiZone === 'puerto_montt' || aiZone === 'santiago') {
+      if (typeof aiZone === 'string' && zoneKeyList.includes(aiZone)) {
         detectedZone = aiZone;
       } else {
-        // Regex fallback on the latest user message
-        const txt = removeAccents(message_text.toLowerCase());
-        const talcaRe = /\b(talca|maule|curico|linares|san javier|constitucion|cauquenes|molina)\b/;
-        const pmRe = /\b(puerto montt|pto\.? montt|los lagos|osorno|puerto varas|llanquihue|castro|chiloe|ancud)\b/;
-        const stgoRe = /\b(santiago|stgo|region metropolitana|\brm\b|providencia|las condes|maipu|nunoa|la florida|puente alto|san bernardo|vitacura|la reina|penalolen|quilicura|recoleta|independencia|estacion central|macul|lo barnechea|huechuraba)\b/;
-        if (talcaRe.test(txt)) detectedZone = 'talca';
-        else if (pmRe.test(txt)) detectedZone = 'puerto_montt';
-        else if (stgoRe.test(txt)) detectedZone = 'santiago';
+        // Fallback on the latest user message, using the aliases configured per zone
+        detectedZone = detectZoneFromText(workshopZones, message_text);
       }
 
       if (detectedZone) {

@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, workshop_id, full_name, email, role, status, google_calendar_connected, google_calendar_email, google_calendar_id, google_connected_at, zone')
       .eq('id', userId)
       .maybeSingle();
 
@@ -164,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: workshop, error: workshopError } = await supabase
         .from('workshops')
         .insert({ name: workshopName })
-        .select()
+        .select('id')
         .single();
 
       if (workshopError) {

@@ -4,6 +4,8 @@ import { ConversationList } from '@/components/inbox/ConversationList';
 import { ChatView } from '@/components/inbox/ChatView';
 import { useConversations, Conversation } from '@/hooks/useConversations';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useWorkshopZones } from '@/hooks/useWorkshopZones';
 import { MessageSquare, ArrowLeft, Inbox, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,14 +35,6 @@ function ConversationListSkeleton() {
   );
 }
 
-const SOC_WORKSHOP_ID = '610fb257-a649-4115-b944-21f31e7952db';
-
-const ZONE_LABELS: Record<string, string> = {
-  santiago: 'Santiago',
-  talca: 'Talca',
-  puerto_montt: 'Puerto Montt',
-};
-
 export default function InboxPage() {
   const { profile } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -49,12 +43,14 @@ export default function InboxPage() {
   const [zoneFilter, setZoneFilter] = useState<string>('all');
   const { data: conversations, isLoading } = useConversations();
 
+  const { features } = useWorkshopFeatures();
+  const { zones: workshopZones, labelOf } = useWorkshopZones();
   const isAdminOrSuperadmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
   const isStaff = profile?.role === 'STAFF';
   const staffZone = isStaff ? profile?.zone : null;
 
-  // Show zone dropdown ONLY for ADMIN/SUPERADMIN of SOC workshop
-  const showZoneFilter = isAdminOrSuperadmin && profile?.workshop_id === SOC_WORKSHOP_ID;
+  // Show zone dropdown ONLY for ADMIN/SUPERADMIN of workshops with zones enabled
+  const showZoneFilter = isAdminOrSuperadmin && features.zones;
   // Show zone badge for STAFF with assigned zone
   const showZoneBadge = isStaff && !!staffZone;
 
@@ -127,16 +123,16 @@ export default function InboxPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las zonas</SelectItem>
-                <SelectItem value="santiago">📍 Santiago</SelectItem>
-                <SelectItem value="talca">📍 Talca</SelectItem>
-                <SelectItem value="puerto_montt">📍 Puerto Montt</SelectItem>
+                {workshopZones.map(zone => (
+                  <SelectItem key={zone.key} value={zone.key}>📍 {zone.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           )}
           {showZoneBadge && (
             <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-foreground">
               <MapPin className="w-3.5 h-3.5 text-primary" />
-              Zona: <span className="font-semibold">{ZONE_LABELS[staffZone!] || staffZone}</span>
+              Zona: <span className="font-semibold">{labelOf(staffZone)}</span>
             </div>
           )}
         </div>

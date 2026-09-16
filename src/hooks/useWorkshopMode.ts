@@ -21,7 +21,7 @@ export function useWorkshopMode() {
       }
       
       const { data, error } = await supabase
-        .from('workshops')
+        .from('workshops_safe')
         .select('booking_mode, category, name')
         .eq('id', profile.workshop_id)
         .single();

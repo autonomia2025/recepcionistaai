@@ -57,7 +57,7 @@ interface WorkshopInfo {
   phone: string | null;
   city: string | null;
   booking_url: string | null;
-  zone_detection_enabled?: boolean | null;
+  features?: Json | null;
 }
 
 interface BotSettingsEditorProps {
@@ -113,8 +113,8 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
     queryKey: ['workshop-info', workshopId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('workshops')
-        .select('address, phone, city, booking_url, zone_detection_enabled')
+        .from('workshops_safe')
+        .select('address, phone, city, booking_url, features')
         .eq('id', workshopId)
         .single();
       
@@ -151,7 +151,7 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
       setWorkshopPhone(workshopInfo.phone || '');
       setWorkshopCity(workshopInfo.city || '');
       setBookingUrl(workshopInfo.booking_url || '');
-      setZoneDetectionEnabled(!!workshopInfo.zone_detection_enabled);
+      setZoneDetectionEnabled((workshopInfo.features as Record<string, unknown> | null)?.zones === true);
     }
   }, [workshopInfo]);
 
@@ -169,7 +169,10 @@ export function BotSettingsEditor({ workshopId, workshopName, open, onOpenChange
           phone: workshopPhone || null,
           city: workshopCity || null,
           booking_url: bookingUrl || null,
-          zone_detection_enabled: zoneDetectionEnabled,
+          features: {
+            ...((workshopInfo?.features as Record<string, unknown> | null) ?? {}),
+            zones: zoneDetectionEnabled,
+          } as Json,
         })
         .eq('id', workshopId);
       
