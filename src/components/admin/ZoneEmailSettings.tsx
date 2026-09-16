@@ -194,13 +194,17 @@ export function ZoneEmailSettings({ workshopId }: ZoneEmailSettingsProps) {
               <div className="flex items-center gap-3 p-3">
                 <span className={cn('w-2.5 h-2.5 rounded-full shrink-0', zoneDotClass(valueOf(zone, 'color')))} />
 
-                <CollapsibleTrigger className="flex-1 min-w-0 text-left group">
-                  <div className="flex items-center gap-2">
+                <CollapsibleTrigger className="flex-1 min-w-0 text-left">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="font-medium truncate">{valueOf(zone, 'label')}</span>
-                    <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{zone.key}</code>
-                    {isDirty && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">sin guardar</Badge>}
+                    {isDirty && (
+                      <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">
+                        sin guardar
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    <code className="bg-muted px-1 py-0.5 rounded mr-1.5">{zone.key}</code>
                     {aliases.length} {aliases.length === 1 ? 'comuna' : 'comunas'}
                     {email ? ` · avisa a ${email}` : ' · sin correo de alertas'}
                   </p>

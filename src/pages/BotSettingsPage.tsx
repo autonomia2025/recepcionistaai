@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, MessageSquare, HelpCircle, Sparkles, Save, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, HelpCircle, Sparkles, Save, Loader2, BookOpen, ChevronDown, FileText } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
@@ -71,6 +73,7 @@ export default function BotSettingsPage() {
   const [tone, setTone] = useState('professional');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [sendPdfDatasheets, setSendPdfDatasheets] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -395,19 +398,43 @@ export default function BotSettingsPage() {
                     workshopId={profile.workshop_id}
                     onImportComplete={() => refetchDocs()}
                   />
-                  <DocumentList
-                    documents={documents}
-                    onDelete={() => refetchDocs()}
-                    isLoading={isLoadingDocs}
-                  />
+                  <Collapsible open={docsOpen} onOpenChange={setDocsOpen} className="rounded-xl border">
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors rounded-xl"
+                      >
+                        <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                          <FileText className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">Documentos cargados</p>
+                          <p className="text-xs text-muted-foreground">
+                            {documents.length} {documents.length === 1 ? 'documento' : 'documentos'}
+                            {usedBytes > 0 && ` · ${(usedBytes / (1024 * 1024)).toFixed(1)} MB`}
+                          </p>
+                        </div>
+                        <ChevronDown className={cn('w-4 h-4 shrink-0 transition-transform', docsOpen && 'rotate-180')} />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t p-3 max-h-[420px] overflow-y-auto">
+                        <DocumentList
+                          documents={documents}
+                          onDelete={() => refetchDocs()}
+                          isLoading={isLoadingDocs}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  {sendPdfDatasheets && <DatasheetLibrary workshopId={profile.workshop_id} />}
                 </>
               )}
             </CardContent>
           </Card>
 
-          {profile?.workshop_id && sendPdfDatasheets && (
-            <DatasheetLibrary workshopId={profile.workshop_id} />
-          )}
+          {profile?.workshop_id && <ZoneEmailSettings workshopId={profile.workshop_id} />}
 
           {/* Personalidad */}
           {profile?.workshop_id && sendPdfDatasheets && (
@@ -633,11 +660,10 @@ export default function BotSettingsPage() {
           </div>
         </div>
 
-        {/* Right column - Chat Simulator + Zone Emails */}
+        {/* Right column - Chat Simulator */}
         <div className="xl:col-span-1 space-y-4">
           <div className="xl:sticky xl:top-6 space-y-4">
             <ChatSimulator />
-            {profile?.workshop_id && <ZoneEmailSettings workshopId={profile.workshop_id} />}
           </div>
         </div>
       </div>
