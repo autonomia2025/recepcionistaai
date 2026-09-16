@@ -26,6 +26,7 @@ import CancelAppointmentPage from "@/pages/CancelAppointmentPage";
 import LandingWizardPage from "@/pages/LandingWizardPage";
 import EmailSettingsPage from "@/pages/EmailSettingsPage";
 import SalesControlPage from "@/pages/SalesControlPage";
+import CommercialSettingsPage from "@/pages/CommercialSettingsPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import NotFound from "@/pages/NotFound";
@@ -87,6 +88,7 @@ const AppRoutes = () => {
         <Route path="/automations" element={<AdminOnlyRoute><AutomationsPage /></AdminOnlyRoute>} />
         <Route path="/email-settings" element={<AdminOnlyRoute><EmailSettingsPage /></AdminOnlyRoute>} />
         <Route path="/sales-control" element={<AdminOnlyRoute><SalesControlPage /></AdminOnlyRoute>} />
+        <Route path="/commercial-settings" element={<AdminOnlyRoute><CommercialSettingsPage /></AdminOnlyRoute>} />
         {/* Admin Routes */}
         <Route path="/admin/workshops" element={<SuperAdminRoute><AdminWorkshopsPage /></SuperAdminRoute>} />
         <Route path="/admin/cobranzas" element={<SuperAdminRoute><CobranzasPage /></SuperAdminRoute>} />

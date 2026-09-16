@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeatInfo, useSubscription, useWorkshop } from '@/hooks/useWorkshopData';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useEffect, useMemo, useState } from 'react';
 import { UserSettingsDialog } from './UserSettingsDialog';
 import { useWorkshopZones, zoneSidebarClass } from '@/hooks/useWorkshopZones';
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 const superadminNavItems = [{
   to: '/admin/workshops',
   icon: Building2,
@@ -64,6 +65,7 @@ export const AppSidebar = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const isSuperAdmin = profile?.role === 'SUPERADMIN';
   const { labelOf, colorOf } = useWorkshopZones();
+  const { features } = useWorkshopFeatures();
   const isImpersonating = !!impersonatedWorkshopId;
   const showLandingButton = (!isSuperAdmin || isImpersonating) && profile?.role === 'ADMIN' && workshopMode?.booking_mode === 'with_scheduling';
 
@@ -113,6 +115,14 @@ export const AppSidebar = () => {
       label: 'Configurar Bot'
     });
 
+    if (features.commercial) {
+      baseItems.push({
+        to: '/commercial-settings',
+        icon: Briefcase,
+        label: 'Configuración comercial'
+      });
+    }
+
     // Only show Recordatorios for workshops with scheduling
     if (workshopMode?.booking_mode === 'with_scheduling') {
       baseItems.push({
@@ -128,7 +138,7 @@ export const AppSidebar = () => {
       label: 'Correo'
     });
     return baseItems;
-  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId, profile?.role]);
+  }, [isSuperAdmin, workshopMode?.booking_mode, impersonatedWorkshopId, profile?.role, features.commercial]);
   const seatDisplay = seatInfo?.isUnlimited ? `${seatInfo.usedSeats} / ∞` : `${seatInfo?.usedSeats || 0} / ${seatInfo?.maxSeats || 0}`;
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1023px)');

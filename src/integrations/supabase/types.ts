@@ -2706,6 +2706,159 @@ export type Database = {
           },
         ]
       }
+      commercial_settings: {
+        Row: {
+          address: string | null
+          business_closes_at: string
+          business_days: number[]
+          business_opens_at: string
+          created_at: string
+          default_delivery_terms: string
+          default_payment_terms: string
+          discount_approval_threshold: number
+          email: string | null
+          legal_footer: string
+          legal_name: string | null
+          logo_path: string | null
+          lost_reasons: string[]
+          next_quote_number: number
+          phones: string[]
+          primary_color: string
+          quote_number_includes_year: boolean
+          quote_number_padding: number
+          quote_prefix: string
+          quote_validity_days: number
+          secondary_color: string
+          tax_id: string | null
+          timezone: string
+          unquoted_lead_alert_hours: number
+          updated_at: string
+          vat_rate: number
+          workshop_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_closes_at?: string
+          business_days?: number[]
+          business_opens_at?: string
+          created_at?: string
+          default_delivery_terms?: string
+          default_payment_terms?: string
+          discount_approval_threshold?: number
+          email?: string | null
+          legal_footer?: string
+          legal_name?: string | null
+          logo_path?: string | null
+          lost_reasons?: string[]
+          next_quote_number?: number
+          phones?: string[]
+          primary_color?: string
+          quote_number_includes_year?: boolean
+          quote_number_padding?: number
+          quote_prefix?: string
+          quote_validity_days?: number
+          secondary_color?: string
+          tax_id?: string | null
+          timezone?: string
+          unquoted_lead_alert_hours?: number
+          updated_at?: string
+          vat_rate?: number
+          workshop_id: string
+        }
+        Update: {
+          address?: string | null
+          business_closes_at?: string
+          business_days?: number[]
+          business_opens_at?: string
+          created_at?: string
+          default_delivery_terms?: string
+          default_payment_terms?: string
+          discount_approval_threshold?: number
+          email?: string | null
+          legal_footer?: string
+          legal_name?: string | null
+          logo_path?: string | null
+          lost_reasons?: string[]
+          next_quote_number?: number
+          phones?: string[]
+          primary_color?: string
+          quote_number_includes_year?: boolean
+          quote_number_padding?: number
+          quote_prefix?: string
+          quote_validity_days?: number
+          secondary_color?: string
+          tax_id?: string | null
+          timezone?: string
+          unquoted_lead_alert_hours?: number
+          updated_at?: string
+          vat_rate?: number
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_settings_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: true
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_playbook_docs: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_playbook_docs_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workshop_zones: {
         Row: {
           aliases: string[]
@@ -3164,7 +3317,12 @@ export type Database = {
         }[]
       }
       get_superadmin_kpis: { Args: never; Returns: Json }
+      ensure_commercial_settings: {
+        Args: { _workshop_id: string }
+        Returns: Database["public"]["Tables"]["commercial_settings"]["Row"]
+      }
       get_user_workshop_id: { Args: { _user_id: string }; Returns: string }
+      is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       has_feature: {
         Args: { _feature: string; _workshop_id: string }
         Returns: boolean
