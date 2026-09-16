@@ -985,7 +985,7 @@ export type Database = {
           resolved: boolean | null
           resolved_at: string | null
           resolved_by: string | null
-          workshop_id: string
+          workshop_id: string | null
         }
         Insert: {
           category: string
@@ -997,7 +997,7 @@ export type Database = {
           resolved?: boolean | null
           resolved_at?: string | null
           resolved_by?: string | null
-          workshop_id: string
+          workshop_id?: string | null
         }
         Update: {
           category?: string
@@ -1009,7 +1009,7 @@ export type Database = {
           resolved?: boolean | null
           resolved_at?: string | null
           resolved_by?: string | null
-          workshop_id?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -3323,6 +3323,8 @@ export type Database = {
       }
       get_user_workshop_id: { Args: { _user_id: string }; Returns: string }
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
+      invoke_scheduled_task: { Args: { _task: string }; Returns: number }
+      verify_cron_secret: { Args: { _token: string }; Returns: boolean }
       has_feature: {
         Args: { _feature: string; _workshop_id: string }
         Returns: boolean

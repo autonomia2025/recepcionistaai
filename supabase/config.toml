@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.scrape-website]
 verify_jwt = false
+
+[functions.scheduled-tasks]
+verify_jwt = false
