@@ -23,6 +23,7 @@ import { ChatSimulator } from '@/components/bot/ChatSimulator';
 import * as XLSX from 'xlsx';
 import { DocumentUploader } from '@/components/bot/DocumentUploader';
 import { DocumentList } from '@/components/bot/DocumentList';
+import { DatasheetLibrary } from '@/components/bot/DatasheetLibrary';
 import { DatasheetCoverage } from '@/components/bot/DatasheetCoverage';
 import { WebImporter } from '@/components/bot/WebImporter';
 import { ZoneEmailSettings } from '@/components/admin/ZoneEmailSettings';
@@ -403,6 +404,10 @@ export default function BotSettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {profile?.workshop_id && sendPdfDatasheets && (
+            <DatasheetLibrary workshopId={profile.workshop_id} />
+          )}
 
           {/* Personalidad */}
           {profile?.workshop_id && sendPdfDatasheets && (
