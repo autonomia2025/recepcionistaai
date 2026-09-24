@@ -2458,7 +2458,6 @@ export type Database = {
           address: string | null
           assigned_at: string | null
           assigned_staff_id: string | null
-          auto_created: boolean
           closed_at: string | null
           comuna: string | null
           contact_id: string
@@ -2470,7 +2469,6 @@ export type Database = {
           id: string
           notes: string | null
           preferred_time_window: string | null
-          qualification: Json | null
           quote_amount: number | null
           quote_file_url: string | null
           quoted_at: string | null
@@ -2486,7 +2484,6 @@ export type Database = {
           address?: string | null
           assigned_at?: string | null
           assigned_staff_id?: string | null
-          auto_created?: boolean
           closed_at?: string | null
           comuna?: string | null
           contact_id: string
@@ -2498,7 +2495,6 @@ export type Database = {
           id?: string
           notes?: string | null
           preferred_time_window?: string | null
-          qualification?: Json | null
           quote_amount?: number | null
           quote_file_url?: string | null
           quoted_at?: string | null
@@ -2514,7 +2510,6 @@ export type Database = {
           address?: string | null
           assigned_at?: string | null
           assigned_staff_id?: string | null
-          auto_created?: boolean
           closed_at?: string | null
           comuna?: string | null
           contact_id?: string
@@ -2526,7 +2521,6 @@ export type Database = {
           id?: string
           notes?: string | null
           preferred_time_window?: string | null
-          qualification?: Json | null
           quote_amount?: number | null
           quote_file_url?: string | null
           quoted_at?: string | null
@@ -3354,15 +3348,6 @@ export type Database = {
       accept_invite: { Args: { invite_token: string }; Returns: Json }
       apply_safe_column_grants: { Args: { _table: string }; Returns: string[] }
       current_staff_zone: { Args: never; Returns: string }
-      create_hot_lead_request: {
-        Args: {
-          _contact_id: string
-          _conversation_id: string
-          _description: string
-          _reasons: Json
-        }
-        Returns: Json
-      }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {
