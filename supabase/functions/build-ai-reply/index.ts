@@ -758,10 +758,19 @@ serve(async (req) => {
   });
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  try {
-    const { conversation_id, workshop_id, message_text, contact_name } = await req.json();
+  // Dry run (SUPERADMIN only): used by the regression script. The history,
+  // stored state and contact zone come in the request and nothing is written
+  // to the database; the reply is computed exactly as in a real turn.
+  let isDryRun = false;
 
-    if (!conversation_id || !workshop_id || !message_text) {
+  try {
+    const {
+      conversation_id, workshop_id, message_text, contact_name,
+      dry_run, history: dryRunHistory, bot_state: dryRunBotState, contact_zone: dryRunContactZone,
+    } = await req.json();
+    isDryRun = dry_run === true;
+
+    if ((!conversation_id && !isDryRun) || !workshop_id || !message_text) {
       return new Response(JSON.stringify({
         error: 'Missing required fields: conversation_id, workshop_id, message_text'
       }), {
@@ -807,6 +816,12 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      if (isDryRun && profile.role !== 'SUPERADMIN') {
+        return new Response(JSON.stringify({ error: 'Forbidden: dry_run requires SUPERADMIN' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     } else {
       console.log('Service role or direct internal call detected, bypassing profile check');
     }
@@ -848,11 +863,13 @@ serve(async (req) => {
     };
 
     // Validate conversation belongs to workshop if it exists
-    const { data: conversation } = await supabase
-      .from('conversations')
-      .select('workshop_id, contact_id, assigned_to_user_id, bot_state')
-      .eq('id', conversation_id)
-      .maybeSingle();
+    const { data: conversation } = isDryRun
+      ? { data: { workshop_id, contact_id: null, assigned_to_user_id: null, bot_state: dryRunBotState ?? {} } }
+      : await supabase
+        .from('conversations')
+        .select('workshop_id, contact_id, assigned_to_user_id, bot_state')
+        .eq('id', conversation_id)
+        .maybeSingle();
 
 
     if (conversation?.workshop_id && conversation.workshop_id !== workshop_id) {
@@ -872,6 +889,9 @@ serve(async (req) => {
         .maybeSingle();
       if (c) contactRecord = c as { id: string; zone: string | null };
     }
+    if (isDryRun) {
+      contactRecord = { id: 'dry-run', zone: typeof dryRunContactZone === 'string' ? dryRunContactZone : null };
+    }
     const zoneDetectionEnabled = parseFeatures((workshop as any).features).zones;
     const workshopZones: WorkshopZone[] = zoneDetectionEnabled
       ? await fetchWorkshopZones(supabase, workshop_id)
@@ -881,12 +901,22 @@ serve(async (req) => {
     const needsZone = zoneDetectionEnabled && contactRecord && !contactRecord.zone;
 
     // Conversation history (last 10 messages, oldest first)
-    const { data: messageRows, error: messagesError } = await supabase
-      .from('messages')
-      .select('text, direction, created_at')
-      .eq('conversation_id', conversation_id)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const { data: messageRows, error: messagesError } = isDryRun
+      ? {
+        data: (Array.isArray(dryRunHistory) ? dryRunHistory : [])
+          .filter((m: unknown): m is { text: string; direction: string } =>
+            !!m && typeof (m as any).text === 'string' && ((m as any).direction === 'inbound' || (m as any).direction === 'outbound'))
+          .slice(-10)
+          .map(m => ({ text: m.text, direction: m.direction, created_at: '' }))
+          .reverse(),
+        error: null,
+      }
+      : await supabase
+        .from('messages')
+        .select('text, direction, created_at')
+        .eq('conversation_id', conversation_id)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError);
@@ -910,7 +940,7 @@ serve(async (req) => {
     const freshState = buildConversationState(messages, message_text);
     const conversationState = mergeConversationState(storedState, freshState);
     const stateChanged = JSON.stringify(storedState) !== JSON.stringify(conversationState);
-    if (stateChanged) {
+    if (stateChanged && !isDryRun) {
       const { error: stateError } = await supabase
         .from('conversations')
         .update({ bot_state: conversationState })
@@ -1211,7 +1241,7 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
 
       // Audit log (best-effort, non-blocking)
       try {
-        await supabase.from('health_logs').insert({
+        if (!isDryRun) await supabase.from('health_logs').insert({
           workshop_id,
           event_type: 'info',
           category: 'bot',
@@ -1237,6 +1267,10 @@ IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.`;
         should_send_booking_link: false,
         reasoning: 'Consulta sobre producto/categoría/precio sin información en RAG. Handoff forzado para evitar alucinación.',
         booking_url: fullBookingUrl,
+        ...(isDryRun ? {
+          dry_run: true,
+          debug: { layer: 'rag_empty_handoff', conversation_state: conversationState, retrieval_query: retrievalQuery },
+        } : {}),
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -1509,7 +1543,14 @@ Criterios:${isChatbotOnly ? '' : `
     console.log('AI reply result:', result);
 
     // ===== Zone detection & auto-assignment =====
-    if (zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
+    let dryRunDetectedZone: string | null = null;
+    if (isDryRun && zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
+      const aiZone = (result as any).detected_zone;
+      dryRunDetectedZone = typeof aiZone === 'string' && zoneKeyList.includes(aiZone)
+        ? aiZone
+        : detectZoneFromText(workshopZones, message_text);
+    }
+    if (!isDryRun && zoneDetectionEnabled && contactRecord && !contactRecord.zone) {
       let detectedZone: string | null = null;
       const aiZone = (result as any).detected_zone;
       if (typeof aiZone === 'string' && zoneKeyList.includes(aiZone)) {
@@ -1876,7 +1917,7 @@ Criterios:${isChatbotOnly ? '' : `
     });
 
     try {
-      await supabase.from('health_logs').insert({
+      if (!isDryRun) await supabase.from('health_logs').insert({
         workshop_id,
         event_type: parseFallbackUsed ? 'error' : 'info',
         category: 'bot',
@@ -1913,6 +1954,20 @@ Criterios:${isChatbotOnly ? '' : `
       booking_url: fullBookingUrl,
       attachment,
       attachments,
+      ...(isDryRun ? {
+        dry_run: true,
+        debug: {
+          layer: parseFallbackUsed ? 'parse_fallback' : (replyWasRewritten ? 'post_processing' : 'none'),
+          parse_fallback: parseFallbackUsed,
+          rewritten: replyWasRewritten,
+          catalog_driven: catalogDrivenReply,
+          ai_original: originalReplies,
+          conversation_state: conversationState,
+          retrieval_query: retrievalQuery,
+          catalog_block_rows: catalogBlockRows.length,
+          detected_zone: dryRunDetectedZone,
+        },
+      } : {}),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -1924,7 +1979,7 @@ Criterios:${isChatbotOnly ? '' : `
 
     // Log error to health_logs for monitoring
     try {
-      await supabase.from('health_logs').insert({
+      if (!isDryRun) await supabase.from('health_logs').insert({
         workshop_id: null,
         event_type: 'error',
         category: 'bot',

@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 recepcionistaai/.env
+
+# Bot regression: real conversations and results (customer data)
+tests/bot-regression/.data/
