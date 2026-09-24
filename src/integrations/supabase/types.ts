@@ -3431,6 +3431,11 @@ export type Database = {
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
+      current_staff_zone: { Args: never; Returns: string }
+      set_contact_zone: {
+        Args: { _contact_id: string; _zone: string | null }
+        Returns: undefined
+      }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       match_bot_knowledge: {
         Args: {

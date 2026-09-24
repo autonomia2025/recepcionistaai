@@ -155,10 +155,7 @@ export function ChatView({ conversation }: ChatViewProps) {
     setIsUpdatingZone(true);
     try {
       const value = newZone === 'none' ? null : newZone;
-      const { error } = await supabase
-        .from('contacts')
-        .update({ zone: value })
-        .eq('id', contact.id);
+      const { error } = await supabase.rpc('set_contact_zone', { _contact_id: contact.id, _zone: value });
       if (error) throw error;
       toast.success(value ? `Zona asignada: ${value}` : 'Zona removida');
       queryClient.invalidateQueries({ queryKey: ['conversations'] });

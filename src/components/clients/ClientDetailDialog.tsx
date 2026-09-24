@@ -252,10 +252,9 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
     const value = newZone === 'none' ? null : newZone;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ zone: value } as any)
-        .eq('id', contactId);
+      // Through the RPC: a zone-restricted seller can move a contact out of their
+      // zone, which a direct UPDATE no longer allows under the zone policies.
+      const { error } = await supabase.rpc('set_contact_zone', { _contact_id: contactId, _zone: value });
       if (error) throw error;
       setZone(value);
       queryClient.invalidateQueries({ queryKey: ['clients'] });
