@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWorkshopFeatures } from "../_shared/features.ts";
 import { buildZonePromptSection, fetchWorkshopZones, zoneKeys } from "../_shared/zones.ts";
+import { pickCommercialFields } from "../_shared/commercialExtraction.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,7 +73,7 @@ serve(async (req) => {
       });
     }
 
-    const { zones: zonesEnabled } = await fetchWorkshopFeatures(supabase, workshop_id);
+    const { zones: zonesEnabled, commercial: commercialEnabled } = await fetchWorkshopFeatures(supabase, workshop_id);
     const workshopZones = zonesEnabled ? await fetchWorkshopZones(supabase, workshop_id) : [];
     const zoneKeyList = zoneKeys(workshopZones);
 
@@ -167,7 +168,9 @@ Responde SOLO con este JSON (sin markdown ni texto adicional):
     "vehicle_brand": "Toyota o null",
     "vehicle_model": "Corolla o null",
     "vehicle_year": 2020,
-    "zone": "${zoneKeyList.join('|') || 'null'} o null"
+${commercialEnabled ? `    "company_name": "Empresa o razón social tal como la escribió el cliente, o null",
+    "tax_id": "RUT tal como lo escribió el cliente (ej: 76.644.520-9), o null",
+` : ''}    "zone": "${zoneKeyList.join('|') || 'null'} o null"
   }
 }
 
@@ -197,7 +200,12 @@ Busca en la conversación si el cliente menciona EXPLÍCITAMENTE:
    - "Mi auto es un Kia Sportage"
 
 ${zonesEnabled ? `5. ZONA: ${buildZonePromptSection(workshopZones)}` : '5. ZONA: No aplica para este negocio, siempre devolver zone = null'}
-
+${commercialEnabled ? `
+6. EMPRESA Y RUT: Detecta la empresa y el RUT para facturar, solo si el cliente los escribe
+   - "76644520-9 Soc ingenieria ltda" → company_name "Soc ingenieria ltda", tax_id "76644520-9"
+   - "la factura va a Agrícola Sur SpA, rut 76.123.456-7"
+   - Copia la empresa y el RUT tal como aparecen; no completes, no corrijas ni deduzcas
+` : ''}
 REGLAS:
 - Solo incluir datos que el cliente mencione EXPLÍCITAMENTE
 - NO inventar ni asumir datos
@@ -347,7 +355,7 @@ Estructura de cada item:
     // Get current contact data to avoid overwriting with nulls
     const { data: currentContact } = await supabase
       .from('contacts')
-      .select('name, phone, email, vehicle_brand, vehicle_model, vehicle_year, zone')
+      .select('name, phone, email, vehicle_brand, vehicle_model, vehicle_year, zone, field_sources')
       .eq('id', contact_id)
       .single();
 
@@ -440,6 +448,16 @@ Estructura de cada item:
       contactUpdate.recontact_reason = analysis.recontact_reason;
     }
 
+    // Data a person edited in the panel (set_contact_fields as "human") is
+    // never overwritten by the analysis.
+    const fieldSources = ((currentContact as { field_sources?: Record<string, string> } | null)?.field_sources) || {};
+    for (const key of ['name', 'phone', 'email']) {
+      if (fieldSources[key] === 'human' && key in contactUpdate) {
+        console.log(`Keeping ${key} edited by a person`);
+        delete contactUpdate[key];
+      }
+    }
+
     console.log('Contact update with extracted data:', {
       ...contactUpdate,
       extracted_name: extracted.name,
@@ -454,6 +472,24 @@ Estructura de cada item:
 
     if (contactError) {
       console.error('Error updating contact:', contactError);
+    }
+
+    // Commercial module: company and RUT, only when the customer wrote them.
+    // Written as "customer" through set_contact_fields, so a person's edit wins.
+    if (commercialEnabled) {
+      const commercialFields = pickCommercialFields(
+        extracted,
+        messages.filter(m => m.direction === 'inbound').map(m => m.text || ''),
+      );
+      if (Object.keys(commercialFields).length > 0) {
+        const { data: fieldsResult, error: fieldsError } = await supabase.rpc('set_contact_fields', {
+          _contact_id: contact_id,
+          _fields: commercialFields,
+          _source: 'customer',
+        });
+        if (fieldsError) console.error('Error saving company/RUT:', fieldsError);
+        else console.log('Company/RUT from conversation:', { proposed: commercialFields, result: fieldsResult });
+      }
     }
 
     // Update conversation with summary and sentiment
