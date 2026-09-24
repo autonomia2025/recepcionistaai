@@ -3278,6 +3278,7 @@ export type Database = {
     Functions: {
       accept_invite: { Args: { invite_token: string }; Returns: Json }
       apply_safe_column_grants: { Args: { _table: string }; Returns: string[] }
+      current_staff_zone: { Args: never; Returns: string }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {
@@ -3316,6 +3317,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      format_rut: { Args: { _rut: string }; Returns: string }
       get_churn_risk: { Args: { p_workshop_id: string }; Returns: string }
       get_conversation_messages: {
         Args: { _conversation_id: string }
@@ -3440,16 +3442,6 @@ export type Database = {
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
-      format_rut: { Args: { _rut: string }; Returns: string }
-      set_contact_fields: {
-        Args: { _contact_id: string; _fields: Json; _source: string }
-        Returns: Json
-      }
-      current_staff_zone: { Args: never; Returns: string }
-      set_contact_zone: {
-        Args: { _contact_id: string; _zone: string | null }
-        Returns: undefined
-      }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       match_bot_knowledge: {
         Args: {
@@ -3466,6 +3458,14 @@ export type Database = {
         }[]
       }
       rebuild_workshops_safe_view: { Args: never; Returns: undefined }
+      set_contact_fields: {
+        Args: { _contact_id: string; _fields: Json; _source: string }
+        Returns: Json
+      }
+      set_contact_zone: {
+        Args: { _contact_id: string; _zone: string }
+        Returns: undefined
+      }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
