@@ -16,7 +16,9 @@ describe("normalizeProductCode", () => {
   });
 });
 
-describe("extractProductCodes (mensaje del cliente)", () => {
+// build-ai-reply reads customer messages with its own stricter extractSocProductCodes;
+// this shared extractor still resolves datasheets, menu picks and reply checks.
+describe("extractProductCodes (extractor compartido)", () => {
   it("una letra de menú no es un código", () => {
     expect(extractProductCodes("B")).toEqual([]);
     expect(extractProductCodes("la C")).toEqual([]);
