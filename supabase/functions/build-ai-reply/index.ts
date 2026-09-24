@@ -18,6 +18,7 @@ import {
   mapWaterType,
 } from "../_shared/catalog.ts";
 import { parseFeatures } from "../_shared/features.ts";
+import { buildProductEvents } from "../_shared/productEvents.ts";
 import {
   detectZoneFromText,
   fetchWorkshopZones,
@@ -1905,6 +1906,49 @@ Criterios:${isChatbotOnly ? '' : `
     // actually receive, so any silent rewrite by a guardrail is auditable.
     const finalReplies = [...(result.replies || [])];
     const replyWasRewritten = JSON.stringify(originalReplies) !== JSON.stringify(finalReplies);
+
+    // ===== Product events (commercial module) =====
+    // Record-only: runs after the reply is final and never changes it. Which
+    // catalog models the customer asked for, the bot showed, the customer
+    // picked, and whose datasheet was sent.
+    if (!isDryRun && parseFeatures((workshop as any).features).commercial && conversation?.contact_id) {
+      try {
+        let datasheets: Array<{ file_name: string; sku_normalized: string | null }> = [];
+        if (attachments.length > 0) {
+          const names = attachments.map(a => a.file_name);
+          const { data: mapped } = await supabase
+            .from('product_catalog')
+            .select('sku_normalized, datasheet_file')
+            .eq('workshop_id', workshop_id)
+            .in('datasheet_file', names);
+          const skuByFile = new Map(((mapped || []) as Array<{ sku_normalized: string; datasheet_file: string }>).map(r => [r.datasheet_file, r.sku_normalized]));
+          datasheets = names.map(file_name => ({ file_name, sku_normalized: skuByFile.get(file_name) ?? null }));
+        }
+
+        const productEvents = buildProductEvents({
+          customerCodes: extractSocProductCodes(message_text),
+          chosenCode: selectedMenuProductCode,
+          replies: finalReplies,
+          datasheets,
+          catalogSkus,
+        });
+
+        if (productEvents.length > 0) {
+          const { error: eventsError } = await supabase.from('conversation_product_events').insert(
+            productEvents.map(event => ({
+              workshop_id,
+              conversation_id,
+              contact_id: conversation.contact_id,
+              ...event,
+            })),
+          );
+          if (eventsError) console.error('Failed to record product events:', eventsError);
+          else console.log('Product events:', productEvents.map(e => `${e.event_type}:${e.sku_normalized ?? e.detail.file_name}`));
+        }
+      } catch (eventsErr) {
+        console.error('Product events error (reply unaffected):', eventsErr);
+      }
+    }
 
     console.log('Response trace:', {
       conversation_id,
