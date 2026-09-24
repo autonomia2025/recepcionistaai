@@ -829,10 +829,12 @@ export type Database = {
         Row: {
           archived: boolean | null
           closed_at: string | null
+          company_name: string | null
           created_at: string
           detected_intent: string | null
           did_schedule: boolean | null
           email: string | null
+          field_sources: Json
           id: string
           instagram_id: string | null
           intent_confidence: number | null
@@ -849,6 +851,7 @@ export type Database = {
           schedule_confidence: number | null
           should_recontact: boolean | null
           tags: string[] | null
+          tax_id: string | null
           vehicle_brand: string | null
           vehicle_model: string | null
           vehicle_year: number | null
@@ -860,10 +863,12 @@ export type Database = {
         Insert: {
           archived?: boolean | null
           closed_at?: string | null
+          company_name?: string | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
           email?: string | null
+          field_sources?: Json
           id?: string
           instagram_id?: string | null
           intent_confidence?: number | null
@@ -880,6 +885,7 @@ export type Database = {
           schedule_confidence?: number | null
           should_recontact?: boolean | null
           tags?: string[] | null
+          tax_id?: string | null
           vehicle_brand?: string | null
           vehicle_model?: string | null
           vehicle_year?: number | null
@@ -891,10 +897,12 @@ export type Database = {
         Update: {
           archived?: boolean | null
           closed_at?: string | null
+          company_name?: string | null
           created_at?: string
           detected_intent?: string | null
           did_schedule?: boolean | null
           email?: string | null
+          field_sources?: Json
           id?: string
           instagram_id?: string | null
           intent_confidence?: number | null
@@ -911,6 +919,7 @@ export type Database = {
           schedule_confidence?: number | null
           should_recontact?: boolean | null
           tags?: string[] | null
+          tax_id?: string | null
           vehicle_brand?: string | null
           vehicle_model?: string | null
           vehicle_year?: number | null
@@ -3431,6 +3440,11 @@ export type Database = {
       }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
+      format_rut: { Args: { _rut: string }; Returns: string }
+      set_contact_fields: {
+        Args: { _contact_id: string; _fields: Json; _source: string }
+        Returns: Json
+      }
       current_staff_zone: { Args: never; Returns: string }
       set_contact_zone: {
         Args: { _contact_id: string; _zone: string | null }

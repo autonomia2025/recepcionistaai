@@ -24,6 +24,9 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { formatRut, isValidRut } from '@/lib/rut';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import {
@@ -49,6 +52,7 @@ import {
   Timer,
   RefreshCw,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -76,6 +80,8 @@ interface Contact {
   tags: string[] | null;
   last_analyzed_at: string | null;
   zone?: string | null;
+  company_name?: string | null;
+  tax_id?: string | null;
 }
 
 interface ServiceRequest {
@@ -286,12 +292,160 @@ function ZoneSelector({ contactId, initialValue }: { contactId: string; initialV
   );
 }
 
+type ContactDetails = {
+  name: string;
+  phone: string | null;
+  email: string | null;
+  company_name: string | null;
+  tax_id: string | null;
+};
+
+const CONTACT_FIELDS: Array<{ key: keyof ContactDetails; label: string; icon: typeof User; placeholder: string }> = [
+  { key: 'name', label: 'Nombre', icon: User, placeholder: 'Nombre del cliente' },
+  { key: 'company_name', label: 'Empresa', icon: Building, placeholder: 'Razón social' },
+  { key: 'tax_id', label: 'RUT', icon: Hash, placeholder: '76.644.520-9' },
+  { key: 'phone', label: 'Teléfono', icon: Phone, placeholder: '+56 9 1234 5678' },
+  { key: 'email', label: 'Correo', icon: Mail, placeholder: 'correo@empresa.cl' },
+];
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+// Edits go through set_contact_fields as "human": whatever a person writes here
+// is never overwritten by the conversation analysis.
+function ContactDataCard({ contactId, details, onSaved }: {
+  contactId: string;
+  details: ContactDetails;
+  onSaved: (details: ContactDetails) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<ContactDetails>(details);
+  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+
+  const clean = (value: string | null) => (value ?? '').trim();
+  const changed = CONTACT_FIELDS.map(f => f.key).filter(key => clean(draft[key]) !== clean(details[key]));
+  const rutInvalid = !!clean(draft.tax_id) && !isValidRut(clean(draft.tax_id));
+  const emailInvalid = !!clean(draft.email) && !EMAIL_RE.test(clean(draft.email));
+  const nameEmpty = !clean(draft.name);
+
+  const startEditing = () => {
+    setDraft(details);
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (changed.length === 0) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const fields = Object.fromEntries(changed.map(key => [key, clean(draft[key]) || null]));
+      const { error } = await supabase.rpc('set_contact_fields', {
+        _contact_id: contactId,
+        _fields: fields,
+        _source: 'human',
+      });
+      if (error) throw error;
+
+      const saved: ContactDetails = { ...details };
+      for (const key of changed) {
+        const value = clean(draft[key]) || null;
+        saved[key] = (key === 'tax_id' && value ? formatRut(value) : key === 'email' && value ? value.toLowerCase() : value) as never;
+      }
+      onSaved(saved);
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('Datos del cliente actualizados');
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : 'No se pudieron guardar los datos');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Briefcase className="w-4 h-4" />
+          Datos del cliente
+        </CardTitle>
+        {!editing && (
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={startEditing}>
+            <Pencil className="w-3.5 h-3.5 mr-1" />
+            Editar
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {editing ? (
+          <div className="space-y-3">
+            {CONTACT_FIELDS.map(({ key, label, placeholder }) => {
+              const invalid = (key === 'tax_id' && rutInvalid) || (key === 'email' && emailInvalid) || (key === 'name' && nameEmpty);
+              return (
+                <div key={key} className="space-y-1">
+                  <Label htmlFor={`contact-${key}`} className="text-xs">{label}</Label>
+                  <Input
+                    id={`contact-${key}`}
+                    value={draft[key] ?? ''}
+                    placeholder={placeholder}
+                    aria-invalid={invalid}
+                    className={cn('h-8 text-sm', invalid && 'border-destructive')}
+                    onChange={(event) => setDraft(d => ({ ...d, [key]: event.target.value }))}
+                    onBlur={() => {
+                      if (key === 'tax_id' && clean(draft.tax_id) && isValidRut(clean(draft.tax_id))) {
+                        setDraft(d => ({ ...d, tax_id: formatRut(clean(d.tax_id)) }));
+                      }
+                    }}
+                  />
+                  {key === 'tax_id' && rutInvalid && <p className="text-xs text-destructive">RUT inválido: revisa el dígito verificador.</p>}
+                  {key === 'email' && emailInvalid && <p className="text-xs text-destructive">Correo inválido.</p>}
+                  {key === 'name' && nameEmpty && <p className="text-xs text-destructive">El nombre no puede quedar vacío.</p>}
+                </div>
+              );
+            })}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving || rutInvalid || emailInvalid || nameEmpty}>
+                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Guardar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+            {CONTACT_FIELDS.map(({ key, label, icon: Icon }) => (
+              <div key={key} className="contents">
+                <dt className="flex items-center gap-1.5 text-muted-foreground">
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </dt>
+                <dd className={cn('truncate', !details[key] && 'text-muted-foreground')}>{details[key] || 'Sin definir'}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ClientDetailContent({ contact }: { contact: Contact }) {
   const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
   const isChatbotOnly = workshopMode?.booking_mode === 'chatbot_only';
   const { features } = useWorkshopFeatures();
   const zonesEnabled = features.zones;
+  const commercialEnabled = features.commercial;
+  const [details, setDetails] = useState<ContactDetails>({
+    name: contact.name,
+    phone: contact.phone,
+    email: contact.email,
+    company_name: contact.company_name ?? null,
+    tax_id: contact.tax_id ?? null,
+  });
   const queryClient = useQueryClient();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -432,18 +586,18 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
               <User className="w-6 h-6 md:w-8 md:h-8 text-primary" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-lg md:text-xl font-semibold truncate">{contact.name}</h3>
+              <h3 className="text-lg md:text-xl font-semibold truncate">{details.name}</h3>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
-                {contact.phone && (
-                  <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground hover:text-primary">
+                {details.phone && (
+                  <a href={`tel:${details.phone}`} className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground hover:text-primary">
                     <Phone className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{contact.phone}</span>
+                    <span className="truncate">{details.phone}</span>
                   </a>
                 )}
-                {contact.email && (
-                  <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground hover:text-primary">
+                {details.email && (
+                  <a href={`mailto:${details.email}`} className="flex items-center gap-1 text-xs md:text-sm text-muted-foreground hover:text-primary">
                     <Mail className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate max-w-[200px]">{contact.email}</span>
+                    <span className="truncate max-w-[200px]">{details.email}</span>
                   </a>
                 )}
               </div>
@@ -456,6 +610,11 @@ function ClientDetailContent({ contact }: { contact: Contact }) {
             <p className="text-xs md:text-sm text-muted-foreground">{scoreInfo.label}</p>
           </div>
         </div>
+
+        {/* Editable customer data (commercial module) */}
+        {commercialEnabled && (
+          <ContactDataCard contactId={contact.id} details={details} onSaved={setDetails} />
+        )}
 
         {/* Re-analyze Button (for chatbot_only mode) */}
         {conversations && conversations.length > 0 && (
@@ -1004,7 +1163,7 @@ export function ClientDetailDialog({ contact, open, onOpenChange }: ClientDetail
             <SheetTitle className="text-lg">Ficha de Cliente</SheetTitle>
             <p className="sr-only">Información detallada del cliente seleccionado</p>
           </SheetHeader>
-          <ClientDetailContent contact={contact} />
+          <ClientDetailContent key={contact.id} contact={contact} />
         </SheetContent>
       </Sheet>
     );
@@ -1017,7 +1176,7 @@ export function ClientDetailDialog({ contact, open, onOpenChange }: ClientDetail
           <DialogTitle>Ficha de Cliente</DialogTitle>
           <DialogDescription className="sr-only">Información detallada del cliente seleccionado</DialogDescription>
         </DialogHeader>
-        <ClientDetailContent contact={contact} />
+        <ClientDetailContent key={contact.id} contact={contact} />
       </DialogContent>
     </Dialog>
   );
