@@ -952,6 +952,75 @@ export type Database = {
           },
         ]
       }
+      conversation_product_events: {
+        Row: {
+          contact_id: string
+          conversation_id: string
+          created_at: string
+          detail: Json
+          event_type: string
+          id: string
+          sku_normalized: string | null
+          workshop_id: string
+        }
+        Insert: {
+          contact_id: string
+          conversation_id: string
+          created_at?: string
+          detail?: Json
+          event_type: string
+          id?: string
+          sku_normalized?: string | null
+          workshop_id: string
+        }
+        Update: {
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string
+          detail?: Json
+          event_type?: string
+          id?: string
+          sku_normalized?: string | null
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_product_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_product_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_product_events_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_product_events_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_product_events_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           ai_summary: string | null
