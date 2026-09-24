@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWorkshopFeatures } from "../_shared/features.ts";
 import { buildZonePromptSection, fetchWorkshopZones, zoneKeys } from "../_shared/zones.ts";
 import { pickCommercialFields } from "../_shared/commercialExtraction.ts";
+import { buildHotLeadQualification } from "../_shared/hotLead.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -489,6 +490,43 @@ Estructura de cada item:
         });
         if (fieldsError) console.error('Error saving company/RUT:', fieldsError);
         else console.log('Company/RUT from conversation:', { proposed: commercialFields, result: fieldsResult });
+      }
+
+      // Hot lead → request in Solicitudes (create_hot_lead_request is the only
+      // automatic creator and never duplicates an open request).
+      try {
+        const [{ data: events }, { data: billing }] = await Promise.all([
+          supabase.from('conversation_product_events').select('event_type, sku_normalized').eq('conversation_id', conversation_id),
+          supabase.from('contacts').select('company_name, tax_id').eq('id', contact_id).single(),
+        ]);
+        const eventRows = (events || []) as Array<{ event_type: string; sku_normalized: string | null }>;
+        const skus = [...new Set(eventRows.map(e => e.sku_normalized).filter((s): s is string => !!s))];
+        const { data: labels } = skus.length > 0
+          ? await supabase.from('product_catalog').select('sku, sku_normalized').eq('workshop_id', workshop_id).in('sku_normalized', skus)
+          : { data: [] };
+
+        const qualification = buildHotLeadQualification({
+          leadScore: contactUpdate.lead_score as number,
+          leadScoreReasoning: (contactUpdate.lead_score_reasoning as string | null) ?? null,
+          events: eventRows,
+          companyName: billing?.company_name ?? null,
+          taxId: billing?.tax_id ?? null,
+          summary: analysis.summary || null,
+          skuLabels: new Map(((labels || []) as Array<{ sku: string; sku_normalized: string }>).map(r => [r.sku_normalized, r.sku])),
+        });
+
+        if (qualification) {
+          const { data: requestResult, error: requestError } = await supabase.rpc('create_hot_lead_request', {
+            _contact_id: contact_id,
+            _conversation_id: conversation_id,
+            _reasons: qualification.reasons,
+            _description: qualification.description,
+          });
+          if (requestError) console.error('Error creating hot lead request:', requestError);
+          else console.log('Hot lead request:', requestResult);
+        }
+      } catch (hotLeadError) {
+        console.error('Hot lead qualification error:', hotLeadError);
       }
     }
 
