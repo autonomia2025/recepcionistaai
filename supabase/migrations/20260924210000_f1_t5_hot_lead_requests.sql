@@ -2,8 +2,9 @@
 --
 -- create_hot_lead_request() es el único creador automático de solicitudes. Lo
 -- llama analyze-conversation (service role) en workshops con el módulo
--- comercial cuando el cliente tiene puntaje 80 o más, eligió un equipo del menú
--- o dejó RUT/empresa. Reglas:
+-- comercial solo para la cola del embudo: el cliente pidió explícitamente
+-- cotización formal o comprar (con su frase como evidencia), o dejó RUT/empresa.
+-- La decisión vive en supabase/functions/_shared/hotLead.ts. Reglas de la base:
 --   · No crea si el cliente ya tiene una solicitud abierta (manual o automática).
 --   · No crea si al cliente se le cerró una solicitud en los últimos 30 días.
 --   · Se asigna al vendedor de la conversación; si no hay, queda sin asignar.

@@ -162,7 +162,8 @@ Responde SOLO con este JSON (sin markdown ni texto adicional):
   "did_schedule": false,
   "schedule_confidence": 0.9,
   "quotation_items": [],
-  "extracted_data": {
+${commercialEnabled ? `  "quote_request": "frase exacta del cliente pidiendo cotización formal o comprar, o null",
+` : ''}  "extracted_data": {
     "name": "Juan Pérez o null si no se menciona",
     "phone": "+56912345678 o null si no se menciona",
     "email": "email@ejemplo.com o null si no se menciona",
@@ -250,7 +251,13 @@ Analiza el CONTENIDO REAL de los mensajes del cliente para determinar su intenci
 - Si la conversación es solo saludos iniciales sin contexto → intent = "saludo"
 - NO asumas "cotizacion" por defecto, analiza lo que el cliente realmente dice
 
-=== QUOTATION_ITEMS ===
+${commercialEnabled ? `=== QUOTE_REQUEST ===
+Copia TEXTUAL la frase del cliente (no del negocio) donde pide una cotización formal o dice que quiere comprar:
+   - "cotízame la MH130", "mándame la cotización", "necesito cotización para facturar", "la quiero", "quiero comprarla"
+NO cuenta como pedido: preguntar precio o cuánto cuesta, pedir la ficha técnica, elegir una opción del menú, responder solo "sí" u "ok".
+Si no hay un pedido así, devuelve null. No resumas ni parafrasees: copia sus palabras.
+
+` : ''}=== QUOTATION_ITEMS ===
 Solo incluye quotation_items si el cliente EXPLÍCITAMENTE menciona productos/servicios que quiere cotizar o comprar con detalles específicos. Si solo pregunta información general, deja el array vacío [].
 
 Estructura de cada item:
@@ -506,8 +513,9 @@ Estructura de cada item:
           : { data: [] };
 
         const qualification = buildHotLeadQualification({
+          quoteRequest: analysis.quote_request ?? null,
+          customerMessages: messages.filter(m => m.direction === 'inbound').map(m => m.text || ''),
           leadScore: contactUpdate.lead_score as number,
-          leadScoreReasoning: (contactUpdate.lead_score_reasoning as string | null) ?? null,
           events: eventRows,
           companyName: billing?.company_name ?? null,
           taxId: billing?.tax_id ?? null,
