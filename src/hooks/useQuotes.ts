@@ -182,7 +182,8 @@ export function useSaveQuote() {
         const position = index + 1;
         if (!line.id) {
           const { error } = await supabase.from('quote_lines').insert({
-            quote_id: quote.id, position, sku: line.sku, sku_normalized: line.sku_normalized,
+            quote_id: quote.id, workshop_id: quote.workshop_id, position,
+            sku: line.sku, sku_normalized: line.sku_normalized,
             description: line.description, quantity: line.quantity, unit_price: line.unit_price,
             discount_pct: line.discount_pct, price_min: line.price_min, price_max: line.price_max, source: line.source,
           });

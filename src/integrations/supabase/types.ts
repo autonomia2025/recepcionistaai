@@ -2350,9 +2350,9 @@ export type Database = {
           created_at: string
           description: string
           discount_pct: number
-          gross_amount: number
+          gross_amount: number | null
           id: string
-          line_total: number
+          line_total: number | null
           position: number
           price_max: number | null
           price_min: number | null
@@ -2368,9 +2368,9 @@ export type Database = {
           created_at?: string
           description: string
           discount_pct?: number
-          gross_amount?: number
+          gross_amount?: number | null
           id?: string
-          line_total?: number
+          line_total?: number | null
           position?: number
           price_max?: number | null
           price_min?: number | null
@@ -2380,15 +2380,15 @@ export type Database = {
           sku_normalized?: string | null
           source?: string
           unit_price?: number
-          workshop_id?: string
+          workshop_id: string
         }
         Update: {
           created_at?: string
           description?: string
           discount_pct?: number
-          gross_amount?: number
+          gross_amount?: number | null
           id?: string
-          line_total?: number
+          line_total?: number | null
           position?: number
           price_max?: number | null
           price_min?: number | null
@@ -2400,7 +2400,36 @@ export type Database = {
           unit_price?: number
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quote_lines_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_lines_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_lines_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_lines_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotes: {
         Row: {
@@ -2447,7 +2476,7 @@ export type Database = {
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
-          client_name?: string
+          client_name: string
           client_phone?: string | null
           client_tax_id?: string | null
           closed_at?: string | null
@@ -2455,7 +2484,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           created_by?: string | null
-          delivery_terms?: string
+          delivery_terms: string
           discount_over_threshold?: boolean
           discount_total?: number
           global_discount_pct?: number
@@ -2463,12 +2492,12 @@ export type Database = {
           id?: string
           issued_at?: string | null
           issued_by?: string | null
-          legal_footer?: string
+          legal_footer: string
           lost_reason?: string | null
           max_discount_pct?: number
           net_total?: number
           notes?: string | null
-          payment_terms?: string
+          payment_terms: string
           pdf_path?: string | null
           quote_number?: string | null
           revision_of?: string | null
@@ -2478,8 +2507,8 @@ export type Database = {
           status?: string
           total?: number
           updated_at?: string
-          validity_days?: number
-          vat_rate?: number
+          validity_days: number
+          vat_rate: number
           vat_total?: number
           workshop_id: string
         }
@@ -2523,7 +2552,78 @@ export type Database = {
           vat_total?: number
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quotes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_revision_of_fkey"
+            columns: ["revision_of"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_service_request_id_fkey"
+            columns: ["service_request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reminder_logs: {
         Row: {
@@ -3533,6 +3633,14 @@ export type Database = {
     Functions: {
       accept_invite: { Args: { invite_token: string }; Returns: Json }
       apply_safe_column_grants: { Args: { _table: string }; Returns: string[] }
+      can_work_quote: {
+        Args: { _contact_id: string; _workshop_id: string }
+        Returns: boolean
+      }
+      catalog_line_description: {
+        Args: { _row: Database["public"]["Tables"]["product_catalog"]["Row"] }
+        Returns: string
+      }
       create_hot_lead_request: {
         Args: {
           _contact_id: string
@@ -3542,9 +3650,11 @@ export type Database = {
         }
         Returns: Json
       }
+      create_quote_draft: {
+        Args: { _service_request_id: string }
+        Returns: Json
+      }
       current_staff_zone: { Args: never; Returns: string }
-      create_quote_draft: { Args: { _service_request_id: string }; Returns: Json }
-      issue_quote: { Args: { _quote_id: string }; Returns: Json }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {
@@ -3709,6 +3819,7 @@ export type Database = {
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
+      issue_quote: { Args: { _quote_id: string }; Returns: Json }
       match_bot_knowledge: {
         Args: {
           match_count?: number
