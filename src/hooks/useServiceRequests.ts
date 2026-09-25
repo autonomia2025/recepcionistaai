@@ -47,7 +47,11 @@ export interface ServiceRequest {
     name: string;
     phone: string | null;
     email: string | null;
+    company_name?: string | null;
+    tax_id?: string | null;
   };
+  auto_created?: boolean;
+  qualification?: unknown;
   conversations?: {
     id: string;
     ai_summary: string | null;
@@ -140,7 +144,7 @@ export function useServiceRequests() {
         .from('service_requests')
         .select(`
           *,
-          contacts (id, name, phone, email, zone),
+          contacts (id, name, phone, email, zone, company_name, tax_id),
           conversations (id, ai_summary, sentiment),
           assigned_staff:profiles!service_requests_assigned_staff_id_fkey (id, full_name),
           quoted_by_profile:profiles!service_requests_quoted_by_fkey (id, full_name)

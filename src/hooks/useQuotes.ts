@@ -10,8 +10,8 @@ export type CatalogRow = Pick<
 >;
 
 export const QUOTE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Borrador',
-  issued: 'Emitida',
+  draft: 'En preparación',
+  issued: 'Oficial',
   sent: 'Enviada',
   accepted: 'Aceptada',
   rejected: 'Rechazada',

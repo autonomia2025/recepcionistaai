@@ -1,21 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, FileCheck2, Loader2, Plus, Save, Search, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileCheck2, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { catalogLineDescription } from '@/lib/catalogDescription';
@@ -23,19 +18,24 @@ import { computeQuoteTotals, formatCLP, lineTotal } from '@/lib/quoteTotals';
 import { formatRut, isValidRut } from '@/lib/rut';
 import {
   type CatalogRow, type DraftLine, EDITABLE_QUOTE_FIELDS, type EditableQuoteFields, type Quote, type QuoteLine,
-  QUOTE_STATUS_LABELS, useCatalogSearch, useDeleteQuoteDraft, useDiscountThreshold, useIssueQuote, useQuote,
-  useQuoteSuggestions, useSaveQuote,
+  useCatalogSearch, useDeleteQuoteDraft, useDiscountThreshold, useIssueQuote, useQuote, useQuoteSuggestions, useSaveQuote,
 } from '@/hooks/useQuotes';
 
-const SOURCE_LABELS: Record<string, string> = {
-  chosen: 'Eligió',
-  customer_asked: 'Lo pidió',
-  datasheet_sent: 'Recibió ficha',
-  suggested: 'Sugerido',
-  manual: 'Agregado',
+// Where each line came from, said the way a seller would say it.
+const ORIGIN: Record<string, string> = {
+  chosen: 'El cliente la eligió en WhatsApp',
+  customer_asked: 'El cliente la preguntó',
+  datasheet_sent: 'Le enviamos su ficha',
+  suggested: 'Recomendada por el bot',
+  manual: 'Agregada a mano',
 };
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const digitsOnly = (value: string) => Number(value.replace(/\D/g, '')) || 0;
+const decimal = (value: string) => {
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const toDraftLine = (line: QuoteLine): DraftLine => ({
   key: line.id,
@@ -65,7 +65,37 @@ const fromCatalog = (row: CatalogRow, source: string): DraftLine => ({
   source,
 });
 
-const toNumber = (value: string) => (value.trim() === '' ? 0 : Number(value));
+function MoneyInput({ value, onChange, id, className }: { value: number; onChange: (value: number) => void; id?: string; className?: string }) {
+  return (
+    <div className={cn('relative', className)}>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+      <Input id={id} inputMode="numeric" className="pl-7 text-right tabular-nums"
+        value={value ? value.toLocaleString('es-CL') : ''} placeholder="0"
+        onChange={event => onChange(digitsOnly(event.target.value))} />
+    </div>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-base font-semibold">{title}</h3>
+        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ReadOnly({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn('text-sm', !value && 'text-muted-foreground')}>{value || '—'}</p>
+    </div>
+  );
+}
 
 interface QuoteEditorDialogProps {
   quoteId: string | null;
@@ -75,25 +105,50 @@ interface QuoteEditorDialogProps {
 
 export function QuoteEditorDialog({ quoteId, open, onOpenChange }: QuoteEditorDialogProps) {
   const { data, isLoading, error } = useQuote(open ? quoteId : null);
+  const [dirty, setDirty] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const requestClose = () => (dirty ? setConfirmClose(true) : onOpenChange(false));
+  const closeNow = () => { setConfirmClose(false); setDirty(false); onOpenChange(false); };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={next => (next ? onOpenChange(true) : requestClose())}>
+      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] h-[92vh] p-0 gap-0 flex flex-col overflow-hidden [&>button]:hidden">
         {isLoading || !data ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-muted-foreground">
             <DialogTitle className="sr-only">Cotización</DialogTitle>
             {error ? 'No se pudo cargar la cotización.' : <Loader2 className="w-5 h-5 animate-spin" />}
           </div>
         ) : (
           // Re-mounted after every save so the form starts from what the database stored.
-          <QuoteEditorBody key={data.quote.updated_at} quote={data.quote} savedLines={data.lines} onClose={() => onOpenChange(false)} />
+          <QuoteEditorBody key={data.quote.updated_at} quote={data.quote} savedLines={data.lines}
+            onDirtyChange={setDirty} onClose={requestClose} onDeleted={closeNow} />
         )}
       </DialogContent>
+
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tienes cambios sin guardar</AlertDialogTitle>
+            <AlertDialogDescription>Si cierras ahora, se pierden los cambios que hiciste en esta cotización.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={closeNow} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Cerrar sin guardar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
 
-function QuoteEditorBody({ quote, savedLines, onClose }: { quote: Quote; savedLines: QuoteLine[]; onClose: () => void }) {
+function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted }: {
+  quote: Quote;
+  savedLines: QuoteLine[];
+  onDirtyChange: (dirty: boolean) => void;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
   const editable = quote.status === 'draft';
   const initialHeader = useMemo(
     () => Object.fromEntries(EDITABLE_QUOTE_FIELDS.map(field => [field, quote[field]])) as EditableQuoteFields,
@@ -115,10 +170,7 @@ function QuoteEditorBody({ quote, savedLines, onClose }: { quote: Quote; savedLi
   const { data: results, isFetching: searching } = useCatalogSearch(editable ? quote.workshop_id : null, search);
 
   const dirty = JSON.stringify(header) !== JSON.stringify(initialHeader) || JSON.stringify(lines) !== JSON.stringify(initialLines);
-  const totals = computeQuoteTotals(lines, Number(header.global_discount_pct), Number(header.vat_rate));
-  const overThreshold = threshold != null && totals.max_discount_pct > threshold;
-  const inQuote = new Set(lines.map(line => line.sku_normalized).filter(Boolean));
-  const pendingSuggestions = (suggestions || []).filter(row => !inQuote.has(row.sku_normalized));
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
 
   const setField = <K extends keyof EditableQuoteFields>(field: K, value: EditableQuoteFields[K]) =>
     setHeader(current => ({ ...current, [field]: value }));
@@ -126,15 +178,21 @@ function QuoteEditorBody({ quote, savedLines, onClose }: { quote: Quote; savedLi
     setLines(current => current.map(line => (line.key === key ? { ...line, ...changes } : line)));
   const addLine = (line: DraftLine) => setLines(current => [...current, line]);
 
+  const totals = computeQuoteTotals(lines, Number(header.global_discount_pct), Number(header.vat_rate));
+  const overThreshold = threshold != null && totals.max_discount_pct > threshold;
+  const inQuote = new Set(lines.map(line => line.sku_normalized).filter(Boolean));
+  const pendingSuggestions = (suggestions || []).filter(row => !inQuote.has(row.sku_normalized));
+  const clientLabel = header.client_company?.trim() || header.client_name?.trim() || 'el cliente';
+
   const problems: string[] = [];
-  if (!header.client_name?.trim()) problems.push('Falta el nombre del cliente.');
-  if (header.client_tax_id?.trim() && !isValidRut(header.client_tax_id)) problems.push('El RUT del cliente no es válido.');
-  if (header.client_email?.trim() && !EMAIL_RE.test(header.client_email.trim())) problems.push('El correo del cliente no es válido.');
-  if (lines.some(line => !line.description.trim())) problems.push('Todas las líneas necesitan descripción.');
-  if (lines.some(line => !(line.quantity > 0))) problems.push('Las cantidades deben ser mayores a cero.');
-  if (lines.some(line => line.unit_price < 0 || line.discount_pct < 0 || line.discount_pct > 100)) problems.push('Revisa precios y descuentos (0 a 100%).');
-  if (Number(header.global_discount_pct) < 0 || Number(header.global_discount_pct) > 100) problems.push('El descuento global va de 0 a 100%.');
-  if (!(Number(header.validity_days) >= 1 && Number(header.validity_days) <= 365)) problems.push('La validez va de 1 a 365 días.');
+  if (!header.client_name?.trim()) problems.push('Falta el nombre del cliente');
+  if (header.client_tax_id?.trim() && !isValidRut(header.client_tax_id)) problems.push('El RUT no es válido');
+  if (header.client_email?.trim() && !EMAIL_RE.test(header.client_email.trim())) problems.push('El correo no es válido');
+  if (lines.some(line => !line.description.trim())) problems.push('Hay un equipo sin descripción');
+  if (lines.some(line => !(line.quantity > 0))) problems.push('Hay una cantidad en cero');
+  if (lines.some(line => line.discount_pct < 0 || line.discount_pct > 100) || Number(header.global_discount_pct) < 0 || Number(header.global_discount_pct) > 100) problems.push('Los descuentos van de 0 a 100%');
+  if (!(Number(header.validity_days) >= 1 && Number(header.validity_days) <= 365)) problems.push('La validez va de 1 a 365 días');
+  const canIssue = lines.length > 0 && totals.net_total > 0 && problems.length === 0;
 
   const normalizedHeader = (): EditableQuoteFields => ({
     ...header,
@@ -147,304 +205,332 @@ function QuoteEditorBody({ quote, savedLines, onClose }: { quote: Quote; savedLi
     notes: header.notes?.trim() || null,
   });
 
+  const save = async () => {
+    await saveQuote.mutateAsync({
+      quote,
+      header: normalizedHeader(),
+      lines: lines.map(line => ({ ...line, description: line.description.trim() })),
+      savedLines,
+    });
+  };
+
   const handleSave = async () => {
-    try {
-      await saveQuote.mutateAsync({ quote, header: normalizedHeader(), lines: lines.map(line => ({ ...line, description: line.description.trim() })), savedLines });
-      toast.success('Borrador guardado');
-    } catch (err) {
-      toast.error('No se pudo guardar', { description: err instanceof Error ? err.message : undefined });
-    }
+    try { await save(); toast.success('Cambios guardados'); }
+    catch (err) { toast.error('No se pudieron guardar los cambios', { description: err instanceof Error ? err.message : undefined }); }
   };
 
   const handleIssue = async () => {
     setConfirmIssue(false);
     try {
+      if (dirty) await save();
       const result = await issueQuote.mutateAsync(quote);
-      toast.success(`Cotización ${result.quote_number} emitida`);
+      toast.success(`Cotización ${result.quote_number} generada`);
     } catch (err) {
-      toast.error('No se pudo emitir', { description: err instanceof Error ? err.message : undefined });
+      toast.error('No se pudo generar la cotización', { description: err instanceof Error ? err.message : undefined });
     }
   };
 
   const handleDelete = async () => {
     setConfirmDelete(false);
-    try {
-      await deleteDraft.mutateAsync(quote);
-      toast.success('Borrador eliminado');
-      onClose();
-    } catch (err) {
-      toast.error('No se pudo eliminar', { description: err instanceof Error ? err.message : undefined });
-    }
+    try { await deleteDraft.mutateAsync(quote); toast.success('Cotización en preparación eliminada'); onDeleted(); }
+    catch (err) { toast.error('No se pudo eliminar', { description: err instanceof Error ? err.message : undefined }); }
   };
+
+  const busy = saveQuote.isPending || issueQuote.isPending;
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-3">
-          <span>{quote.quote_number ? `Cotización ${quote.quote_number}` : 'Borrador de cotización'}</span>
-          <Badge variant={editable ? 'secondary' : 'default'}>{QUOTE_STATUS_LABELS[quote.status] ?? quote.status}</Badge>
-        </DialogTitle>
-        <DialogDescription>
-          {editable
-            ? 'Revisa y ajusta el borrador. Al emitir se asigna el número oficial y ya no se puede editar.'
-            : `Emitida el ${quote.issued_at ? format(new Date(quote.issued_at), "d 'de' MMMM yyyy, HH:mm", { locale: es }) : '—'}. Para cambiarla hay que crear una revisión.`}
-        </DialogDescription>
-      </DialogHeader>
-
-      <ScrollArea className="flex-1 min-h-0 pr-3">
-        <div className="space-y-6 pb-2">
-          {/* Client */}
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Cliente</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {([
-                ['client_name', 'Nombre', 'Nombre del cliente'],
-                ['client_company', 'Empresa', 'Razón social'],
-                ['client_tax_id', 'RUT', '76.644.520-9'],
-                ['client_email', 'Correo', 'correo@empresa.cl'],
-                ['client_phone', 'Teléfono', '+56 9 1234 5678'],
-                ['client_address', 'Dirección', 'Dirección o comuna'],
-              ] as const).map(([field, label, placeholder]) => (
-                <div key={field} className="space-y-1">
-                  <Label htmlFor={`quote-${field}`} className="text-xs">{label}</Label>
-                  <Input
-                    id={`quote-${field}`}
-                    value={(header[field] as string | null) ?? ''}
-                    placeholder={placeholder}
-                    disabled={!editable}
-                    className="h-8 text-sm"
-                    onChange={event => setField(field, event.target.value)}
-                    onBlur={() => {
-                      if (field === 'client_tax_id' && header.client_tax_id && isValidRut(header.client_tax_id)) {
-                        setField('client_tax_id', formatRut(header.client_tax_id));
-                      }
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <Separator />
-
-          {/* Lines */}
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Equipos</h4>
-            {lines.length === 0 && (
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 border-b px-6 py-4">
+        <div className="min-w-0 space-y-1">
+          <DialogTitle className="text-lg truncate">
+            {quote.quote_number ? `Cotización ${quote.quote_number}` : `Cotización para ${clientLabel}`}
+          </DialogTitle>
+          <DialogDescription asChild>
+            {editable ? (
               <p className="text-sm text-muted-foreground">
-                No hay equipos todavía. {editable && 'Búscalos en el catálogo o agrega una línea libre.'}
+                <span className="font-medium text-amber-700 dark:text-amber-400">En preparación.</span>{' '}
+                Revisa equipos y precios; cuando esté lista, genera la cotización oficial.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Cotización oficial generada el {quote.issued_at ? format(new Date(quote.issued_at), "d 'de' MMMM yyyy", { locale: es }) : '—'}. Ya no se puede modificar.
               </p>
             )}
-            {lines.length > 0 && (
-              <div className="rounded-lg border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-xs text-muted-foreground">
-                    <tr>
-                      <th className="text-left font-medium p-2">Equipo</th>
-                      <th className="text-right font-medium p-2 w-20">Cant.</th>
-                      <th className="text-right font-medium p-2 w-36">Precio unit. neto</th>
-                      <th className="text-right font-medium p-2 w-20">Desc. %</th>
-                      <th className="text-right font-medium p-2 w-32">Total</th>
-                      {editable && <th className="w-10" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map(line => (
-                      <tr key={line.key} className="border-t align-top">
-                        <td className="p-2 space-y-1">
-                          <div className="flex items-center gap-2">
-                            {line.sku && <span className="font-semibold">{line.sku}</span>}
-                            <Badge variant="outline" className="text-[10px] font-normal">{SOURCE_LABELS[line.source] ?? line.source}</Badge>
-                          </div>
-                          <Input
-                            value={line.description}
-                            disabled={!editable}
-                            placeholder="Descripción"
-                            className="h-8 text-sm"
-                            onChange={event => setLine(line.key, { description: event.target.value })}
-                          />
-                          {(line.price_min != null || line.price_max != null) && (
-                            <p className="text-xs text-muted-foreground">
-                              Rango del catálogo: {formatCLP(line.price_min ?? line.price_max ?? 0)} – {formatCLP(line.price_max ?? line.price_min ?? 0)} neto
-                            </p>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <Input type="number" min={0.01} step={1} value={line.quantity} disabled={!editable}
-                            className="h-8 text-sm text-right" onChange={event => setLine(line.key, { quantity: toNumber(event.target.value) })} />
-                        </td>
-                        <td className="p-2">
-                          <Input type="number" min={0} step={1000} value={line.unit_price} disabled={!editable}
-                            className="h-8 text-sm text-right" onChange={event => setLine(line.key, { unit_price: Math.round(toNumber(event.target.value)) })} />
-                        </td>
-                        <td className="p-2">
-                          <Input type="number" min={0} max={100} step={0.5} value={line.discount_pct} disabled={!editable}
-                            className={cn('h-8 text-sm text-right', threshold != null && line.discount_pct > threshold && 'border-amber-500')}
-                            onChange={event => setLine(line.key, { discount_pct: toNumber(event.target.value) })} />
-                        </td>
-                        <td className="p-2 text-right font-medium whitespace-nowrap pt-4">{formatCLP(lineTotal(line))}</td>
-                        {editable && (
-                          <td className="p-2 pt-3">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Quitar línea"
-                              onClick={() => setLines(current => current.filter(item => item.key !== line.key))}>
-                              <Trash2 className="w-4 h-4 text-muted-foreground" />
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </DialogDescription>
+        </div>
+        <Button variant="ghost" size="icon" className="flex-shrink-0 -mr-2" onClick={onClose} aria-label="Cerrar">
+          <X className="w-5 h-5" />
+        </Button>
+      </div>
+
+      {/* Body (native scroll) */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+        <div className="space-y-8">
+          <Section title="Equipos y precios" hint={editable ? 'Los precios parten del máximo del rango del catálogo. Ajusta con descuento.' : undefined}>
+            {lines.length === 0 && (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Esta cotización todavía no tiene equipos.{editable && ' Búscalos abajo en el catálogo.'}
               </div>
             )}
+
+            <div className="space-y-3">
+              {lines.map(line => {
+                const lineDiscountHigh = threshold != null && line.discount_pct > threshold;
+                return (
+                  <div key={line.key} className="rounded-lg border bg-card p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold">{line.sku ?? 'Ítem libre'}</p>
+                        <p className="text-xs text-muted-foreground">{ORIGIN[line.source] ?? ''}</p>
+                      </div>
+                      {editable && (
+                        <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setLines(current => current.filter(item => item.key !== line.key))}>
+                          <Trash2 className="w-4 h-4 mr-1" /> Quitar
+                        </Button>
+                      )}
+                    </div>
+
+                    {editable ? (
+                      <Textarea rows={2} value={line.description} placeholder="Descripción que verá el cliente"
+                        className="text-sm resize-none min-h-0" onChange={event => setLine(line.key, { description: event.target.value })} />
+                    ) : (
+                      <p className="text-sm">{line.description}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                        {editable
+                          ? <Input inputMode="decimal" className="text-right tabular-nums" value={line.quantity}
+                              onChange={event => setLine(line.key, { quantity: decimal(event.target.value) })} />
+                          : <p className="text-sm tabular-nums">{line.quantity}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Precio unitario neto</Label>
+                        {editable
+                          ? <MoneyInput value={line.unit_price} onChange={value => setLine(line.key, { unit_price: value })} />
+                          : <p className="text-sm tabular-nums">{formatCLP(line.unit_price)}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Descuento</Label>
+                        {editable ? (
+                          <div className="relative">
+                            <Input inputMode="decimal" className={cn('pr-7 text-right tabular-nums', lineDiscountHigh && 'border-amber-500 focus-visible:ring-amber-500')}
+                              value={line.discount_pct || ''} placeholder="0"
+                              onChange={event => setLine(line.key, { discount_pct: decimal(event.target.value) })} />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                          </div>
+                        ) : <p className="text-sm tabular-nums">{line.discount_pct}%</p>}
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <Label className="text-xs text-muted-foreground">Total línea</Label>
+                        <p className="h-10 flex items-center justify-end text-base font-semibold tabular-nums">{formatCLP(lineTotal(line))}</p>
+                      </div>
+                    </div>
+
+                    {(line.price_min != null || line.price_max != null) && (
+                      <p className="text-xs text-muted-foreground">
+                        Precio de catálogo: {formatCLP(line.price_min ?? line.price_max ?? 0)} a {formatCLP(line.price_max ?? line.price_min ?? 0)} neto
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             {editable && (
               <div className="space-y-3">
                 {pendingSuggestions.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> El bot también le recomendó:</span>
-                    {pendingSuggestions.map(row => (
-                      <Button key={row.sku_normalized} variant="outline" size="sm" className="h-7 text-xs" onClick={() => addLine(fromCatalog(row, 'suggested'))}>
-                        <Plus className="w-3 h-3 mr-1" /> {row.sku}
-                      </Button>
-                    ))}
+                  <div className="rounded-lg bg-primary/5 p-3 space-y-2">
+                    <p className="text-sm flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> El bot también le recomendó:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {pendingSuggestions.map(row => (
+                        <Button key={row.sku_normalized} variant="outline" size="sm" className="bg-background" onClick={() => addLine(fromCatalog(row, 'suggested'))}>
+                          <Plus className="w-4 h-4 mr-1" /> Agregar {row.sku}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
-                <div className="flex flex-col md:flex-row gap-2">
+
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-2.5 top-2 text-muted-foreground" />
-                    <Input value={search} placeholder="Buscar un equipo del catálogo por código (ej: MH130)" className="h-8 text-sm pl-8"
+                    <Search className="pointer-events-none w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input value={search} placeholder="Agregar otro equipo: busca por código (ej. MH130)" className="pl-9"
                       onChange={event => setSearch(event.target.value)} />
                   </div>
-                  <Button variant="outline" size="sm" className="h-8" onClick={() => addLine({
+                  <Button variant="outline" onClick={() => addLine({
                     key: crypto.randomUUID(), id: null, sku: null, sku_normalized: null, description: '', quantity: 1,
                     unit_price: 0, discount_pct: 0, price_min: null, price_max: null, source: 'manual',
                   })}>
-                    <Plus className="w-4 h-4 mr-1" /> Línea libre
+                    <Plus className="w-4 h-4 mr-1" /> Ítem libre
                   </Button>
                 </div>
+
                 {search.trim().length >= 2 && (
-                  <div className="rounded-lg border divide-y">
-                    {searching && <p className="p-2 text-xs text-muted-foreground">Buscando…</p>}
-                    {!searching && (results || []).length === 0 && <p className="p-2 text-xs text-muted-foreground">Sin resultados.</p>}
-                    {(results || []).map(row => (
-                      <button key={row.sku_normalized} type="button" disabled={inQuote.has(row.sku_normalized)}
-                        className="w-full text-left p-2 text-sm hover:bg-muted/50 disabled:opacity-50 flex justify-between gap-3"
-                        onClick={() => { addLine(fromCatalog(row, 'manual')); setSearch(''); }}>
-                        <span><span className="font-semibold">{row.sku}</span> <span className="text-muted-foreground">{catalogLineDescription(row)}</span></span>
-                        <span className="whitespace-nowrap text-muted-foreground">{row.price_max != null ? formatCLP(Number(row.price_max)) : 'sin precio'}</span>
-                      </button>
-                    ))}
+                  <div className="rounded-lg border divide-y overflow-hidden">
+                    {searching && <p className="p-3 text-sm text-muted-foreground">Buscando…</p>}
+                    {!searching && (results || []).length === 0 && <p className="p-3 text-sm text-muted-foreground">No hay equipos con ese código.</p>}
+                    {(results || []).map(row => {
+                      const already = inQuote.has(row.sku_normalized);
+                      return (
+                        <button key={row.sku_normalized} type="button" disabled={already}
+                          className="w-full text-left p-3 hover:bg-muted/50 disabled:opacity-50 disabled:hover:bg-transparent flex items-center justify-between gap-3"
+                          onClick={() => { addLine(fromCatalog(row, 'manual')); setSearch(''); }}>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">{row.sku}</span>
+                            <span className="block text-xs text-muted-foreground truncate">{catalogLineDescription(row)}</span>
+                          </span>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {already ? 'Ya está' : row.price_max != null ? formatCLP(Number(row.price_max)) : 'Sin precio'}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
-          </section>
+          </Section>
 
-          <Separator />
-
-          {/* Conditions + totals */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Condiciones</h4>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Validez (días)</Label>
-                  <Input type="number" min={1} max={365} value={header.validity_days} disabled={!editable} className="h-8 text-sm"
-                    onChange={event => setField('validity_days', toNumber(event.target.value))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Descuento global %</Label>
-                  <Input type="number" min={0} max={100} step={0.5} value={header.global_discount_pct} disabled={!editable} className="h-8 text-sm"
-                    onChange={event => setField('global_discount_pct', toNumber(event.target.value))} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">IVA %</Label>
-                  <Input type="number" min={0} max={100} step={0.5} value={header.vat_rate} disabled={!editable} className="h-8 text-sm"
-                    onChange={event => setField('vat_rate', toNumber(event.target.value))} />
-                </div>
-              </div>
+          <Section title="Datos del cliente" hint={editable ? 'Salen en la cotización. Vienen de la conversación; corrígelos si hace falta.' : undefined}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
-                ['payment_terms', 'Forma de pago'],
-                ['delivery_terms', 'Plazo de entrega'],
-                ['notes', 'Notas para el cliente'],
-              ] as const).map(([field, label]) => (
+                ['client_company', 'Empresa', 'Razón social'],
+                ['client_tax_id', 'RUT', '76.644.520-9'],
+                ['client_name', 'Contacto', 'Nombre de la persona'],
+                ['client_email', 'Correo', 'correo@empresa.cl'],
+                ['client_phone', 'Teléfono', '+56 9 1234 5678'],
+                ['client_address', 'Dirección', 'Dirección o comuna'],
+              ] as const).map(([field, label, placeholder]) => editable ? (
                 <div key={field} className="space-y-1">
-                  <Label className="text-xs">{label}</Label>
-                  <Textarea rows={2} value={(header[field] as string | null) ?? ''} disabled={!editable} className="text-sm"
-                    onChange={event => setField(field, event.target.value)} />
+                  <Label htmlFor={`quote-${field}`} className="text-xs text-muted-foreground">{label}</Label>
+                  <Input id={`quote-${field}`} value={(header[field] as string | null) ?? ''} placeholder={placeholder}
+                    aria-invalid={(field === 'client_tax_id' && !!header.client_tax_id?.trim() && !isValidRut(header.client_tax_id))
+                      || (field === 'client_email' && !!header.client_email?.trim() && !EMAIL_RE.test(header.client_email.trim()))}
+                    className="aria-[invalid=true]:border-destructive"
+                    onChange={event => setField(field, event.target.value)}
+                    onBlur={() => {
+                      if (field === 'client_tax_id' && header.client_tax_id && isValidRut(header.client_tax_id)) setField('client_tax_id', formatRut(header.client_tax_id));
+                    }} />
                 </div>
+              ) : (
+                <ReadOnly key={field} label={label} value={header[field] as string | null} />
               ))}
             </div>
+          </Section>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Totales</h4>
-              <div className="rounded-lg border p-4 space-y-2 text-sm">
+          <Section title="Condiciones comerciales" hint={editable ? 'Vienen de Configuración comercial. Puedes ajustarlas solo para esta cotización.' : undefined}>
+            {editable ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Válida por (días)</Label>
+                    <Input inputMode="numeric" value={header.validity_days || ''} onChange={event => setField('validity_days', digitsOnly(event.target.value))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Descuento sobre el total</Label>
+                    <div className="relative">
+                      <Input inputMode="decimal" className="pr-7" value={header.global_discount_pct || ''} placeholder="0"
+                        onChange={event => setField('global_discount_pct', decimal(event.target.value))} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">IVA</Label>
+                    <div className="relative">
+                      <Input inputMode="decimal" className="pr-7" value={header.vat_rate}
+                        onChange={event => setField('vat_rate', decimal(event.target.value))} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                </div>
                 {([
-                  ['Subtotal', formatCLP(totals.gross_subtotal)],
-                  ['Descuentos', totals.discount_total > 0 ? `−${formatCLP(totals.discount_total)}` : formatCLP(0)],
-                  ['Neto', formatCLP(totals.net_total)],
-                  [`IVA (${Number(header.vat_rate)}%)`, formatCLP(totals.vat_total)],
-                ] as const).map(([label, value]) => (
-                  <div key={label} className="flex justify-between">
-                    <span className="text-muted-foreground">{label}</span>
-                    <span>{value}</span>
+                  ['payment_terms', 'Forma de pago'],
+                  ['delivery_terms', 'Plazo de entrega'],
+                  ['notes', 'Nota para el cliente (opcional)'],
+                ] as const).map(([field, label]) => (
+                  <div key={field} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">{label}</Label>
+                    <Textarea rows={2} className="resize-none" value={(header[field] as string | null) ?? ''} onChange={event => setField(field, event.target.value)} />
                   </div>
                 ))}
-                <Separator />
-                <div className="flex justify-between text-base font-semibold">
-                  <span>Total</span>
-                  <span>{formatCLP(totals.total)}</span>
-                </div>
               </div>
-              {overThreshold && (
-                <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>
-                    El descuento ({totals.max_discount_pct}%) supera el umbral de {threshold}% de Configuración comercial.
-                    La cotización quedará marcada para que el administrador la vea.
-                  </span>
-                </div>
-              )}
-              {editable && problems.length > 0 && (
-                <ul className="text-xs text-destructive space-y-0.5">{problems.map(problem => <li key={problem}>• {problem}</li>)}</ul>
-              )}
-            </div>
-          </section>
-        </div>
-      </ScrollArea>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <ReadOnly label="Válida por" value={`${header.validity_days} días`} />
+                <ReadOnly label="Forma de pago" value={header.payment_terms} />
+                <ReadOnly label="Plazo de entrega" value={header.delivery_terms} />
+                {header.notes && <ReadOnly label="Nota para el cliente" value={header.notes} />}
+              </div>
+            )}
+          </Section>
 
-      {editable && (
-        <div className="flex flex-wrap justify-between gap-2 pt-3 border-t">
-          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setConfirmDelete(true)} disabled={deleteDraft.isPending}>
-            <Trash2 className="w-4 h-4 mr-1" /> Eliminar borrador
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSave} disabled={!dirty || problems.length > 0 || saveQuote.isPending}>
-              {saveQuote.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-              Guardar
-            </Button>
-            <Button size="sm" onClick={() => setConfirmIssue(true)}
-              disabled={dirty || lines.length === 0 || totals.net_total <= 0 || problems.length > 0 || issueQuote.isPending}
-              title={dirty ? 'Guarda los cambios antes de emitir' : undefined}>
-              {issueQuote.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileCheck2 className="w-4 h-4 mr-1" />}
-              Emitir cotización
-            </Button>
-          </div>
+          {editable && (
+            <div className="pt-2">
+              <button type="button" className="text-sm text-muted-foreground hover:text-destructive underline-offset-4 hover:underline"
+                onClick={() => setConfirmDelete(true)} disabled={deleteDraft.isPending}>
+                Eliminar esta cotización en preparación
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Footer: totals and actions, always visible */}
+      <div className="border-t bg-muted/40 px-6 py-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="space-y-0.5">
+            <p className="text-sm text-muted-foreground tabular-nums">
+              Neto {formatCLP(totals.net_total)} + IVA {Number(header.vat_rate)}% {formatCLP(totals.vat_total)}
+              {totals.discount_total > 0 && <> · incluye descuento de {formatCLP(totals.discount_total)}</>}
+            </p>
+            <p className="text-xl font-semibold tabular-nums">Total {formatCLP(totals.total)}</p>
+            {overThreshold && (
+              <p className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" /> Descuento de {totals.max_discount_pct}%: supera el {threshold}% permitido; el administrador lo verá.
+              </p>
+            )}
+            {editable && problems.length > 0 && (
+              <p className="text-sm text-destructive">{problems.join(' · ')}</p>
+            )}
+          </div>
+
+          {editable && (
+            <div className="flex items-center gap-2 md:justify-end">
+              <span className="text-xs text-muted-foreground mr-1 hidden sm:inline">
+                {saveQuote.isPending ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Todo guardado'}
+              </span>
+              <Button variant="outline" onClick={handleSave} disabled={!dirty || problems.length > 0 || busy}>
+                {saveQuote.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                Guardar
+              </Button>
+              <Button onClick={() => setConfirmIssue(true)} disabled={!canIssue || busy}>
+                {issueQuote.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileCheck2 className="w-4 h-4 mr-1" />}
+                Generar cotización oficial
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
 
       <AlertDialog open={confirmIssue} onOpenChange={setConfirmIssue}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Emitir la cotización?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se le asigna el número oficial y ya no se podrá editar. Total: {formatCLP(totals.total)} (neto {formatCLP(totals.net_total)}).
+            <AlertDialogTitle>¿Generar la cotización oficial?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Para {clientLabel}, por un total de <span className="font-medium text-foreground">{formatCLP(totals.total)}</span> (neto {formatCLP(totals.net_total)}).</p>
+                <p>Se le asigna el número oficial correlativo y ya no se podrá modificar.{dirty && ' Tus cambios se guardan antes.'}</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Volver</AlertDialogCancel>
-            <AlertDialogAction onClick={handleIssue}>Emitir</AlertDialogAction>
+            <AlertDialogCancel>Revisar de nuevo</AlertDialogCancel>
+            <AlertDialogAction onClick={handleIssue}>Generar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -452,8 +538,8 @@ function QuoteEditorBody({ quote, savedLines, onClose }: { quote: Quote; savedLi
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar el borrador?</AlertDialogTitle>
-            <AlertDialogDescription>Se borra el borrador y sus líneas. Esto no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar esta cotización en preparación?</AlertDialogTitle>
+            <AlertDialogDescription>Se borran los equipos y precios que armaste. Siempre puedes crear otra desde la solicitud.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>

@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   User, Phone, Mail, MapPin, Clock, MessageSquare, 
-  FileText, DollarSign, AlertCircle, Calendar, CheckCircle2, Upload, ExternalLink
+  FileText, DollarSign, AlertCircle, Calendar, CheckCircle2, Upload, ExternalLink, Building2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { RequestQuotesSection } from '@/components/quotes/RequestQuotesSection';
+import { LeadReasonCard } from './LeadReasonCard';
 import {
   ServiceRequest,
   ServiceRequestStatus,
@@ -191,6 +192,12 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                       <span>{request.contacts.email}</span>
                     </div>
                   )}
+                  {(request.contacts?.company_name || request.contacts?.tax_id) && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                      <span>{[request.contacts.company_name, request.contacts.tax_id ? `RUT ${request.contacts.tax_id}` : null].filter(Boolean).join(' · ')}</span>
+                    </div>
+                  )}
                   {(request.address || request.comuna) && (
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -206,7 +213,9 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                   Detalles de la Solicitud
                 </h4>
                 <div className="space-y-3">
-                  {request.description && (
+                  {request.auto_created && request.qualification ? (
+                    <LeadReasonCard contactId={request.contact_id} workshopId={request.workshop_id} qualification={request.qualification} />
+                  ) : request.description && (
                     <div>
                       <Label className="text-xs text-muted-foreground">Descripción</Label>
                       <p className="text-sm mt-1 whitespace-pre-line">{request.description}</p>

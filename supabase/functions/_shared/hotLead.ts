@@ -9,11 +9,11 @@
 export interface HotLeadInput {
   quoteRequest: string | null        // phrase the analysis says the customer used
   customerMessages: string[]         // what the customer actually wrote
-  leadScore: number
+  leadScore: number   // kept for the caller's log; not a trigger
   events: Array<{ event_type: string; sku_normalized: string | null }>
   companyName: string | null
   taxId: string | null
-  summary: string | null
+  summary: string | null   // not used in the text: it goes stale
   skuLabels: Map<string, string>
 }
 
@@ -53,34 +53,19 @@ export function buildHotLeadQualification(input: HotLeadInput): HotLeadQualifica
   )]
 
   const reasons: Array<Record<string, unknown>> = []
-  const why: string[] = []
-
   const quote = verifiedQuoteRequest(input.quoteRequest, input.customerMessages)
-  if (quote) {
-    reasons.push({ rule: 'quote_requested', evidence: quote })
-    why.push(`pidió cotizar ("${quote}")`)
-  }
-  if (input.companyName || input.taxId) {
-    reasons.push({ rule: 'billing_data', company_name: input.companyName, tax_id: input.taxId })
-    const data = [input.companyName, input.taxId ? `RUT ${input.taxId}` : null].filter(Boolean).join(', ')
-    why.push(`dejó datos para cotizar (${data})`)
-  }
+  if (quote) reasons.push({ rule: 'quote_requested', evidence: quote })
+  const billingData = [input.companyName, input.taxId ? `RUT ${input.taxId}` : null].filter(Boolean).join(' · ')
+  if (billingData) reasons.push({ rule: 'billing_data', company_name: input.companyName, tax_id: input.taxId })
   if (reasons.length === 0) return null
 
+  // Short, plain text for the request card. The detail view renders the reasons
+  // and the live equipment itself, so nothing here goes stale.
   const chosen = skusOf('chosen')
-  const context = [
-    chosen.length > 0 ? `eligió ${chosen.map(label).join(', ')}` : null,
-    skusOf('datasheet_sent').length > 0 ? 'recibió ficha técnica' : null,
-    `puntaje ${input.leadScore}`,
-  ].filter(Boolean)
-  const interest = [...new Set([...chosen, ...skusOf('customer_asked'), ...skusOf('recommended')])].slice(0, 5)
-
+  const interest = [...new Set([...chosen, ...skusOf('customer_asked'), ...skusOf('datasheet_sent'), ...skusOf('recommended')])]
   const lines = [
-    'Lead listo para cotizar, detectado por el bot.',
-    `Motivo: ${why.join(' · ')}.`,
-    `Contexto: ${context.join(' · ')}.`,
-    interest.length > 0 ? `Equipos de interés: ${interest.map(label).join(', ')}.` : null,
-    input.summary ? `Resumen: ${input.summary}` : null,
+    quote ? `Pidió cotizar por WhatsApp: “${quote}”` : `Dejó sus datos para facturar (${billingData}).`,
+    interest.length > 0 ? `Equipo: ${interest.slice(0, 2).map(label).join(', ')}${interest.length > 2 ? ` y ${interest.length - 2} más` : ''}.` : null,
   ].filter(Boolean)
 
   return { reasons, description: lines.join('\n') }

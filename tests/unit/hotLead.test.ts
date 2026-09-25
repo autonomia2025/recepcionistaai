@@ -34,7 +34,7 @@ describe("cola del embudo: qué sí basta", () => {
       quoteRequest: "Cotízame la MH130 por favor",
     })!;
     expect(q.reasons).toEqual([{ rule: "quote_requested", evidence: "Cotízame la MH130 por favor" }]);
-    expect(q.description).toContain('Motivo: pidió cotizar ("Cotízame la MH130 por favor").');
+    expect(q.description).toBe("Pidió cotizar por WhatsApp: “Cotízame la MH130 por favor”");
   });
 
   it("dejó RUT o empresa", () => {
@@ -42,12 +42,12 @@ describe("cola del embudo: qué sí basta", () => {
     expect(q.reasons).toEqual([{ rule: "billing_data", company_name: "Soc ingenieria ltda", tax_id: "76.644.520-9" }]);
   });
 
-  it("elegir, ficha y puntaje aparecen como contexto, y los equipos se listan (elegido primero)", () => {
+  it("texto corto y simple: sin puntaje ni resumen, equipo elegido primero", () => {
     const q = buildHotLeadQualification({
       ...base,
       leadScore: 88,
       taxId: "76.644.520-9",
-      summary: "Sala de ordeña, 120 vacas, monofásico.",
+      summary: "Sala de ordeña, 120 vacas. Falta correo.",
       events: [
         { event_type: "recommended", sku_normalized: "PWSB12011MB" },
         { event_type: "recommended", sku_normalized: "MH13010MI" },
@@ -55,13 +55,19 @@ describe("cola del embudo: qué sí basta", () => {
         { event_type: "datasheet_sent", sku_normalized: "MH13010MI" },
       ],
     })!;
-    expect(q.description).toBe(
-      "Lead listo para cotizar, detectado por el bot.\n" +
-      "Motivo: dejó datos para cotizar (RUT 76.644.520-9).\n" +
-      "Contexto: eligió MH130-10M-I · recibió ficha técnica · puntaje 88.\n" +
-      "Equipos de interés: MH130-10M-I, PWSB120-11MB.\n" +
-      "Resumen: Sala de ordeña, 120 vacas, monofásico.",
-    );
+    expect(q.description).toBe("Dejó sus datos para facturar (RUT 76.644.520-9).\nEquipo: MH130-10M-I, PWSB120-11MB.");
+    expect(q.description).not.toContain("puntaje");
+    expect(q.description).not.toContain("Falta correo");
+  });
+
+  it("con muchos equipos resume el resto", () => {
+    const q = buildHotLeadQualification({
+      ...base,
+      companyName: "X SpA",
+      skuLabels: new Map(),
+      events: ["A1", "B2", "C3", "D4"].map((sku) => ({ event_type: "recommended", sku_normalized: sku })),
+    })!;
+    expect(q.description).toBe("Dejó sus datos para facturar (X SpA).\nEquipo: A1, B2 y 2 más.");
   });
 });
 
