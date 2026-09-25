@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, FileCheck2, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileCheck2, FileDown, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -20,6 +20,7 @@ import {
   type CatalogRow, type DraftLine, EDITABLE_QUOTE_FIELDS, type EditableQuoteFields, type Quote, type QuoteLine,
   useCatalogSearch, useDeleteQuoteDraft, useDiscountThreshold, useIssueQuote, useQuote, useQuoteSuggestions, useSaveQuote,
 } from '@/hooks/useQuotes';
+import { openQuotePdf, useGenerateQuotePdf } from '@/hooks/useQuotePdf';
 
 // Where each line came from, said the way a seller would say it.
 const ORIGIN: Record<string, string> = {
@@ -165,6 +166,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
   const saveQuote = useSaveQuote();
   const issueQuote = useIssueQuote();
   const deleteDraft = useDeleteQuoteDraft();
+  const generatePdf = useGenerateQuotePdf();
   const { data: threshold } = useDiscountThreshold(quote.workshop_id);
   const { data: suggestions } = useQuoteSuggestions(editable ? quote.contact_id : null, quote.workshop_id);
   const { data: results, isFetching: searching } = useCatalogSearch(editable ? quote.workshop_id : null, search);
@@ -224,10 +226,29 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
     try {
       if (dirty) await save();
       const result = await issueQuote.mutateAsync(quote);
-      toast.success(`Cotización ${result.quote_number} generada`);
+      try {
+        await generatePdf.mutateAsync(quote.id);
+        toast.success(`Cotización ${result.quote_number} generada, con su PDF`);
+      } catch (pdfError) {
+        toast.warning(`Cotización ${result.quote_number} generada, pero el PDF no se pudo crear`, {
+          description: 'Ábrela y presiona "Crear PDF" para reintentar.',
+        });
+        console.error('Quote PDF error:', pdfError);
+      }
     } catch (err) {
       toast.error('No se pudo generar la cotización', { description: err instanceof Error ? err.message : undefined });
     }
+  };
+
+  const handleCreatePdf = async () => {
+    try { await generatePdf.mutateAsync(quote.id); toast.success('PDF creado'); }
+    catch (err) { toast.error('No se pudo crear el PDF', { description: err instanceof Error ? err.message : undefined }); }
+  };
+
+  const handleOpenPdf = async () => {
+    if (!quote.pdf_path) return;
+    try { await openQuotePdf(quote.pdf_path); }
+    catch (err) { toast.error('No se pudo abrir el PDF', { description: err instanceof Error ? err.message : undefined }); }
   };
 
   const handleDelete = async () => {
@@ -236,7 +257,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
     catch (err) { toast.error('No se pudo eliminar', { description: err instanceof Error ? err.message : undefined }); }
   };
 
-  const busy = saveQuote.isPending || issueQuote.isPending;
+  const busy = saveQuote.isPending || issueQuote.isPending || generatePdf.isPending;
 
   return (
     <>
@@ -499,6 +520,21 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
             )}
           </div>
 
+          {!editable && (
+            <div className="flex items-center gap-2 md:justify-end">
+              {quote.pdf_path ? (
+                <Button onClick={handleOpenPdf}>
+                  <FileDown className="w-4 h-4 mr-1" /> Descargar PDF
+                </Button>
+              ) : (
+                <Button onClick={handleCreatePdf} disabled={generatePdf.isPending}>
+                  {generatePdf.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileDown className="w-4 h-4 mr-1" />}
+                  Crear PDF
+                </Button>
+              )}
+            </div>
+          )}
+
           {editable && (
             <div className="flex items-center gap-2 md:justify-end">
               <span className="text-xs text-muted-foreground mr-1 hidden sm:inline">
@@ -509,7 +545,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
                 Guardar
               </Button>
               <Button onClick={() => setConfirmIssue(true)} disabled={!canIssue || busy}>
-                {issueQuote.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileCheck2 className="w-4 h-4 mr-1" />}
+                {issueQuote.isPending || generatePdf.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileCheck2 className="w-4 h-4 mr-1" />}
                 Generar cotización oficial
               </Button>
             </div>
@@ -524,7 +560,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>Para {clientLabel}, por un total de <span className="font-medium text-foreground">{formatCLP(totals.total)}</span> (neto {formatCLP(totals.net_total)}).</p>
-                <p>Se le asigna el número oficial correlativo y ya no se podrá modificar.{dirty && ' Tus cambios se guardan antes.'}</p>
+                <p>Se le asigna el número oficial correlativo, se crea el PDF para enviar al cliente y ya no se podrá modificar.{dirty && ' Tus cambios se guardan antes.'}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

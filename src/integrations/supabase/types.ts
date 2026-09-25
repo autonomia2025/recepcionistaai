@@ -3820,6 +3820,7 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
+      set_quote_pdf: { Args: { _path: string; _quote_id: string }; Returns: string }
       match_bot_knowledge: {
         Args: {
           match_count?: number

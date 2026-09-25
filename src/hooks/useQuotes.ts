@@ -48,7 +48,7 @@ export function useRequestQuotes(requestId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('quotes')
-        .select('id, status, quote_number, net_total, total, discount_over_threshold, created_at, issued_at')
+        .select('id, status, quote_number, net_total, total, discount_over_threshold, created_at, issued_at, pdf_path')
         .eq('service_request_id', requestId!)
         .order('created_at', { ascending: false });
       if (error) throw error;

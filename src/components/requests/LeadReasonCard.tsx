@@ -14,7 +14,7 @@ function equipmentNote(types: Set<string>): string {
   if (types.has('chosen')) parts.push('la eligió');
   else if (types.has('customer_asked')) parts.push('la preguntó');
   if (types.has('datasheet_sent')) parts.push('recibió la ficha');
-  if (parts.length === 0) return 'se la recomendamos';
+  if (parts.length === 0) return 'Se la recomendamos';
   const text = parts.join(' y ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }

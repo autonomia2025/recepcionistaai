@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, FilePlus2, FileText, Loader2 } from 'lucide-react';
+import { AlertTriangle, FileDown, FilePlus2, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { QUOTE_STATUS_LABELS, useCreateQuoteDraft, useRequestQuotes } from '@/hooks/useQuotes';
 import { formatCLP } from '@/lib/quoteTotals';
 import { QuoteEditorDialog } from './QuoteEditorDialog';
+import { openQuotePdf } from '@/hooks/useQuotePdf';
 
 // Quotes built in the system for a request (commercial module). Sits next to
 // the existing "Marcar cotización enviada" flow, which keeps working as before.
@@ -50,10 +51,11 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
       {(quotes || []).length > 0 && (
         <div className="rounded-lg border divide-y">
           {(quotes || []).map(quote => (
-            <button key={quote.id} type="button" onClick={() => setOpenQuoteId(quote.id)}
-              className="w-full flex items-center justify-between gap-3 p-3 text-left text-sm hover:bg-muted/50">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
+            <div key={quote.id} role="button" tabIndex={0} onClick={() => setOpenQuoteId(quote.id)}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setOpenQuoteId(quote.id); } }}
+              className="w-full flex items-center justify-between gap-3 p-3 text-left text-sm hover:bg-muted/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{quote.quote_number ?? 'En preparación'}</span>
                   {quote.status !== 'draft' && (
                     <Badge className="text-[10px]">{QUOTE_STATUS_LABELS[quote.status] ?? quote.status}</Badge>
@@ -68,11 +70,22 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
                   {format(new Date(quote.issued_at ?? quote.created_at), "d 'de' MMMM yyyy", { locale: es })}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="font-medium">{formatCLP(Number(quote.total))}</p>
-                <p className="text-xs text-muted-foreground">neto {formatCLP(Number(quote.net_total))}</p>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="font-medium">{formatCLP(Number(quote.total))}</p>
+                  <p className="text-xs text-muted-foreground">neto {formatCLP(Number(quote.net_total))}</p>
+                </div>
+                {quote.pdf_path && (
+                  <Button variant="outline" size="sm" aria-label={`Descargar PDF de ${quote.quote_number}`}
+                    onClick={event => {
+                      event.stopPropagation();
+                      openQuotePdf(quote.pdf_path!).catch(err => toast.error('No se pudo abrir el PDF', { description: err instanceof Error ? err.message : undefined }));
+                    }}>
+                    <FileDown className="w-4 h-4 mr-1" /> PDF
+                  </Button>
+                )}
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
