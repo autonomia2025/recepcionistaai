@@ -21,6 +21,7 @@ import {
   useCatalogSearch, useDeleteQuoteDraft, useDiscountThreshold, useIssueQuote, useQuote, useQuoteSuggestions, useSaveQuote,
 } from '@/hooks/useQuotes';
 import { openQuotePdf, useGenerateQuotePdf } from '@/hooks/useQuotePdf';
+import { QuoteLifecycleActions, QuoteStatusLine } from './QuoteLifecycle';
 
 // Where each line came from, said the way a seller would say it.
 const ORIGIN: Record<string, string> = {
@@ -102,9 +103,10 @@ interface QuoteEditorDialogProps {
   quoteId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenQuote?: (quoteId: string) => void;
 }
 
-export function QuoteEditorDialog({ quoteId, open, onOpenChange }: QuoteEditorDialogProps) {
+export function QuoteEditorDialog({ quoteId, open, onOpenChange, onOpenQuote }: QuoteEditorDialogProps) {
   const { data, isLoading, error } = useQuote(open ? quoteId : null);
   const [dirty, setDirty] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -123,7 +125,7 @@ export function QuoteEditorDialog({ quoteId, open, onOpenChange }: QuoteEditorDi
         ) : (
           // Re-mounted after every save so the form starts from what the database stored.
           <QuoteEditorBody key={data.quote.updated_at} quote={data.quote} savedLines={data.lines}
-            onDirtyChange={setDirty} onClose={requestClose} onDeleted={closeNow} />
+            onDirtyChange={setDirty} onClose={requestClose} onDeleted={closeNow} onOpenQuote={onOpenQuote ?? (() => undefined)} />
         )}
       </DialogContent>
 
@@ -143,12 +145,13 @@ export function QuoteEditorDialog({ quoteId, open, onOpenChange }: QuoteEditorDi
   );
 }
 
-function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted }: {
+function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted, onOpenQuote }: {
   quote: Quote;
   savedLines: QuoteLine[];
   onDirtyChange: (dirty: boolean) => void;
   onClose: () => void;
   onDeleted: () => void;
+  onOpenQuote: (quoteId: string) => void;
 }) {
   const editable = quote.status === 'draft';
   const initialHeader = useMemo(
@@ -274,10 +277,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
                 Revisa equipos y precios; cuando esté lista, genera la cotización oficial.
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Cotización oficial generada el {quote.issued_at ? format(new Date(quote.issued_at), "d 'de' MMMM yyyy", { locale: es }) : '—'}. Ya no se puede modificar.
-              </p>
+              <div><QuoteStatusLine quote={quote} /></div>
             )}
           </DialogDescription>
         </div>
@@ -521,18 +521,8 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted 
           </div>
 
           {!editable && (
-            <div className="flex items-center gap-2 md:justify-end">
-              {quote.pdf_path ? (
-                <Button onClick={handleOpenPdf}>
-                  <FileDown className="w-4 h-4 mr-1" /> Descargar PDF
-                </Button>
-              ) : (
-                <Button onClick={handleCreatePdf} disabled={generatePdf.isPending}>
-                  {generatePdf.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileDown className="w-4 h-4 mr-1" />}
-                  Crear PDF
-                </Button>
-              )}
-            </div>
+            <QuoteLifecycleActions quote={quote} onOpenPdf={handleOpenPdf} onCreatePdf={handleCreatePdf}
+              pdfPending={generatePdf.isPending} onOpenQuote={onOpenQuote} />
           )}
 
           {editable && (

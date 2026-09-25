@@ -397,7 +397,8 @@ export default function RequestsPage() {
 
       {/* Dialogs */}
       <RequestDetailDialog
-        request={selectedRequest}
+        // Always the latest copy from the list, so status changes show up while it is open.
+        request={requests?.find(r => r.id === selectedRequest?.id) ?? selectedRequest}
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
       />

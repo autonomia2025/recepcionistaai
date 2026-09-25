@@ -11,7 +11,7 @@ export type CatalogRow = Pick<
 
 export const QUOTE_STATUS_LABELS: Record<string, string> = {
   draft: 'En preparación',
-  issued: 'Oficial',
+  issued: 'Por enviar',
   sent: 'Enviada',
   accepted: 'Aceptada',
   rejected: 'Rechazada',
@@ -48,7 +48,7 @@ export function useRequestQuotes(requestId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('quotes')
-        .select('id, status, quote_number, net_total, total, discount_over_threshold, created_at, issued_at, pdf_path')
+        .select('id, status, quote_number, net_total, total, discount_over_threshold, created_at, issued_at, sent_at, closed_at, pdf_path')
         .eq('service_request_id', requestId!)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -231,3 +231,57 @@ export function useDeleteQuoteDraft() {
     onSuccess: (_data, quote) => queryClient.invalidateQueries({ queryKey: ['request-quotes', quote.service_request_id] }),
   });
 }
+
+export const SENT_VIA_LABELS: Record<string, string> = {
+  email: 'por correo',
+  whatsapp: 'por WhatsApp',
+  in_person: 'en persona',
+  other: 'por otro medio',
+};
+
+export function useLostReasons(workshopId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['lost-reasons', workshopId],
+    queryFn: async () => {
+      const { data } = await supabase.from('commercial_settings').select('lost_reasons').eq('workshop_id', workshopId!).maybeSingle();
+      return (data?.lost_reasons as string[] | undefined) ?? ['Precio', 'Competencia', 'Sin presupuesto', 'Fuera de plazo', 'No responde', 'Otro'];
+    },
+    enabled: !!workshopId,
+  });
+}
+
+// Lifecycle of an official quote. Every action also refreshes the request,
+// because sending and closing update it the same way the manual flow does.
+function useQuoteAction<TArgs, TResult>(run: (args: TArgs) => Promise<TResult>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quote'] });
+      queryClient.invalidateQueries({ queryKey: ['request-quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['client-service-requests'] });
+    },
+  });
+}
+
+type ActionResult = { quote_id: string; status?: string; created?: boolean };
+const done = <T,>(result: { data: T; error: unknown }) => {
+  if (result.error) throw result.error;
+  return result.data as unknown as ActionResult;
+};
+
+export const useMarkQuoteSent = () =>
+  useQuoteAction(async ({ quoteId, via }: { quoteId: string; via: string }) =>
+    done(await supabase.rpc('mark_quote_sent', { _quote_id: quoteId, _sent_via: via })));
+
+export const useCloseQuote = () =>
+  useQuoteAction(async ({ quoteId, outcome, reason, closeRequest }: { quoteId: string; outcome: 'accepted' | 'rejected'; reason?: string; closeRequest?: boolean }) =>
+    done(await supabase.rpc('close_quote', { _quote_id: quoteId, _outcome: outcome, _lost_reason: reason, _close_request: closeRequest ?? true })));
+
+export const useVoidQuote = () =>
+  useQuoteAction(async ({ quoteId, reason }: { quoteId: string; reason: string }) =>
+    done(await supabase.rpc('void_quote', { _quote_id: quoteId, _reason: reason })));
+
+export const useReviseQuote = () =>
+  useQuoteAction(async (quoteId: string) => done(await supabase.rpc('revise_quote', { _quote_id: quoteId })));

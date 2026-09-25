@@ -8,6 +8,15 @@ import { Button } from '@/components/ui/button';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { QUOTE_STATUS_LABELS, useCreateQuoteDraft, useRequestQuotes } from '@/hooks/useQuotes';
 import { formatCLP } from '@/lib/quoteTotals';
+import { cn } from '@/lib/utils';
+
+const STATUS_BADGE: Record<string, string> = {
+  issued: 'border-amber-300 bg-amber-50 text-amber-800',
+  sent: 'border-sky-300 bg-sky-50 text-sky-800',
+  accepted: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  rejected: 'border-red-300 bg-red-50 text-red-700',
+  void: 'border-muted text-muted-foreground line-through',
+};
 import { QuoteEditorDialog } from './QuoteEditorDialog';
 import { openQuotePdf } from '@/hooks/useQuotePdf';
 
@@ -58,7 +67,9 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{quote.quote_number ?? 'En preparación'}</span>
                   {quote.status !== 'draft' && (
-                    <Badge className="text-[10px]">{QUOTE_STATUS_LABELS[quote.status] ?? quote.status}</Badge>
+                    <Badge variant="outline" className={cn('text-[10px] font-medium', STATUS_BADGE[quote.status])}>
+                      {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
+                    </Badge>
                   )}
                   {quote.discount_over_threshold && (
                     <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-700">
@@ -90,7 +101,7 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
         </div>
       )}
 
-      <QuoteEditorDialog quoteId={openQuoteId} open={!!openQuoteId} onOpenChange={open => !open && setOpenQuoteId(null)} />
+      <QuoteEditorDialog quoteId={openQuoteId} open={!!openQuoteId} onOpenChange={open => !open && setOpenQuoteId(null)} onOpenQuote={setOpenQuoteId} />
     </div>
   );
 }

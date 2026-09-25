@@ -290,7 +290,7 @@ export default function SalesControlPage() {
 
       {selected && (
         <RequestDetailDialog
-          request={selected}
+          request={requests.find(r => r.id === selected.id) ?? selected}
           open={!!selected}
           onOpenChange={(open) => !open && setSelected(null)}
         />

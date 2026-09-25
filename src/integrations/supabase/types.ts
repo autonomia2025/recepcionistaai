@@ -2471,6 +2471,8 @@ export type Database = {
           vat_rate: number
           vat_total: number
           workshop_id: string
+          sent_via: string | null
+          void_reason: string | null
         }
         Insert: {
           client_address?: string | null
@@ -2511,6 +2513,8 @@ export type Database = {
           vat_rate: number
           vat_total?: number
           workshop_id: string
+          sent_via?: string | null
+          void_reason?: string | null
         }
         Update: {
           client_address?: string | null
@@ -2551,6 +2555,8 @@ export type Database = {
           vat_rate?: number
           vat_total?: number
           workshop_id?: string
+          sent_via?: string | null
+          void_reason?: string | null
         }
         Relationships: [
           {
@@ -2761,6 +2767,7 @@ export type Database = {
           updated_at: string
           urgency: Database["public"]["Enums"]["request_urgency"]
           workshop_id: string
+          lost_reason: string | null
         }
         Insert: {
           address?: string | null
@@ -2789,6 +2796,7 @@ export type Database = {
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           workshop_id: string
+          lost_reason?: string | null
         }
         Update: {
           address?: string | null
@@ -2817,6 +2825,7 @@ export type Database = {
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           workshop_id?: string
+          lost_reason?: string | null
         }
         Relationships: [
           {
@@ -3820,6 +3829,13 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
+      mark_quote_sent: { Args: { _quote_id: string; _sent_via?: string }; Returns: Json }
+      close_quote: {
+        Args: { _close_request?: boolean; _lost_reason?: string; _outcome: string; _quote_id: string }
+        Returns: Json
+      }
+      void_quote: { Args: { _quote_id: string; _reason: string }; Returns: Json }
+      revise_quote: { Args: { _quote_id: string }; Returns: Json }
       match_bot_knowledge: {
         Args: {
           match_count?: number
