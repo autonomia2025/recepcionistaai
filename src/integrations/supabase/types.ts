@@ -2345,6 +2345,186 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_lines: {
+        Row: {
+          created_at: string
+          description: string
+          discount_pct: number
+          gross_amount: number
+          id: string
+          line_total: number
+          position: number
+          price_max: number | null
+          price_min: number | null
+          quantity: number
+          quote_id: string
+          sku: string | null
+          sku_normalized: string | null
+          source: string
+          unit_price: number
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          discount_pct?: number
+          gross_amount?: number
+          id?: string
+          line_total?: number
+          position?: number
+          price_max?: number | null
+          price_min?: number | null
+          quantity?: number
+          quote_id: string
+          sku?: string | null
+          sku_normalized?: string | null
+          source?: string
+          unit_price?: number
+          workshop_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discount_pct?: number
+          gross_amount?: number
+          id?: string
+          line_total?: number
+          position?: number
+          price_max?: number | null
+          price_min?: number | null
+          quantity?: number
+          quote_id?: string
+          sku?: string | null
+          sku_normalized?: string | null
+          source?: string
+          unit_price?: number
+          workshop_id?: string
+        }
+        Relationships: []
+      }
+      quotes: {
+        Row: {
+          client_address: string | null
+          client_company: string | null
+          client_email: string | null
+          client_name: string
+          client_phone: string | null
+          client_tax_id: string | null
+          closed_at: string | null
+          contact_id: string
+          conversation_id: string | null
+          created_at: string
+          created_by: string | null
+          delivery_terms: string
+          discount_over_threshold: boolean
+          discount_total: number
+          global_discount_pct: number
+          gross_subtotal: number
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          legal_footer: string
+          lost_reason: string | null
+          max_discount_pct: number
+          net_total: number
+          notes: string | null
+          payment_terms: string
+          pdf_path: string | null
+          quote_number: string | null
+          revision_of: string | null
+          sent_at: string | null
+          sent_by: string | null
+          service_request_id: string | null
+          status: string
+          total: number
+          updated_at: string
+          validity_days: number
+          vat_rate: number
+          vat_total: number
+          workshop_id: string
+        }
+        Insert: {
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          client_tax_id?: string | null
+          closed_at?: string | null
+          contact_id: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_terms?: string
+          discount_over_threshold?: boolean
+          discount_total?: number
+          global_discount_pct?: number
+          gross_subtotal?: number
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          legal_footer?: string
+          lost_reason?: string | null
+          max_discount_pct?: number
+          net_total?: number
+          notes?: string | null
+          payment_terms?: string
+          pdf_path?: string | null
+          quote_number?: string | null
+          revision_of?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          service_request_id?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+          validity_days?: number
+          vat_rate?: number
+          vat_total?: number
+          workshop_id: string
+        }
+        Update: {
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          client_tax_id?: string | null
+          closed_at?: string | null
+          contact_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_terms?: string
+          discount_over_threshold?: boolean
+          discount_total?: number
+          global_discount_pct?: number
+          gross_subtotal?: number
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          legal_footer?: string
+          lost_reason?: string | null
+          max_discount_pct?: number
+          net_total?: number
+          notes?: string | null
+          payment_terms?: string
+          pdf_path?: string | null
+          quote_number?: string | null
+          revision_of?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          service_request_id?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+          validity_days?: number
+          vat_rate?: number
+          vat_total?: number
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       reminder_logs: {
         Row: {
           appointment_id: string | null
@@ -3363,6 +3543,8 @@ export type Database = {
         Returns: Json
       }
       current_staff_zone: { Args: never; Returns: string }
+      create_quote_draft: { Args: { _service_request_id: string }; Returns: Json }
+      issue_quote: { Args: { _quote_id: string }; Returns: Json }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {

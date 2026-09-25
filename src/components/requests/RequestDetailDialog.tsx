@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { RequestQuotesSection } from '@/components/quotes/RequestQuotesSection';
 import {
   ServiceRequest,
   ServiceRequestStatus,
@@ -208,7 +209,7 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                   {request.description && (
                     <div>
                       <Label className="text-xs text-muted-foreground">Descripción</Label>
-                      <p className="text-sm mt-1">{request.description}</p>
+                      <p className="text-sm mt-1 whitespace-pre-line">{request.description}</p>
                     </div>
                   )}
                   {request.preferred_time_window && (
@@ -227,6 +228,9 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
               </div>
 
               <Separator />
+
+              {/* Quotes built in the system (commercial module only) */}
+              <RequestQuotesSection requestId={request.id} />
 
               {/* Quotation Section */}
               {request.status !== 'done' && request.status !== 'lost' && (
