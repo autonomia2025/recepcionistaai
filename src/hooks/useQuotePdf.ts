@@ -100,7 +100,7 @@ export function useGenerateQuotePdf() {
       const bytes = await buildQuotePdf(data);
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
-        .upload(path, new Blob([bytes], { type: 'application/pdf' }), { contentType: 'application/pdf', upsert: false });
+        .upload(path, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }), { contentType: 'application/pdf', upsert: false });
       // A previous attempt may have uploaded it already: registering still works.
       if (uploadError && !/exists|duplicate/i.test(uploadError.message)) throw uploadError;
       const { data: registered, error } = await supabase.rpc('set_quote_pdf', { _quote_id: quoteId, _path: path });
