@@ -1663,6 +1663,72 @@ export type Database = {
           },
         ]
       }
+      lead_call_guide_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          guide_id: string
+          id: string
+          updated_at: string
+          useful: boolean
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          guide_id: string
+          id?: string
+          updated_at?: string
+          useful: boolean
+          user_id?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          guide_id?: string
+          id?: string
+          updated_at?: string
+          useful?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      lead_call_guides: {
+        Row: {
+          contact_id: string
+          content: Json
+          generated_at: string
+          generated_by: string | null
+          id: string
+          last_message_at: string | null
+          model: string | null
+          service_request_id: string
+          workshop_id: string
+        }
+        Insert: {
+          contact_id: string
+          content: Json
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          model?: string | null
+          service_request_id: string
+          workshop_id: string
+        }
+        Update: {
+          contact_id?: string
+          content?: Json
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          model?: string | null
+          service_request_id?: string
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       marketing_leads: {
         Row: {
           company: string | null

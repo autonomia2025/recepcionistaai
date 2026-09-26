@@ -32,6 +32,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { RequestQuotesSection } from '@/components/quotes/RequestQuotesSection';
 import { LeadReasonCard } from './LeadReasonCard';
+import { CallGuideCard } from './CallGuideCard';
 import {
   ServiceRequest,
   ServiceRequestStatus,
@@ -206,6 +207,9 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
                   )}
                 </div>
               </div>
+
+              {/* First-call brief (commercial module) */}
+              <CallGuideCard requestId={request.id} conversationId={request.conversation_id} />
 
               {/* Request Details */}
               <div className="space-y-3">
