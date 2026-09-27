@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList, Briefcase } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList, Briefcase, ListChecks, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeatInfo, useSubscription, useWorkshop } from '@/hooks/useWorkshopData';
@@ -87,6 +87,15 @@ export const AppSidebar = () => {
       label: 'Clientes'
     }];
 
+    // Commercial module: everyone gets their own day list, right after Dashboard.
+    if (features.commercial) {
+      baseItems.splice(1, 0, {
+        to: '/my-day',
+        icon: ListChecks,
+        label: 'Mi día'
+      });
+    }
+
     // Add Agenda only for with_scheduling mode (chatbot_only has no calendar)
     if (workshopMode?.booking_mode === 'with_scheduling') {
       baseItems.push({
@@ -104,6 +113,14 @@ export const AppSidebar = () => {
       icon: BarChart2,
       label: 'Control de Ventas'
     });
+
+    if (features.commercial) {
+      baseItems.push({
+        to: '/commercial-summary',
+        icon: Lightbulb,
+        label: 'Resumen comercial'
+      });
+    }
 
     baseItems.push({
       to: '/team',
