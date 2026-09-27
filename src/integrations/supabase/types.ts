@@ -1691,7 +1691,22 @@ export type Database = {
           useful?: boolean
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_call_guide_feedback_guide_id_fkey"
+            columns: ["guide_id"]
+            isOneToOne: false
+            referencedRelation: "lead_call_guides"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guide_feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_call_guides: {
         Row: {
@@ -1727,7 +1742,50 @@ export type Database = {
           service_request_id?: string
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_call_guides_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guides_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guides_service_request_id_fkey"
+            columns: ["service_request_id"]
+            isOneToOne: true
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guides_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guides_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_call_guides_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_leads: {
         Row: {
@@ -2529,6 +2587,7 @@ export type Database = {
           revision_of: string | null
           sent_at: string | null
           sent_by: string | null
+          sent_via: string | null
           service_request_id: string | null
           status: string
           total: number
@@ -2536,9 +2595,8 @@ export type Database = {
           validity_days: number
           vat_rate: number
           vat_total: number
-          workshop_id: string
-          sent_via: string | null
           void_reason: string | null
+          workshop_id: string
         }
         Insert: {
           client_address?: string | null
@@ -2571,6 +2629,7 @@ export type Database = {
           revision_of?: string | null
           sent_at?: string | null
           sent_by?: string | null
+          sent_via?: string | null
           service_request_id?: string | null
           status?: string
           total?: number
@@ -2578,9 +2637,8 @@ export type Database = {
           validity_days: number
           vat_rate: number
           vat_total?: number
-          workshop_id: string
-          sent_via?: string | null
           void_reason?: string | null
+          workshop_id: string
         }
         Update: {
           client_address?: string | null
@@ -2613,6 +2671,7 @@ export type Database = {
           revision_of?: string | null
           sent_at?: string | null
           sent_by?: string | null
+          sent_via?: string | null
           service_request_id?: string | null
           status?: string
           total?: number
@@ -2620,9 +2679,8 @@ export type Database = {
           validity_days?: number
           vat_rate?: number
           vat_total?: number
-          workshop_id?: string
-          sent_via?: string | null
           void_reason?: string | null
+          workshop_id?: string
         }
         Relationships: [
           {
@@ -2820,6 +2878,7 @@ export type Database = {
           estimated_value: number | null
           first_contact_at: string | null
           id: string
+          lost_reason: string | null
           notes: string | null
           preferred_time_window: string | null
           qualification: Json | null
@@ -2833,7 +2892,6 @@ export type Database = {
           updated_at: string
           urgency: Database["public"]["Enums"]["request_urgency"]
           workshop_id: string
-          lost_reason: string | null
         }
         Insert: {
           address?: string | null
@@ -2849,6 +2907,7 @@ export type Database = {
           estimated_value?: number | null
           first_contact_at?: string | null
           id?: string
+          lost_reason?: string | null
           notes?: string | null
           preferred_time_window?: string | null
           qualification?: Json | null
@@ -2862,7 +2921,6 @@ export type Database = {
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           workshop_id: string
-          lost_reason?: string | null
         }
         Update: {
           address?: string | null
@@ -2878,6 +2936,7 @@ export type Database = {
           estimated_value?: number | null
           first_contact_at?: string | null
           id?: string
+          lost_reason?: string | null
           notes?: string | null
           preferred_time_window?: string | null
           qualification?: Json | null
@@ -2891,7 +2950,6 @@ export type Database = {
           updated_at?: string
           urgency?: Database["public"]["Enums"]["request_urgency"]
           workshop_id?: string
-          lost_reason?: string | null
         }
         Relationships: [
           {
@@ -3716,6 +3774,15 @@ export type Database = {
         Args: { _row: Database["public"]["Tables"]["product_catalog"]["Row"] }
         Returns: string
       }
+      close_quote: {
+        Args: {
+          _close_request?: boolean
+          _lost_reason?: string
+          _outcome: string
+          _quote_id: string
+        }
+        Returns: Json
+      }
       create_hot_lead_request: {
         Args: {
           _contact_id: string
@@ -3895,13 +3962,10 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
-      mark_quote_sent: { Args: { _quote_id: string; _sent_via?: string }; Returns: Json }
-      close_quote: {
-        Args: { _close_request?: boolean; _lost_reason?: string; _outcome: string; _quote_id: string }
+      mark_quote_sent: {
+        Args: { _quote_id: string; _sent_via?: string }
         Returns: Json
       }
-      void_quote: { Args: { _quote_id: string; _reason: string }; Returns: Json }
-      revise_quote: { Args: { _quote_id: string }; Returns: Json }
       match_bot_knowledge: {
         Args: {
           match_count?: number
@@ -3917,6 +3981,7 @@ export type Database = {
         }[]
       }
       rebuild_workshops_safe_view: { Args: never; Returns: undefined }
+      revise_quote: { Args: { _quote_id: string }; Returns: Json }
       set_contact_fields: {
         Args: { _contact_id: string; _fields: Json; _source: string }
         Returns: Json
@@ -3930,6 +3995,10 @@ export type Database = {
         Returns: string
       }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }
+      void_quote: {
+        Args: { _quote_id: string; _reason: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "SUPERADMIN" | "ADMIN" | "STAFF"
