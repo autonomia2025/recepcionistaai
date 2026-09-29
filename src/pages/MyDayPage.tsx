@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { ChevronRight, Loader2, Mail, RefreshCw } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestFactList } from '@/components/commercial/RequestFactList';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCommercialFacts } from '@/hooks/useCommercialFacts';
+import { useUnreadQuoteReplies } from '@/hooks/useQuoteEmail';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { buildMyDay } from '@/lib/insights';
@@ -17,9 +20,10 @@ export default function MyDayPage() {
   const { data: facts, isLoading, isFetching, error, refetch } = useCommercialFacts('me');
   const { data: requests = [] } = useServiceRequests();
   const [openId, setOpenId] = useState<string | null>(null);
+  const { data: replies = [] } = useUnreadQuoteReplies();
   const sections = useMemo(() => (facts ? buildMyDay(facts) : []), [facts]);
   const selected = requests.find(r => r.id === openId) ?? null;
-  const pending = sections.reduce((sum, s) => sum + s.items.length, 0);
+  const pending = sections.reduce((sum, s) => sum + s.items.length, 0) + replies.length;
   const late = sections.reduce((sum, s) => sum + s.items.filter(i => i.late).length, 0);
   const firstName = profile?.full_name?.split(' ')[0];
 
@@ -47,6 +51,34 @@ export default function MyDayPage() {
           </Button>
         }
       />
+
+      {replies.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <Mail className="w-4 h-4 text-sky-600" /> Te respondieron por correo
+            <span className="text-sm font-normal text-muted-foreground">{replies.length}</span>
+          </h2>
+          <ul className="divide-y rounded-lg border bg-card">
+            {replies.map(reply => (
+              <li key={reply.id}>
+                <button type="button" disabled={!reply.service_request_id} onClick={() => reply.service_request_id && setOpenId(reply.service_request_id)}
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{reply.from_name || reply.from_address}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {(reply.body_text || '').split('\n').find(line => line.trim()) || 'Respondió la cotización'}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDistanceToNow(new Date(reply.received_at), { addSuffix: true, locale: es })}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {isLoading ? (
         <p className="text-muted-foreground flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</p>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Ban, CheckCircle2, Clock, CopyPlus, FileDown, Loader2, MoreHorizontal, Send, ThumbsDown, ThumbsUp, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, Clock, CopyPlus, FileDown, Loader2, Mail, MoreHorizontal, Send, ThumbsDown, ThumbsUp, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -17,6 +17,8 @@ import { formatCLP } from '@/lib/quoteTotals';
 import {
   type Quote, SENT_VIA_LABELS, useCloseQuote, useLostReasons, useMarkQuoteSent, useReviseQuote, useVoidQuote,
 } from '@/hooks/useQuotes';
+import { useEmailReady } from '@/hooks/useQuoteEmail';
+import { SendQuoteEmailDialog } from './SendQuoteEmailDialog';
 
 const date = (value: string | null) => (value ? format(new Date(value), "d 'de' MMMM", { locale: es }) : '—');
 const errorText = (err: unknown) => (err instanceof Error ? err.message : undefined);
@@ -55,6 +57,8 @@ export function QuoteLifecycleActions({ quote, onOpenPdf, onCreatePdf, pdfPendin
   const [reason, setReason] = useState('');
   const [closeRequest, setCloseRequest] = useState(true);
   const [voidReason, setVoidReason] = useState('');
+  const [emailOpen, setEmailOpen] = useState(false);
+  const emailReady = useEmailReady();
 
   const markSent = useMarkQuoteSent();
   const closeQuote = useCloseQuote();
@@ -94,8 +98,14 @@ export function QuoteLifecycleActions({ quote, onOpenPdf, onCreatePdf, pdfPendin
       )}
 
       {quote.status === 'issued' && (
-        <Button onClick={() => setDialog('send')} disabled={busy || !quote.pdf_path} title={!quote.pdf_path ? 'Primero crea el PDF' : undefined}>
+        <Button variant={emailReady ? 'outline' : 'default'} onClick={() => setDialog('send')} disabled={busy || !quote.pdf_path} title={!quote.pdf_path ? 'Primero crea el PDF' : undefined}>
           <Send className="w-4 h-4 mr-1" /> Marcar como enviada
+        </Button>
+      )}
+
+      {quote.status === 'issued' && emailReady && (
+        <Button onClick={() => setEmailOpen(true)} disabled={busy || !quote.pdf_path} title={!quote.pdf_path ? 'Primero crea el PDF' : undefined}>
+          <Mail className="w-4 h-4 mr-1" /> Enviar por correo
         </Button>
       )}
 
@@ -118,6 +128,11 @@ export function QuoteLifecycleActions({ quote, onOpenPdf, onCreatePdf, pdfPendin
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {quote.status === 'sent' && emailReady && quote.pdf_path && (
+              <DropdownMenuItem onSelect={() => setEmailOpen(true)}>
+                <Mail className="w-4 h-4 mr-2" /> Enviar de nuevo por correo
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={handleRevise}>
               <CopyPlus className="w-4 h-4 mr-2" /> Hacer nueva versión
             </DropdownMenuItem>
@@ -134,6 +149,8 @@ export function QuoteLifecycleActions({ quote, onOpenPdf, onCreatePdf, pdfPendin
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+
+      {emailReady && <SendQuoteEmailDialog quote={quote} open={emailOpen} onOpenChange={setEmailOpen} />}
 
       {/* Mark as sent */}
       <AlertDialog open={dialog === 'send'} onOpenChange={value => !value && setDialog(null)}>

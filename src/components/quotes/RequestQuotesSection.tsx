@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, FileDown, FilePlus2, FileText, Loader2 } from 'lucide-react';
+import { AlertTriangle, FileDown, FilePlus2, FileText, Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { QUOTE_STATUS_LABELS, useCreateQuoteDraft, useRequestQuotes } from '@/hooks/useQuotes';
+import { useUnreadQuoteReplies } from '@/hooks/useQuoteEmail';
 import { formatCLP } from '@/lib/quoteTotals';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,8 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
   const { data: quotes, isLoading } = useRequestQuotes(features.commercial ? requestId : null);
   const createDraft = useCreateQuoteDraft();
   const [openQuoteId, setOpenQuoteId] = useState<string | null>(null);
+  const { data: unreadReplies } = useUnreadQuoteReplies();
+  const repliedQuotes = new Set((unreadReplies || []).map(reply => reply.quote_id));
 
   if (!features.commercial) return null;
 
@@ -69,6 +72,11 @@ export function RequestQuotesSection({ requestId }: { requestId: string }) {
                   {quote.status !== 'draft' && (
                     <Badge variant="outline" className={cn('text-[10px] font-medium', STATUS_BADGE[quote.status])}>
                       {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
+                    </Badge>
+                  )}
+                  {repliedQuotes.has(quote.id) && (
+                    <Badge className="text-[10px] bg-sky-600 hover:bg-sky-600">
+                      <Mail className="w-3 h-3 mr-1" /> El cliente respondió
                     </Badge>
                   )}
                   {quote.discount_over_threshold && (

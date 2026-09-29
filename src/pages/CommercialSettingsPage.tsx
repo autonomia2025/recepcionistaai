@@ -20,6 +20,7 @@ import {
   FileText,
   ImageOff,
   Loader2,
+  Mail,
   Pencil,
   Plus,
   Save,
@@ -33,6 +34,7 @@ import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { useCommercialSettings, type CommercialSettings } from '@/hooks/useCommercialSettings';
 import { formatRut, isValidRut } from '@/lib/rut';
 import { formatQuoteNumber } from '@/lib/quoteNumber';
+import { QuoteEmailSettings } from '@/components/commercial/QuoteEmailSettings';
 
 type PlaybookDoc = Database['public']['Tables']['sales_playbook_docs']['Row'];
 
@@ -548,6 +550,10 @@ export default function CommercialSettingsPage() {
             <BookOpen className="w-4 h-4" />
             Argumentario
           </TabsTrigger>
+          <TabsTrigger value="correo" className="gap-2">
+            <Mail className="w-4 h-4" />
+            Correo
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="identidad" className="mt-6 space-y-4">
@@ -820,6 +826,10 @@ export default function CommercialSettingsPage() {
 
         <TabsContent value="argumentario" className="mt-6">
           <PlaybookTab workshopId={workshopId} />
+        </TabsContent>
+
+        <TabsContent value="correo" className="mt-6">
+          <QuoteEmailSettings companyName={draft.legal_name || null} />
         </TabsContent>
       </Tabs>
     </div>

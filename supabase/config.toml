@@ -104,3 +104,12 @@ verify_jwt = false
 
 [functions.generate-call-guide]
 verify_jwt = false
+
+[functions.quote-email-domain]
+verify_jwt = false
+
+[functions.send-quote-email]
+verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false
