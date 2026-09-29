@@ -30,8 +30,8 @@ serve(async (req) => {
     const { data: auth } = await userClient.auth.getUser();
     if (!auth?.user) return json(401, { error: 'Unauthorized' });
     if (!Deno.env.get('MS_CLIENT_ID') || !Deno.env.get('MS_CLIENT_SECRET')) return json(500, { error: 'Falta configurar la app de Microsoft (MS_CLIENT_ID / MS_CLIENT_SECRET)' });
-    const secret = Deno.env.get('OAUTH_STATE_SECRET');
-    if (!secret) return json(500, { error: 'Falta OAUTH_STATE_SECRET' });
+    // Same secret as the existing Google connections (they fall back to the service key too).
+    const secret = Deno.env.get('OAUTH_STATE_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     const { data: profile } = await supabase.from('profiles').select('workshop_id').eq('id', auth.user.id).maybeSingle();
     if (!profile?.workshop_id) return json(400, { error: 'Sin negocio asociado' });

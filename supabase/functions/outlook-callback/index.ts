@@ -18,7 +18,7 @@ const back = (url: string, result: string, reason?: string) => {
 
 serve(async (req) => {
   const url = new URL(req.url);
-  const payload = await verifyState(url.searchParams.get('state'), Deno.env.get('OAUTH_STATE_SECRET') ?? '');
+  const payload = await verifyState(url.searchParams.get('state'), Deno.env.get('OAUTH_STATE_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '');
   const returnTo = payload?.returnTo ?? safeReturnUrl(null, APP_URL);
   if (!payload) return back(returnTo, 'error', 'invalid_state');
 
