@@ -31,6 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { RequestQuotesSection } from '@/components/quotes/RequestQuotesSection';
+import { ClientEmailThread } from '@/components/email/ClientEmailThread';
 import { LeadReasonCard } from './LeadReasonCard';
 import { CallGuideCard } from './CallGuideCard';
 import {
@@ -244,6 +245,9 @@ export function RequestDetailDialog({ request, open, onOpenChange }: RequestDeta
 
               {/* Quotes built in the system (commercial module only) */}
               <RequestQuotesSection requestId={request.id} />
+
+              {/* Emails with this client from the sellers' Outlook (commercial module only) */}
+              <ClientEmailThread contactId={request.contact_id} />
 
               {/* Quotation Section */}
               {request.status !== 'done' && request.status !== 'lost' && (

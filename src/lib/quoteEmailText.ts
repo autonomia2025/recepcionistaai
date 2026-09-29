@@ -15,7 +15,7 @@ export function defaultQuoteSubject(quoteNumber: string, companyName: string | n
   return companyName ? `Cotización ${quoteNumber} · ${companyName}` : `Cotización ${quoteNumber}`;
 }
 
-export function defaultAnswerSubject(lastSubject: string | null, quoteNumber: string): string {
-  const base = (lastSubject ?? '').replace(/^\s*((re|rv|fw|fwd)\s*:\s*)+/i, '').trim() || `Cotización ${quoteNumber}`;
+export function defaultAnswerSubject(lastSubject: string | null, fallback: string): string {
+  const base = (lastSubject ?? '').replace(/^\s*((re|rv|fw|fwd)\s*:\s*)+/i, '').trim() || fallback;
   return `Re: ${base}`;
 }

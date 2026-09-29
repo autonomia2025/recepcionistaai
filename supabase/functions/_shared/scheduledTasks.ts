@@ -3,6 +3,8 @@
 // x-cron-secret header. Adding a task = one entry in SCHEDULED_TASKS plus one
 // cron.schedule() row calling public.invoke_scheduled_task('<name>').
 
+import { syncAllMailboxes } from './mailSync.ts'
+
 export interface TaskContext {
   // deno-lint-ignore no-explicit-any
   supabase: any
@@ -25,8 +27,12 @@ export const heartbeat: ScheduledTask = async ({ supabase, trigger }) => {
   return { ran_at: ranAt }
 }
 
+// Emails with clients from the sellers' connected Outlook mailboxes (F4).
+export const mailSync: ScheduledTask = ({ supabase }) => syncAllMailboxes(supabase)
+
 export const SCHEDULED_TASKS: Record<string, ScheduledTask> = {
   heartbeat,
+  'mail-sync': mailSync,
 }
 
 export interface HandlerDeps {

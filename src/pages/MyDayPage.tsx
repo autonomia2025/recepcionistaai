@@ -8,7 +8,8 @@ import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestFactList } from '@/components/commercial/RequestFactList';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCommercialFacts } from '@/hooks/useCommercialFacts';
-import { useUnreadQuoteReplies } from '@/hooks/useQuoteEmail';
+import { useUnreadQuoteReplies } from '@/hooks/useClientEmail';
+import { MailboxConnection } from '@/components/email/MailboxConnection';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { buildMyDay } from '@/lib/insights';
@@ -43,7 +44,7 @@ export default function MyDayPage() {
         description={facts
           ? pending === 0
             ? 'No tienes pendientes. Buen trabajo.'
-            : `Tienes ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}${late ? `, ${late} ${late === 1 ? 'atrasado' : 'atrasados'}` : ''}. Empieza por los marcados en rojo.`
+            : `Tienes ${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}${late ? `, ${late} ${late === 1 ? 'atrasado' : 'atrasados'}. Empieza por los marcados en rojo.` : '.'}`
           : 'Tus pendientes de hoy.'}
         actions={
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
@@ -51,6 +52,8 @@ export default function MyDayPage() {
           </Button>
         }
       />
+
+      <MailboxConnection />
 
       {replies.length > 0 && (
         <section className="space-y-2">
@@ -70,7 +73,7 @@ export default function MyDayPage() {
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatDistanceToNow(new Date(reply.received_at), { addSuffix: true, locale: es })}
+                    {formatDistanceToNow(new Date(reply.sent_at), { addSuffix: true, locale: es })}
                   </span>
                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 </button>

@@ -105,11 +105,14 @@ verify_jwt = false
 [functions.generate-call-guide]
 verify_jwt = false
 
-[functions.quote-email-domain]
+[functions.send-client-email]
 verify_jwt = false
 
-[functions.send-quote-email]
+[functions.outlook-auth]
 verify_jwt = false
 
-[functions.resend-webhook]
+[functions.outlook-callback]
+verify_jwt = false
+
+[functions.mail-sync]
 verify_jwt = false

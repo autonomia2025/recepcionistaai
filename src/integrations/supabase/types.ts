@@ -825,6 +825,87 @@ export type Database = {
           },
         ]
       }
+      contact_emails: {
+        Row: {
+          attachments: Json
+          body_text: string
+          cc_addresses: string[]
+          contact_id: string
+          conversation_id: string | null
+          created_at: string
+          direction: string
+          from_address: string
+          from_name: string | null
+          id: string
+          internet_message_id: string | null
+          kind: string | null
+          mailbox_email: string
+          mailbox_user_id: string | null
+          provider_message_id: string
+          quote_id: string | null
+          read_at: string | null
+          read_by: string | null
+          sent_at: string
+          sent_from_panel: boolean
+          service_request_id: string | null
+          subject: string | null
+          to_addresses: string[]
+          workshop_id: string
+        }
+        Insert: {
+          attachments?: Json
+          body_text?: string
+          cc_addresses?: string[]
+          contact_id: string
+          conversation_id?: string | null
+          created_at?: string
+          direction: string
+          from_address: string
+          from_name?: string | null
+          id?: string
+          internet_message_id?: string | null
+          kind?: string | null
+          mailbox_email: string
+          mailbox_user_id?: string | null
+          provider_message_id: string
+          quote_id?: string | null
+          read_at?: string | null
+          read_by?: string | null
+          sent_at: string
+          sent_from_panel?: boolean
+          service_request_id?: string | null
+          subject?: string | null
+          to_addresses?: string[]
+          workshop_id: string
+        }
+        Update: {
+          attachments?: Json
+          body_text?: string
+          cc_addresses?: string[]
+          contact_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          direction?: string
+          from_address?: string
+          from_name?: string | null
+          id?: string
+          internet_message_id?: string | null
+          kind?: string | null
+          mailbox_email?: string
+          mailbox_user_id?: string | null
+          provider_message_id?: string
+          quote_id?: string | null
+          read_at?: string | null
+          read_by?: string | null
+          sent_at?: string
+          sent_from_panel?: boolean
+          service_request_id?: string | null
+          subject?: string | null
+          to_addresses?: string[]
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           archived: boolean | null
@@ -2469,138 +2550,6 @@ export type Database = {
         }
         Relationships: []
       }
-      quote_email_replies: {
-        Row: {
-          attachments: Json
-          body_text: string
-          created_at: string
-          from_address: string
-          from_name: string | null
-          id: string
-          message_id: string | null
-          provider_email_id: string
-          quote_email_id: string | null
-          quote_id: string
-          quoted_text: string | null
-          read_at: string | null
-          read_by: string | null
-          received_at: string
-          sender_verified: boolean | null
-          service_request_id: string | null
-          subject: string | null
-          workshop_id: string
-        }
-        Insert: {
-          attachments?: Json
-          body_text?: string
-          created_at?: string
-          from_address: string
-          from_name?: string | null
-          id?: string
-          message_id?: string | null
-          provider_email_id: string
-          quote_email_id?: string | null
-          quote_id: string
-          quoted_text?: string | null
-          read_at?: string | null
-          read_by?: string | null
-          received_at?: string
-          sender_verified?: boolean | null
-          service_request_id?: string | null
-          subject?: string | null
-          workshop_id: string
-        }
-        Update: {
-          attachments?: Json
-          body_text?: string
-          created_at?: string
-          from_address?: string
-          from_name?: string | null
-          id?: string
-          message_id?: string | null
-          provider_email_id?: string
-          quote_email_id?: string | null
-          quote_id?: string
-          quoted_text?: string | null
-          read_at?: string | null
-          read_by?: string | null
-          received_at?: string
-          sender_verified?: boolean | null
-          service_request_id?: string | null
-          subject?: string | null
-          workshop_id?: string
-        }
-        Relationships: []
-      }
-      quote_emails: {
-        Row: {
-          attachment_name: string | null
-          body_text: string
-          cc_addresses: string[]
-          created_at: string
-          from_address: string
-          id: string
-          kind: string
-          message_id: string | null
-          provider_email_id: string | null
-          quote_id: string
-          reply_to_address: string
-          reply_token: string
-          sent_by: string | null
-          service_request_id: string | null
-          status: string
-          status_detail: string | null
-          subject: string
-          to_addresses: string[]
-          updated_at: string
-          workshop_id: string
-        }
-        Insert: {
-          attachment_name?: string | null
-          body_text: string
-          cc_addresses?: string[]
-          created_at?: string
-          from_address: string
-          id?: string
-          kind?: string
-          message_id?: string | null
-          provider_email_id?: string | null
-          quote_id: string
-          reply_to_address: string
-          reply_token: string
-          sent_by?: string | null
-          service_request_id?: string | null
-          status?: string
-          status_detail?: string | null
-          subject: string
-          to_addresses: string[]
-          updated_at?: string
-          workshop_id: string
-        }
-        Update: {
-          attachment_name?: string | null
-          body_text?: string
-          cc_addresses?: string[]
-          created_at?: string
-          from_address?: string
-          id?: string
-          kind?: string
-          message_id?: string | null
-          provider_email_id?: string | null
-          quote_id?: string
-          reply_to_address?: string
-          reply_token?: string
-          sent_by?: string | null
-          service_request_id?: string | null
-          status?: string
-          status_detail?: string | null
-          subject?: string
-          to_addresses?: string[]
-          updated_at?: string
-          workshop_id?: string
-        }
-        Relationships: []
-      }
       quote_lines: {
         Row: {
           created_at: string
@@ -3135,6 +3084,60 @@ export type Database = {
           },
         ]
       }
+      staff_mailboxes: {
+        Row: {
+          access_token: string | null
+          connected_at: string
+          display_name: string | null
+          email: string
+          inbox_synced_until: string | null
+          last_error: string | null
+          last_sync_at: string | null
+          provider: string
+          refresh_token: string
+          sent_synced_until: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+          workshop_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          connected_at?: string
+          display_name?: string | null
+          email: string
+          inbox_synced_until?: string | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token: string
+          sent_synced_until?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+          workshop_id: string
+        }
+        Update: {
+          access_token?: string | null
+          connected_at?: string
+          display_name?: string | null
+          email?: string
+          inbox_synced_until?: string | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token?: string
+          sent_synced_until?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -3440,45 +3443,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      workshop_email_domains: {
-        Row: {
-          checked_at: string | null
-          created_at: string
-          created_by: string | null
-          domain: string
-          provider_domain_id: string | null
-          records: Json
-          sender_local: string
-          status: string
-          updated_at: string
-          workshop_id: string
-        }
-        Insert: {
-          checked_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          domain: string
-          provider_domain_id?: string | null
-          records?: Json
-          sender_local?: string
-          status?: string
-          updated_at?: string
-          workshop_id: string
-        }
-        Update: {
-          checked_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          domain?: string
-          provider_domain_id?: string | null
-          records?: Json
-          sender_local?: string
-          status?: string
-          updated_at?: string
-          workshop_id?: string
-        }
-        Relationships: []
       }
       workshop_gmail_tokens: {
         Row: {
@@ -4134,7 +4098,8 @@ export type Database = {
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
-      mark_quote_replies_read: { Args: { _quote_id: string }; Returns: number }
+      disconnect_my_mailbox: { Args: never; Returns: boolean }
+      mark_contact_emails_read: { Args: { _contact_id: string }; Returns: number }
       mark_quote_sent: {
         Args: { _quote_id: string; _sent_via?: string }
         Returns: Json

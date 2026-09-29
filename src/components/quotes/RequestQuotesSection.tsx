@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { QUOTE_STATUS_LABELS, useCreateQuoteDraft, useRequestQuotes } from '@/hooks/useQuotes';
-import { useUnreadQuoteReplies } from '@/hooks/useQuoteEmail';
+import { useUnreadQuoteReplies } from '@/hooks/useClientEmail';
 import { formatCLP } from '@/lib/quoteTotals';
 import { cn } from '@/lib/utils';
 

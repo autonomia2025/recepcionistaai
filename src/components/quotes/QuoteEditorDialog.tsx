@@ -22,7 +22,7 @@ import {
 } from '@/hooks/useQuotes';
 import { openQuotePdf, useGenerateQuotePdf } from '@/hooks/useQuotePdf';
 import { QuoteLifecycleActions, QuoteStatusLine } from './QuoteLifecycle';
-import { QuoteEmailThread } from './QuoteEmailThread';
+import { ClientEmailThread } from '@/components/email/ClientEmailThread';
 
 // Where each line came from, said the way a seller would say it.
 const ORIGIN: Record<string, string> = {
@@ -290,7 +290,7 @@ function QuoteEditorBody({ quote, savedLines, onDirtyChange, onClose, onDeleted,
       {/* Body (native scroll) */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
         <div className="space-y-8">
-          {!editable && <QuoteEmailThread quote={quote} />}
+          {!editable && <ClientEmailThread contactId={quote.contact_id} quoteId={quote.id} title="Correos de esta cotización" />}
 
           <Section title="Equipos y precios" hint={editable ? 'Los precios parten del máximo del rango del catálogo. Ajusta con descuento.' : undefined}>
             {lines.length === 0 && (
