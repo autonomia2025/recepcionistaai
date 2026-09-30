@@ -2148,7 +2148,57 @@ export type Database = {
           superseded_at?: string | null
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_next_actions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_done_by_fkey"
+            columns: ["done_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_service_request_id_fkey"
+            columns: ["service_request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_next_actions_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_leads: {
         Row: {
@@ -4242,11 +4292,13 @@ export type Database = {
         Returns: Json
       }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
-      complete_next_action: { Args: { _id: string; _note?: string }; Returns: boolean }
-      commercial_metrics: { Args: { _from: string; _to: string }; Returns: Json }
       commercial_interested: { Args: never; Returns: Json }
       commercial_lead_inbox: {
         Args: { _days?: number; _scope?: string; _staff?: string }
+        Returns: Json
+      }
+      commercial_metrics: {
+        Args: { _from: string; _to: string }
         Returns: Json
       }
       commercial_open_work: {
@@ -4270,6 +4322,10 @@ export type Database = {
         }[]
       }
       commercial_team_activity: { Args: { _days?: number }; Returns: Json }
+      complete_next_action: {
+        Args: { _id: string; _note?: string }
+        Returns: boolean
+      }
       create_hot_lead_request: {
         Args: {
           _contact_id: string
@@ -4311,6 +4367,7 @@ export type Database = {
           default_payment_terms: string
           discount_approval_threshold: number
           email: string | null
+          gross_margin_pct: number | null
           legal_footer: string
           legal_name: string | null
           logo_path: string | null
@@ -4466,7 +4523,15 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
+      lead_last_activity: { Args: { _request_id: string }; Returns: string }
       lead_priority: { Args: { _request_id: string }; Returns: Json }
+      leads_needing_next_action: {
+        Args: { _limit?: number }
+        Returns: {
+          basis_at: string
+          request_id: string
+        }[]
+      }
       mark_contact_emails_read: {
         Args: { _contact_id: string }
         Returns: number
@@ -4493,6 +4558,13 @@ export type Database = {
         Args: { _max?: number; _names: string[] }
         Returns: string
       }
+      next_action_followed: {
+        Args: {
+          _a: Database["public"]["Tables"]["lead_next_actions"]["Row"]
+          _tz: string
+        }
+        Returns: boolean
+      }
       pending_email_reviews: {
         Args: { _limit?: number }
         Returns: {
@@ -4502,11 +4574,29 @@ export type Database = {
       rebuild_workshops_safe_view: { Args: never; Returns: undefined }
       revise_quote: { Args: { _quote_id: string }; Returns: Json }
       run_commercial_alerts: { Args: { _now?: string }; Returns: Json }
+      save_next_action: {
+        Args: {
+          _action: string
+          _action_type: string
+          _argument: string
+          _basis_at: string
+          _due: string
+          _evidence: string
+          _model: string
+          _reason: string
+          _request_id: string
+        }
+        Returns: string
+      }
       seller_attention_stats: {
         Args: { _from: string; _staff: string; _workshop: string }
         Returns: Json
       }
       seller_email_stats: {
+        Args: { _from: string; _staff: string; _workshop: string }
+        Returns: Json
+      }
+      seller_next_action_stats: {
         Args: { _from: string; _staff: string; _workshop: string }
         Returns: Json
       }
