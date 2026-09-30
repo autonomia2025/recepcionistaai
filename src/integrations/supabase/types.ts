@@ -713,6 +713,56 @@ export type Database = {
           },
         ]
       }
+      commercial_alert_log: {
+        Row: {
+          alert_key: string
+          created_at: string
+          user_id: string
+          workshop_id: string
+        }
+        Insert: {
+          alert_key: string
+          created_at?: string
+          user_id: string
+          workshop_id: string
+        }
+        Update: {
+          alert_key?: string
+          created_at?: string
+          user_id?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_alert_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_alert_log_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_alert_log_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_alert_log_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commercial_settings: {
         Row: {
           address: string | null
@@ -4007,7 +4057,37 @@ export type Database = {
         }
         Returns: Json
       }
+      clp_text: { Args: { _value: number }; Returns: string }
+      commercial_email_threads: {
+        Args: { _days?: number; _staff?: string }
+        Returns: Json
+      }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
+      commercial_lead_inbox: {
+        Args: { _days?: number; _scope?: string; _staff?: string }
+        Returns: Json
+      }
+      commercial_open_work: {
+        Args: { _workshop: string }
+        Returns: {
+          amount: number
+          amount_is_estimate: boolean
+          assigned_at: string
+          client: string
+          created_at: string
+          quote_id: string
+          quote_number: string
+          quote_status: string
+          quoted_at: string
+          request_id: string
+          sent_at: string
+          staff_id: string
+          staff_name: string
+          status: string
+          zone_label: string
+        }[]
+      }
+      commercial_team_activity: { Args: { _days?: number }; Returns: Json }
       create_hot_lead_request: {
         Args: {
           _contact_id: string
@@ -4022,10 +4102,21 @@ export type Database = {
         Returns: Json
       }
       current_staff_zone: { Args: never; Returns: string }
-      commercial_email_threads: { Args: { _days?: number; _staff?: string }; Returns: Json }
-      commercial_lead_inbox: { Args: { _days?: number; _scope?: string; _staff?: string }; Returns: Json }
-      commercial_team_activity: { Args: { _days?: number }; Returns: Json }
       disconnect_my_mailbox: { Args: never; Returns: boolean }
+      emit_commercial_notice: {
+        Args: {
+          _keys: string[]
+          _link_many: string
+          _link_one: string
+          _message: string
+          _title_many: string
+          _title_one: string
+          _type: string
+          _user: string
+          _workshop: string
+        }
+        Returns: number
+      }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {
@@ -4213,8 +4304,17 @@ export type Database = {
           similarity: number
         }[]
       }
+      names_phrase: {
+        Args: { _max?: number; _names: string[] }
+        Returns: string
+      }
       rebuild_workshops_safe_view: { Args: never; Returns: undefined }
       revise_quote: { Args: { _quote_id: string }; Returns: Json }
+      run_commercial_alerts: { Args: { _now?: string }; Returns: Json }
+      seller_email_stats: {
+        Args: { _from: string; _staff: string; _workshop: string }
+        Returns: Json
+      }
       set_contact_fields: {
         Args: { _contact_id: string; _fields: Json; _source: string }
         Returns: Json
