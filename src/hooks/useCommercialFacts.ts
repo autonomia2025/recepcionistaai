@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CommercialFacts, TeamActivity } from '@/lib/insights';
 import type { InterestedRow, LeadInbox } from '@/lib/leads';
+import type { Database } from '@/integrations/supabase/types';
 
 // Facts are computed by the database when the screen opens (and on refresh),
 // so the sentences are always current.
@@ -111,5 +112,72 @@ export function useTakeInterested() {
       queryClient.invalidateQueries({ queryKey: ['lead-inbox'] });
       queryClient.invalidateQueries({ queryKey: ['service-requests'] });
     },
+  });
+}
+
+// "Qué hacer ahora" (F5): the active next action of each visible lead.
+export type NextAction = Database['public']['Tables']['lead_next_actions']['Row'];
+
+export function useActiveNextActions() {
+  const { profile } = useAuth();
+  return useQuery({
+    queryKey: ['next-actions', profile?.workshop_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('lead_next_actions').select('*').eq('active', true);
+      if (error) throw error;
+      return new Map((data ?? []).map(a => [a.service_request_id, a as NextAction]));
+    },
+    enabled: !!profile?.workshop_id,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+async function invokeFn<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    const payload = await (error as { context?: Response }).context?.json?.().catch(() => null);
+    throw new Error(payload?.error ?? error.message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data as T;
+}
+
+export function useRefreshNextAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) => invokeFn<{ action: NextAction }>('generate-next-action', { service_request_id: requestId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['next-actions'] }),
+  });
+}
+
+export function useCompleteNextAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, note }: { id: string; note?: string }) => {
+      const { error } = await supabase.rpc('complete_next_action', { _id: id, _note: note ?? undefined });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['next-actions'] }),
+  });
+}
+
+// "Qué hacer hoy" in Mi día: my suggested actions due today or overdue.
+export function useMyActionsToday() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['next-actions', 'mine-today', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('lead_next_actions')
+        .select('*, contacts(name, company_name)')
+        .eq('active', true).eq('staff_id', user!.id).is('done_at', null)
+        .order('due_date');
+      if (error) throw error;
+      const today = new Date().toLocaleDateString('en-CA');
+      return ((data ?? []) as unknown as Array<NextAction & { contacts: { name: string; company_name: string | null } | null }>)
+        .filter(a => a.due_date <= today);
+    },
+    enabled: !!user?.id,
+    refetchInterval: 120_000,
   });
 }

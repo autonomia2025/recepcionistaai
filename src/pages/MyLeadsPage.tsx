@@ -9,20 +9,21 @@ import { InterestedDetail } from '@/components/leads/InterestedDetail';
 import { LeadDetail } from '@/components/leads/LeadDetail';
 import { STAGE_STYLE } from '@/components/leads/stageStyle';
 import { useAuth } from '@/contexts/AuthContext';
-import { useInterested, useLeadInbox } from '@/hooks/useCommercialFacts';
+import { type NextAction, useActiveNextActions, useInterested, useLeadInbox } from '@/hooks/useCommercialFacts';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { formatCLP } from '@/lib/quoteTotals';
 import {
   type InterestedRow, type LeadFilter, type LeadRow, type LeadStage, type PriorityView, STAGE_FILTERS,
-  agoPhrase, groupByDay, interestLabel, leadAmount, leadStage, matchesFilter, priorityView,
+  ACTION_LABELS, agoPhrase, dueLabel, groupByDay, interestLabel, leadAmount, leadStage, matchesFilter, priorityView,
 } from '@/lib/leads';
 import { cn } from '@/lib/utils';
 
-interface Item { lead: LeadRow; stage: LeadStage; priority: PriorityView }
+interface Item { lead: LeadRow; stage: LeadStage; priority: PriorityView; next?: NextAction }
 
 function LeadListItem({ item, active, showStaff, onClick }: { item: Item; active: boolean; showStaff: boolean; onClick: () => void }) {
-  const { lead, stage, priority } = item;
+  const { lead, stage, priority, next } = item;
+  const nextDue = next && !next.done_at ? dueLabel(next.due_date) : null;
   const amount = leadAmount(lead);
   const unread = Number(lead.unread_in ?? 0) > 0;
   return (
@@ -51,6 +52,11 @@ function LeadListItem({ item, active, showStaff, onClick }: { item: Item; active
         ) : priority.kind ? (
           <p className="text-xs text-muted-foreground">{priority.kind}</p>
         ) : null}
+        {next && nextDue && (
+          <p className={cn('text-xs truncate', nextDue.overdue ? 'text-destructive font-medium' : nextDue.today ? 'text-orange-700' : 'text-muted-foreground')}>
+            Próximo: {ACTION_LABELS[next.action_type] ?? next.action} · {nextDue.text}
+          </p>
+        )}
         {showStaff && <p className="text-xs text-muted-foreground">{lead.staff_name ?? 'Sin vendedor'}</p>}
       </div>
     </button>
@@ -90,12 +96,13 @@ export default function MyLeadsPage() {
   const { data: inbox, isLoading, isFetching, error, refetch } = useLeadInbox(scope, scope === 'team' ? staffId : null);
   const { data: interested = [], isLoading: interestedLoading, error: interestedError, refetch: refetchInterested } = useInterested();
   const { data: requests = [], isLoading: requestsLoading } = useServiceRequests();
+  const { data: nextActions } = useActiveNextActions();
 
   const items = useMemo<Item[]>(() => {
     if (!inbox) return [];
     const now = new Date();
-    return inbox.leads.map(lead => ({ lead, stage: leadStage(lead, inbox, now), priority: priorityView(lead, inbox) }));
-  }, [inbox]);
+    return inbox.leads.map(lead => ({ lead, stage: leadStage(lead, inbox, now), priority: priorityView(lead, inbox), next: nextActions?.get(lead.id) }));
+  }, [inbox, nextActions]);
 
   const counts = useMemo(() => Object.fromEntries(STAGE_FILTERS.map(f => [f.key, items.filter(i => matchesFilter(i.stage, i.lead, f.key)).length])), [items]);
   const q = search.trim().toLowerCase();
@@ -235,7 +242,7 @@ export default function MyLeadsPage() {
       <section className={cn('flex-1 min-w-0 min-h-0 overflow-y-auto', hasDetail ? 'block' : 'hidden md:block')}>
         {selected ? (
           <div className="p-4 md:p-6 max-w-4xl">
-            <LeadDetail key={selected.lead.id} lead={selected.lead} stage={selected.stage} priority={selected.priority}
+            <LeadDetail key={selected.lead.id} lead={selected.lead} stage={selected.stage} priority={selected.priority} nextAction={selected.next ?? null}
               request={request} requestLoading={requestsLoading} onBack={() => selectLead(null)} />
           </div>
         ) : selectedInterested ? (

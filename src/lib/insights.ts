@@ -250,6 +250,9 @@ export interface SellerActivity {
   answer_expected?: number;
   with_next_step?: number;
   with_risks?: number;
+  // Next actions suggested by the AI
+  actions_due?: number;
+  actions_followed?: number;
 }
 
 export interface TeamActivity {
@@ -303,6 +306,7 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
     reviewed: Number(s.reviewed ?? 0), tone_avg: s.tone_avg == null ? null : Number(s.tone_avg),
     answered_all: Number(s.answered_all ?? 0), answer_expected: Number(s.answer_expected ?? 0),
     with_next_step: Number(s.with_next_step ?? 0), with_risks: Number(s.with_risks ?? 0),
+    actions_due: Number(s.actions_due ?? 0), actions_followed: Number(s.actions_followed ?? 0),
   }));
   const measured = sellers.filter(s => s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE);
   const teamSpeed = measured.length >= 2 ? median(measured.map(s => s.median_hours_to_quote!)) : null;
@@ -392,6 +396,12 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
         lines.push(`${s.with_risks} ${plural(s.with_risks, 'correo tiene', 'correos tienen')} promesas o datos que no calzan con la cotización. Revísalos en Correos del equipo.`);
         if (severity === 'good' || severity === 'info') severity = 'medium';
       }
+    }
+
+    // Does the seller follow the suggested next actions?
+    if (s.actions_due > 0) {
+      lines.push(`Siguió ${s.actions_followed} de ${s.actions_due} ${plural(s.actions_due, 'recomendación', 'recomendaciones')} a tiempo.`);
+      if (s.actions_due >= 4 && s.actions_followed / s.actions_due < 0.5 && (severity === 'good' || severity === 'info')) severity = 'medium';
     }
 
     // Closes

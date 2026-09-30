@@ -115,3 +115,15 @@ describe("prioridad y plazo de atención", () => {
     expect(matchesFilter(leadStage(n, inbox, now), n, "urgent")).toBe(false);
   });
 });
+
+describe("fecha de la próxima acción", () => {
+  it("hoy, mañana, día con nombre y vencidas", async () => {
+    const { dueLabel } = await import("@/lib/leads");
+    const at = new Date(2026, 9, 1, 12); // jueves 1 de octubre
+    expect(dueLabel("2026-10-01", at)).toEqual({ text: "Hoy", overdue: false, today: true });
+    expect(dueLabel("2026-10-02", at)).toEqual({ text: "Mañana", overdue: false, today: false });
+    expect(dueLabel("2026-10-05", at)).toEqual({ text: "Lunes 5", overdue: false, today: false });
+    expect(dueLabel("2026-09-30", at)).toEqual({ text: "Vencida ayer", overdue: true, today: false });
+    expect(dueLabel("2026-09-28", at)).toEqual({ text: "Vencida (era el lunes 28)", overdue: true, today: false });
+  });
+});

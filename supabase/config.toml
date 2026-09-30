@@ -119,3 +119,6 @@ verify_jwt = false
 
 [functions.draft-client-reply]
 verify_jwt = false
+
+[functions.generate-next-action]
+verify_jwt = false

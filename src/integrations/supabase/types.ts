@@ -2081,6 +2081,72 @@ export type Database = {
           },
         ]
       }
+      lead_next_actions: {
+        Row: {
+          action: string
+          action_type: string
+          active: boolean
+          argument: string | null
+          basis_at: string
+          contact_id: string
+          created_at: string
+          done_at: string | null
+          done_by: string | null
+          done_note: string | null
+          due_date: string
+          evidence: string | null
+          id: string
+          model: string | null
+          reason: string | null
+          service_request_id: string
+          staff_id: string | null
+          superseded_at: string | null
+          workshop_id: string
+        }
+        Insert: {
+          action: string
+          action_type: string
+          active?: boolean
+          argument?: string | null
+          basis_at: string
+          contact_id: string
+          created_at?: string
+          done_at?: string | null
+          done_by?: string | null
+          done_note?: string | null
+          due_date: string
+          evidence?: string | null
+          id?: string
+          model?: string | null
+          reason?: string | null
+          service_request_id: string
+          staff_id?: string | null
+          superseded_at?: string | null
+          workshop_id: string
+        }
+        Update: {
+          action?: string
+          action_type?: string
+          active?: boolean
+          argument?: string | null
+          basis_at?: string
+          contact_id?: string
+          created_at?: string
+          done_at?: string | null
+          done_by?: string | null
+          done_note?: string | null
+          due_date?: string
+          evidence?: string | null
+          id?: string
+          model?: string | null
+          reason?: string | null
+          service_request_id?: string
+          staff_id?: string | null
+          superseded_at?: string | null
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       marketing_leads: {
         Row: {
           company: string | null
@@ -4173,6 +4239,7 @@ export type Database = {
         Returns: Json
       }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
+      complete_next_action: { Args: { _id: string; _note?: string }; Returns: boolean }
       commercial_interested: { Args: never; Returns: Json }
       commercial_lead_inbox: {
         Args: { _days?: number; _scope?: string; _staff?: string }

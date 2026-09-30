@@ -203,6 +203,12 @@ describe("cómo trabaja el equipo", () => {
     expect(card.severity).toBe("medium");
   });
 
+  it("adherencia a las recomendaciones", () => {
+    const [card] = buildTeamActivity(team([seller({ staff_name: "J", open_now: 2, actions_due: 6, actions_followed: 2 })]));
+    expect(card.lines).toContain("Siguió 2 de 6 recomendaciones a tiempo.");
+    expect(card.severity).toBe("medium");
+  });
+
   it("la base entrega números como texto: se convierten", () => {
     const [card] = buildTeamActivity(team([seller({ staff_name: "Z", assigned: "3" as unknown as number, quoted: "3" as unknown as number, median_hours_to_quote: "12.5" as unknown as number, speed_sample: "3" as unknown as number })]));
     expect(card.lines[1]).toBe("Tarda 13 horas en cotizar (mitad de los casos).");

@@ -237,3 +237,28 @@ export function leadAmount(lead: LeadRow): { value: number; estimate: boolean } 
   if (lead.catalog_amount != null && Number(lead.catalog_amount) > 0) return { value: Number(lead.catalog_amount), estimate: true };
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// "Qué hacer ahora": due date in words.
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+export function dueLabel(due: string, now = new Date()): { text: string; overdue: boolean; today: boolean } {
+  const today = ymd(now);
+  const tomorrow = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const yesterday = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const date = new Date(`${due}T12:00:00`);
+  const named = `${WEEKDAYS[date.getDay()]} ${date.getDate()}`;
+  if (due === today) return { text: 'Hoy', overdue: false, today: true };
+  if (due === tomorrow) return { text: 'Mañana', overdue: false, today: false };
+  if (due < today) return { text: due === yesterday ? 'Vencida ayer' : `Vencida (era el ${named})`, overdue: true, today: false };
+  return { text: `${named[0].toUpperCase()}${named.slice(1)}`, overdue: false, today: false };
+}
+
+export const ACTION_LABELS: Record<string, string> = {
+  call: 'Llamar',
+  email: 'Escribir',
+  send_quote: 'Enviar cotización',
+  follow_up: 'Seguimiento',
+  visit: 'Visita',
+  wait: 'Esperar',
+};

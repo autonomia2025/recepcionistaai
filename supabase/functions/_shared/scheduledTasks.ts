@@ -5,6 +5,7 @@
 
 import { syncAllMailboxes } from './mailSync.ts'
 import { reviewPendingEmails } from './emailReviewTask.ts'
+import { refreshNextActions } from './nextActionTask.ts'
 
 export interface TaskContext {
   // deno-lint-ignore no-explicit-any
@@ -34,10 +35,14 @@ export const mailSync: ScheduledTask = ({ supabase }) => syncAllMailboxes(supaba
 // AI review of the emails sellers send to clients (F5).
 export const emailReview: ScheduledTask = ({ supabase }) => reviewPendingEmails(supabase)
 
+// "Qué hacer ahora" on open leads (F5).
+export const nextActions: ScheduledTask = ({ supabase }) => refreshNextActions(supabase)
+
 export const SCHEDULED_TASKS: Record<string, ScheduledTask> = {
   heartbeat,
   'mail-sync': mailSync,
   'email-review': emailReview,
+  'next-actions': nextActions,
 }
 
 export interface HandlerDeps {

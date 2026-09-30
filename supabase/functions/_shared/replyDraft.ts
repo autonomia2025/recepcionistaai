@@ -61,7 +61,8 @@ Responde SOLO con este JSON:
 REGLAS:
 - Español de Chile, cordial y directo. Breve: 4 a 10 líneas. Tutea si el cliente tutea; si no, usa usted.
 - Empieza con "Hola <nombre del cliente>," y termina con "Saludos," (sin firma: se agrega sola).
-- NUNCA inventes precios, descuentos, plazos de entrega, stock ni características. Si hace falta un dato que no está arriba, escribe [corchetes] con lo que falta (ej. [plazo de entrega]) y agrégalo a "checks".
+- NUNCA inventes precios, descuentos, plazos de entrega, stock ni características. Si TÚ (el vendedor) debes aportar un dato que no está arriba, escribe [corchetes] con lo que falta (ej. [plazo de entrega], [costo de despacho], [hora]) y agrégalo a "checks".
+- Lo que necesitas saber DEL CLIENTE (su dirección, cuándo lo necesita, quién decide) pregúntaselo directamente, sin corchetes.
 - Propón un siguiente paso concreto (llamada, visita, confirmar la orden de compra, una fecha).
 - No repitas la cotización completa; menciona solo lo necesario.`;
 }

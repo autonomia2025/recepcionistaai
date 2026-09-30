@@ -15,11 +15,14 @@ import { formatCLP } from '@/lib/quoteTotals';
 import { type LeadRow, type LeadStage, type PriorityView, leadAmount } from '@/lib/leads';
 import { cn } from '@/lib/utils';
 import { STAGE_STYLE } from './stageStyle';
+import { NextActionCard } from './NextActionCard';
+import type { NextAction } from '@/hooks/useCommercialFacts';
 
 // Everything about one lead on one screen: why it arrived, the call guide,
 // the quotes and the emails with the client.
-export function LeadDetail({ lead, stage, priority, request, requestLoading = false, onBack }: {
+export function LeadDetail({ lead, stage, priority, nextAction, request, requestLoading = false, onBack }: {
   lead: LeadRow;
+  nextAction?: NextAction | null;
   stage: LeadStage;
   priority?: PriorityView;
   request: ServiceRequest | null;
@@ -87,6 +90,8 @@ export function LeadDetail({ lead, stage, priority, request, requestLoading = fa
         <p className="text-sm text-muted-foreground">{requestLoading ? 'Cargando la ficha…' : 'No se encontró la ficha de esta solicitud.'}</p>
       ) : (
         <>
+          {stage.key !== 'won' && stage.key !== 'lost' && lead.staff_id && <NextActionCard requestId={lead.id} action={nextAction} />}
+
           {/* The conversation with the client, first when they wrote */}
           <ClientEmailThread
             contactId={lead.contact_id}

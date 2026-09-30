@@ -81,6 +81,7 @@ describe("borrador de respuesta", () => {
     });
     expect(p).toContain("NUNCA inventes precios");
     expect(p).toContain("[corchetes]");
+    expect(p).toContain("pregúntaselo directamente, sin corchetes");
     expect(p).toContain("SEGUIMIENTO");
     expect(p).toContain("Sala de ordeña de 120 vacas");
   });
