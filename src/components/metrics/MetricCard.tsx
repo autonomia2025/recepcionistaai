@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getMetricDefinition } from './metricDefinitions';
 import { MetricDetailModal } from './MetricDetailModal';
+import { MetricExplainer } from './MetricExplainer';
+import { botExplanation } from '@/lib/botMetrics';
 import { cn } from '@/lib/utils';
 import { TrendingUp, Info } from 'lucide-react';
 
@@ -12,6 +14,8 @@ interface MetricCardProps {
   isAdmin?: boolean;
   className?: string;
   subtitle?: string;
+  // Full explanation panel (commercial workshops); others keep the modal.
+  rich?: boolean;
 }
 
 export function MetricCard({
@@ -21,6 +25,7 @@ export function MetricCard({
   isAdmin = false,
   className,
   subtitle,
+  rich = false,
 }: MetricCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const metric = getMetricDefinition(metricId);
@@ -105,14 +110,18 @@ export function MetricCard({
         </Tooltip>
       </TooltipProvider>
 
-      <MetricDetailModal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        metricId={metricId}
-        currentValue={value}
-        workshopId={workshopId}
-        isAdmin={isAdmin}
-      />
+      {rich && typeof value === 'number' && botExplanation(metricId, value) ? (
+        <MetricExplainer explanation={botExplanation(metricId, value)} open={isModalOpen} onOpenChange={setIsModalOpen} />
+      ) : (
+        <MetricDetailModal
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          metricId={metricId}
+          currentValue={value}
+          workshopId={workshopId}
+          isAdmin={isAdmin}
+        />
+      )}
     </>
   );
 }

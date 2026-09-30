@@ -774,6 +774,7 @@ export type Database = {
           default_payment_terms: string
           discount_approval_threshold: number
           email: string | null
+          gross_margin_pct: number | null
           legal_footer: string
           legal_name: string | null
           logo_path: string | null
@@ -804,6 +805,7 @@ export type Database = {
           default_payment_terms?: string
           discount_approval_threshold?: number
           email?: string | null
+          gross_margin_pct?: number | null
           legal_footer?: string
           legal_name?: string | null
           logo_path?: string | null
@@ -834,6 +836,7 @@ export type Database = {
           default_payment_terms?: string
           discount_approval_threshold?: number
           email?: string | null
+          gross_margin_pct?: number | null
           legal_footer?: string
           legal_name?: string | null
           logo_path?: string | null
@@ -4240,6 +4243,7 @@ export type Database = {
       }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
       complete_next_action: { Args: { _id: string; _note?: string }; Returns: boolean }
+      commercial_metrics: { Args: { _from: string; _to: string }; Returns: Json }
       commercial_interested: { Args: never; Returns: Json }
       commercial_lead_inbox: {
         Args: { _days?: number; _scope?: string; _staff?: string }

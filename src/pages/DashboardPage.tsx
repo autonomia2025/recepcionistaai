@@ -9,6 +9,8 @@ import { MINUTES_SAVED_PER_CONVERSATION, VALUE_PER_HOUR_CLP } from '@/components
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
 import { useWorkshopZones } from '@/hooks/useWorkshopZones';
+import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { CommercialMetrics } from '@/components/dashboard/CommercialMetrics';
 
 function MetricSkeleton() {
   return (
@@ -28,6 +30,10 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const { data: workshopMode } = useWorkshopMode();
   const { labelOf } = useWorkshopZones();
+  const { features } = useWorkshopFeatures();
+  // Commercial module (SOC): business results first; other workshops unchanged.
+  const commercial = features.commercial;
+  const showCommercial = commercial && (profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN');
 
   const staffZone = profile?.role === 'STAFF' ? profile?.zone : null;
 
@@ -148,38 +154,45 @@ export default function DashboardPage() {
         </div>
       )}
       
+      {showCommercial && <CommercialMetrics />}
+
       {/* Section: Key Metrics */}
       <div>
         <div className="section-header">
-          <h2 className="section-title">Métricas principales</h2>
+          <h2 className="section-title">{commercial ? 'Lo que hace el bot' : 'Métricas principales'}</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
           <MetricCard
             metricId="hours_saved"
             value={stats.hoursSaved}
             workshopId={workshopId}
+            rich={commercial}
             className="bg-gradient-to-br from-primary/5 via-transparent to-transparent"
           />
           <MetricCard
             metricId="value_generated"
             value={stats.valueGenerated}
             workshopId={workshopId}
+            rich={commercial}
             className="bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent"
           />
           <MetricCard
             metricId="conversations"
             value={stats.conversations}
             workshopId={workshopId}
+            rich={commercial}
           />
           <MetricCard
             metricId="clients"
             value={stats.contacts}
             workshopId={workshopId}
+            rich={commercial}
           />
           <MetricCard
             metricId="closed_clients"
             value={stats.closedClients}
             workshopId={workshopId}
+            rich={commercial}
             className="bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent"
           />
         </div>
@@ -198,21 +211,25 @@ export default function DashboardPage() {
             metricId="bot_messages"
             value={stats.messagesOut}
             workshopId={workshopId}
+            rich={commercial}
           />
           <MetricCard
             metricId="messages_received"
             value={stats.messagesIn}
             workshopId={workshopId}
+            rich={commercial}
           />
           <MetricCard
             metricId="appointments"
             value={stats.appointments}
             workshopId={workshopId}
+            rich={commercial}
           />
           <MetricCard
             metricId="conversion_rate"
             value={conversionRate}
             workshopId={workshopId}
+            rich={commercial}
           />
         </div>
       </div>
