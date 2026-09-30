@@ -15,7 +15,8 @@ import { ConnectOutlookButton } from './MailboxConnection';
 
 export type SendTarget =
   | { kind: 'quote'; quote: Quote }
-  | { kind: 'answer'; email: ContactEmail };
+  | { kind: 'answer'; email: ContactEmail }
+  | { kind: 'message'; contactId: string; requestId: string | null; workshopId: string; to: string | null; clientName: string | null };
 
 // Sends from the seller's own Outlook: the official quote (with its PDF) or
 // an answer to a client's email, in the same thread.
@@ -28,7 +29,8 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
   const send = useSendClientEmail();
   const quote = target?.kind === 'quote' ? target.quote : null;
   const email = target?.kind === 'answer' ? target.email : null;
-  const workshopId = quote?.workshop_id ?? email?.workshop_id ?? null;
+  const note = target?.kind === 'message' ? target : null;
+  const workshopId = quote?.workshop_id ?? email?.workshop_id ?? note?.workshopId ?? null;
 
   const { data: companyName } = useQuery({
     queryKey: ['company-name', workshopId],
@@ -54,10 +56,15 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
       setTo(target.quote.client_email ?? '');
       setSubject(defaultQuoteSubject(number, companyName ?? null));
       setMessage(defaultQuoteMessage({ clientName: target.quote.client_name, quoteNumber: number, validityDays: Number(target.quote.validity_days) || null }));
-    } else {
+    } else if (target.kind === 'answer') {
       setTo(target.email.direction === 'in' ? target.email.from_address : target.email.to_addresses.join(', '));
       setSubject(defaultAnswerSubject(target.email.subject, 'Consulta'));
       setMessage('');
+    } else {
+      const first = (target.clientName ?? '').trim().split(/\s+/)[0];
+      setTo(target.to ?? '');
+      setSubject(companyName ? `Seguimiento · ${companyName}` : 'Seguimiento');
+      setMessage(first ? `Hola ${first},\n\n` : 'Hola,\n\n');
     }
     setCc('');
     setTouched(false);
@@ -83,11 +90,11 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
         kind: target.kind,
         quoteId: quote?.id ?? email?.quote_id ?? null,
         replyToEmailId: email?.id ?? null,
-        contactId: quote?.contact_id ?? email!.contact_id,
-        requestId: quote?.service_request_id ?? email?.service_request_id ?? null,
+        contactId: quote?.contact_id ?? email?.contact_id ?? note!.contactId,
+        requestId: quote?.service_request_id ?? email?.service_request_id ?? note?.requestId ?? null,
         to: toList, cc: ccList, subject: subject.trim(), message: message.trim(),
       });
-      toast.success(target.kind === 'quote' ? `Cotización enviada a ${toList.join(', ')}` : 'Respuesta enviada', {
+      toast.success(target.kind === 'quote' ? `Cotización enviada a ${toList.join(', ')}` : target.kind === 'answer' ? 'Respuesta enviada' : `Correo enviado a ${toList.join(', ')}`, {
         description: result.marked_sent ? 'La solicitud pasó a "Cotizada". Cuando el cliente responda, lo verás aquí.' : `Salió desde ${result.from}; también queda en tus Enviados de Outlook.`,
       });
       if (result.warning) toast.warning(result.warning);
@@ -97,12 +104,19 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
     }
   };
 
-  const title = target?.kind === 'quote' ? `Enviar ${target.quote.quote_number} por correo` : 'Responder al cliente';
+  const title = target?.kind === 'quote' ? `Enviar ${target.quote.quote_number} por correo` : target?.kind === 'answer' ? 'Responder al cliente' : `Escribir a ${target?.clientName ?? 'el cliente'}`;
 
   return (
     <Dialog open={open} onOpenChange={next => !send.isPending && onOpenChange(next)}>
       <DialogContent className="max-w-xl w-[calc(100vw-1rem)] max-h-[92vh] p-0 gap-0 flex flex-col overflow-hidden"
-        onOpenAutoFocus={event => { if (target?.kind === 'answer' && ready) { event.preventDefault(); messageRef.current?.focus(); } }}>
+        onOpenAutoFocus={event => {
+          if ((target?.kind === 'answer' || target?.kind === 'message') && ready) {
+            event.preventDefault();
+            const box = messageRef.current;
+            box?.focus();
+            box?.setSelectionRange(box.value.length, box.value.length);
+          }
+        }}>
         <DialogHeader className="px-6 pt-6 pb-4 pr-12 text-left">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

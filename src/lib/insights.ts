@@ -232,6 +232,12 @@ export interface SellerActivity {
   lost: number;
   won_amount: number;
   guide_feedback: number;
+  // Email (from the connected Outlook mailboxes)
+  emails_sent?: number;
+  emails_received?: number;
+  email_reply_median_hours?: number | null;
+  email_reply_sample?: number;
+  emails_waiting_now?: number;
 }
 
 export interface TeamActivity {
@@ -276,9 +282,14 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
     quoted_last_7_days: Number(s.quoted_last_7_days), open_now: Number(s.open_now),
     waiting_late_now: Number(s.waiting_late_now), followup_late_now: Number(s.followup_late_now),
     won: Number(s.won), lost: Number(s.lost), won_amount: Number(s.won_amount), guide_feedback: Number(s.guide_feedback),
+    emails_sent: Number(s.emails_sent ?? 0), emails_received: Number(s.emails_received ?? 0),
+    email_reply_median_hours: s.email_reply_median_hours == null ? null : Number(s.email_reply_median_hours),
+    email_reply_sample: Number(s.email_reply_sample ?? 0), emails_waiting_now: Number(s.emails_waiting_now ?? 0),
   }));
   const measured = sellers.filter(s => s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE);
   const teamSpeed = measured.length >= 2 ? median(measured.map(s => s.median_hours_to_quote!)) : null;
+  const repliers = sellers.filter(s => s.email_reply_median_hours != null && s.email_reply_sample >= MIN_SPEED_SAMPLE);
+  const teamReply = repliers.length >= 2 ? median(repliers.map(s => s.email_reply_median_hours!)) : null;
 
   const cards = sellers.map((s): SellerCard => {
     const name = s.staff_name ?? 'Sin nombre';
@@ -321,6 +332,27 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
       lines.push(`Tarda ${durationPhrase(s.median_hours_to_quote)} en cotizar (mitad de los casos).${compare}`);
     } else if (s.speed_sample > 0) {
       lines.push(`Aún pocos casos para medir su velocidad (${s.speed_sample} de ${MIN_SPEED_SAMPLE}).`);
+    }
+
+    // Email with clients
+    if (s.emails_waiting_now > 0) {
+      lines.unshift(`${s.emails_waiting_now} ${plural(s.emails_waiting_now, 'cliente espera', 'clientes esperan')} su respuesta por correo hace más de 24 horas.`);
+      if (severity === 'good' || severity === 'info') {
+        severity = 'medium';
+        headline = `${s.emails_waiting_now} ${plural(s.emails_waiting_now, 'cliente le escribió', 'clientes le escribieron')} y ${plural(s.emails_waiting_now, 'sigue', 'siguen')} sin respuesta.`;
+        lines.shift();
+      }
+    }
+    if (s.emails_sent + s.emails_received > 0) {
+      let reply = '';
+      if (s.email_reply_median_hours != null && s.email_reply_sample >= MIN_SPEED_SAMPLE) {
+        reply = ` Responde en ${durationPhrase(s.email_reply_median_hours)} (mitad de los casos)`;
+        if (teamReply != null) {
+          reply += s.email_reply_median_hours > teamReply * 1.5 ? `, más lento que el equipo (${durationPhrase(teamReply)}).`
+            : s.email_reply_median_hours < teamReply / 1.5 ? `, más rápido que el equipo (${durationPhrase(teamReply)}).` : ', similar al equipo.';
+        } else reply += '.';
+      }
+      lines.push(`Correos: envió ${s.emails_sent} y recibió ${s.emails_received}.${reply}`);
     }
 
     // Closes

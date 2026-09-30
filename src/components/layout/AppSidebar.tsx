@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList, Briefcase, ListChecks, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Calendar, UserCog, Building2, LogOut, ChevronLeft, ChevronRight, BarChart3, BarChart2, Settings, Bot, DollarSign, Globe, Activity, Mail, UserPlus, ScrollText, ClipboardList, Briefcase, ListChecks, Lightbulb, Inbox, MailSearch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeatInfo, useSubscription, useWorkshop } from '@/hooks/useWorkshopData';
@@ -93,6 +93,10 @@ export const AppSidebar = () => {
         to: '/my-day',
         icon: ListChecks,
         label: 'Mi día'
+      }, {
+        to: '/leads',
+        icon: Inbox,
+        label: 'Mis leads'
       });
     }
 
@@ -119,6 +123,10 @@ export const AppSidebar = () => {
         to: '/commercial-summary',
         icon: Lightbulb,
         label: 'Resumen comercial'
+      }, {
+        to: '/team-emails',
+        icon: MailSearch,
+        label: 'Correos del equipo'
       });
     }
 

@@ -144,7 +144,7 @@ export function useMarkContactEmailsRead() {
 }
 
 export interface SendClientEmailInput {
-  kind: 'quote' | 'answer';
+  kind: 'quote' | 'answer' | 'message';
   quoteId?: string | null;
   replyToEmailId?: string | null;
   contactId: string;
@@ -163,6 +163,8 @@ export function useSendClientEmail() {
         kind: input.kind,
         quote_id: input.quoteId ?? undefined,
         reply_to_email_id: input.replyToEmailId ?? undefined,
+        contact_id: input.kind === 'message' ? input.contactId : undefined,
+        request_id: input.kind === 'message' ? input.requestId ?? undefined : undefined,
         to: input.to,
         cc: input.cc,
         subject: input.subject,
@@ -175,6 +177,7 @@ export function useSendClientEmail() {
       queryClient.invalidateQueries({ queryKey: ['request-quotes', input.requestId] });
       queryClient.invalidateQueries({ queryKey: ['service-requests'] });
       queryClient.invalidateQueries({ queryKey: ['client-service-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-inbox'] });
     },
   });
 }

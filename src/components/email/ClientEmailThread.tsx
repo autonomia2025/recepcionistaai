@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ArrowDownLeft, ArrowUpRight, Mail, Paperclip, Reply } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { openQuotePdf } from '@/hooks/useQuotePdf';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
+import { useAuth } from '@/contexts/AuthContext';
 import { type ContactEmail, useContactEmails, useMarkContactEmailsRead } from '@/hooks/useClientEmail';
 import { cn } from '@/lib/utils';
 import { SendClientEmailDialog, type SendTarget } from './SendClientEmailDialog';
@@ -62,12 +63,15 @@ function EmailItem({ email, onAnswer }: { email: ContactEmail; onAnswer: () => v
 
 // Emails with a client, oldest first. With quoteId, only that quote's threads.
 // Seeing the new ones marks them as read.
-export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el cliente' }: {
+export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el cliente', emptyText, actions }: {
   contactId: string;
   quoteId?: string;
   title?: string;
+  emptyText?: string; // show the section (with this text) even when there are no emails
+  actions?: ReactNode;
 }) {
   const { features } = useWorkshopFeatures();
+  const { user } = useAuth();
   const { data } = useContactEmails(features.commercial ? contactId : null);
   const markRead = useMarkContactEmailsRead();
   const [target, setTarget] = useState<SendTarget | null>(null);
@@ -78,7 +82,9 @@ export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el 
     return data.filter(e => e.quote_id === quoteId || (e.conversation_id && threads.has(e.conversation_id)));
   }, [data, quoteId]);
 
-  const unread = emails.filter(e => e.direction === 'in' && !e.read_at).length;
+  // Only the seller whose mailbox received the email "reads" it; an admin
+  // looking at the thread must not clear the seller's "te escribió".
+  const unread = emails.filter(e => e.direction === 'in' && !e.read_at && e.mailbox_user_id === user?.id).length;
   useEffect(() => {
     if (unread > 0 && !markRead.isPending) {
       // Give the person a moment to see the "Nuevo" mark before it goes.
@@ -87,17 +93,24 @@ export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el 
     }
   }, [unread, contactId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!features.commercial || emails.length === 0) return null;
+  if (!features.commercial || (emails.length === 0 && !emptyText)) return null;
 
   return (
     <section className="space-y-3">
-      <div>
-        <h4 className="text-sm font-semibold flex items-center gap-2"><Mail className="w-4 h-4" /> {title}</h4>
-        <p className="text-xs text-muted-foreground">Desde los correos de Outlook conectados. Solo se muestran los correos con este cliente.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold flex items-center gap-2"><Mail className="w-4 h-4" /> {title}</h4>
+          <p className="text-xs text-muted-foreground">Desde los correos de Outlook conectados. Solo se muestran los correos con este cliente.</p>
+        </div>
+        {actions}
       </div>
-      <ul className="rounded-lg border divide-y">
-        {emails.map(email => <EmailItem key={email.id} email={email} onAnswer={() => setTarget({ kind: 'answer', email })} />)}
-      </ul>
+      {emails.length === 0 ? (
+        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4">{emptyText}</p>
+      ) : (
+        <ul className="rounded-lg border divide-y">
+          {emails.map(email => <EmailItem key={email.id} email={email} onAnswer={() => setTarget({ kind: 'answer', email })} />)}
+        </ul>
+      )}
       <SendClientEmailDialog target={target} open={!!target} onOpenChange={open => !open && setTarget(null)} />
     </section>
   );

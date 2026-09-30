@@ -29,6 +29,8 @@ import SalesControlPage from "@/pages/SalesControlPage";
 import CommercialSettingsPage from "@/pages/CommercialSettingsPage";
 import CommercialSummaryPage from "@/pages/CommercialSummaryPage";
 import MyDayPage from "@/pages/MyDayPage";
+import MyLeadsPage from "@/pages/MyLeadsPage";
+import TeamEmailsPage from "@/pages/TeamEmailsPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import UpdatePasswordPage from "@/pages/UpdatePasswordPage";
 import NotFound from "@/pages/NotFound";
@@ -85,6 +87,7 @@ const AppRoutes = () => {
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/my-day" element={<MyDayPage />} />
+        <Route path="/leads" element={<MyLeadsPage />} />
         {/* ADMIN-only routes */}
         <Route path="/team" element={<AdminOnlyRoute><TeamPage /></AdminOnlyRoute>} />
         <Route path="/bot" element={<AdminOnlyRoute><BotSettingsPage /></AdminOnlyRoute>} />
@@ -93,6 +96,7 @@ const AppRoutes = () => {
         <Route path="/sales-control" element={<AdminOnlyRoute><SalesControlPage /></AdminOnlyRoute>} />
         <Route path="/commercial-settings" element={<AdminOnlyRoute><CommercialSettingsPage /></AdminOnlyRoute>} />
         <Route path="/commercial-summary" element={<AdminOnlyRoute><CommercialSummaryPage /></AdminOnlyRoute>} />
+        <Route path="/team-emails" element={<AdminOnlyRoute><TeamEmailsPage /></AdminOnlyRoute>} />
         {/* Admin Routes */}
         <Route path="/admin/workshops" element={<SuperAdminRoute><AdminWorkshopsPage /></SuperAdminRoute>} />
         <Route path="/admin/cobranzas" element={<SuperAdminRoute><CobranzasPage /></SuperAdminRoute>} />

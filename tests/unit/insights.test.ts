@@ -170,6 +170,25 @@ describe("cómo trabaja el equipo", () => {
     expect(card.headline).toBe("No tiene solicitudes abiertas.");
   });
 
+  it("correos: clientes esperando respuesta suben la alerta; tiempos de respuesta comparados", () => {
+    const cards = buildTeamActivity(team([
+      seller({ staff_name: "Ana", open_now: 2, emails_sent: 9, emails_received: 7, email_reply_median_hours: 2, email_reply_sample: 6 }),
+      seller({ staff_name: "Jorge", open_now: 3, emails_sent: 4, emails_received: 6, email_reply_median_hours: 20, email_reply_sample: 5, emails_waiting_now: 2 }),
+      seller({ staff_name: "Luis", open_now: 1, emails_sent: 3, emails_received: 3, email_reply_median_hours: 6, email_reply_sample: 3 }),
+    ]));
+    expect(cards[0].name).toBe("Jorge");
+    expect(cards[0].severity).toBe("medium");
+    expect(cards[0].headline).toBe("2 clientes le escribieron y siguen sin respuesta.");
+    expect(cards[0].lines).toContain("Correos: envió 4 y recibió 6. Responde en 20 horas (mitad de los casos), más lento que el equipo (6 horas).");
+    expect(cards.find(c => c.name === "Ana")!.lines).toContain("Correos: envió 9 y recibió 7. Responde en 2 horas (mitad de los casos), más rápido que el equipo (6 horas).");
+  });
+
+  it("si ya tenía clientes esperando cotización, los correos pendientes van como línea", () => {
+    const [card] = buildTeamActivity(team([seller({ staff_name: "J", waiting_late_now: 1, open_now: 1, emails_waiting_now: 1, emails_received: 1 })]));
+    expect(card.headline).toBe("Hoy tiene 1 cliente esperando cotización hace más de 48 horas.");
+    expect(card.lines[0]).toBe("1 cliente espera su respuesta por correo hace más de 24 horas.");
+  });
+
   it("la base entrega números como texto: se convierten", () => {
     const [card] = buildTeamActivity(team([seller({ staff_name: "Z", assigned: "3" as unknown as number, quoted: "3" as unknown as number, median_hours_to_quote: "12.5" as unknown as number, speed_sample: "3" as unknown as number })]));
     expect(card.lines[1]).toBe("Tarda 13 horas en cotizar (mitad de los casos).");

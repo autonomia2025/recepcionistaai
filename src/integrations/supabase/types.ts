@@ -4022,6 +4022,8 @@ export type Database = {
         Returns: Json
       }
       current_staff_zone: { Args: never; Returns: string }
+      commercial_email_threads: { Args: { _days?: number; _staff?: string }; Returns: Json }
+      commercial_lead_inbox: { Args: { _days?: number; _scope?: string; _staff?: string }; Returns: Json }
       commercial_team_activity: { Args: { _days?: number }; Returns: Json }
       disconnect_my_mailbox: { Args: never; Returns: boolean }
       ensure_commercial_settings: {

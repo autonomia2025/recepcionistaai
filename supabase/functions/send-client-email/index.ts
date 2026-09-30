@@ -9,10 +9,11 @@ import { accessTokenFor, graph, GraphError, type MailboxRow, MailboxDisconnected
 // - kind 'quote': the official quote with its PDF; the first time it also
 //   marks the quote as sent, like "Marcar como enviada".
 // - kind 'answer': a reply to an email in contact_emails, in the same thread.
+// - kind 'message': a new email to a client (e.g. a follow-up from "Mis leads").
 // The sent message is stored in contact_emails right away (same id the sync
 // later finds in Sent Items, so it is never duplicated).
 //
-// POST { kind, quote_id?, reply_to_email_id?, to, cc?, subject, message }
+// POST { kind, quote_id?, reply_to_email_id?, contact_id?, request_id?, to, cc?, subject, message }
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,14 +48,25 @@ serve(async (req) => {
     if (!auth?.user) return json(401, { error: 'Unauthorized' });
 
     const body = await req.json().catch(() => ({}));
-    const kind = body.kind === 'answer' ? 'answer' : 'quote';
+    const kind = body.kind === 'answer' ? 'answer' : body.kind === 'message' ? 'message' : 'quote';
 
     // What is being answered / sent, read as the caller (row-level security).
     // deno-lint-ignore no-explicit-any
     let quote: Record<string, any> | null = null;
     // deno-lint-ignore no-explicit-any
     let original: Record<string, any> | null = null;
-    if (kind === 'answer') {
+    // deno-lint-ignore no-explicit-any
+    let lead: Record<string, any> | null = null;
+    if (kind === 'message') {
+      if (!body.contact_id) return json(400, { error: 'Falta el cliente' });
+      const { data: contactRow } = await userClient.from('contacts').select('id, workshop_id').eq('id', body.contact_id).maybeSingle();
+      if (!contactRow) return json(404, { error: 'Cliente no encontrado' });
+      lead = { workshop_id: contactRow.workshop_id, contact_id: contactRow.id, service_request_id: null };
+      if (body.request_id) {
+        const { data: request } = await userClient.from('service_requests').select('id, contact_id').eq('id', body.request_id).maybeSingle();
+        if (request && request.contact_id === contactRow.id) lead.service_request_id = request.id;
+      }
+    } else if (kind === 'answer') {
       if (!body.reply_to_email_id) return json(400, { error: 'Falta el correo a responder' });
       const { data } = await userClient.from('contact_emails').select('*').eq('id', body.reply_to_email_id).maybeSingle();
       if (!data) return json(404, { error: 'Correo no encontrado' });
@@ -74,8 +86,8 @@ serve(async (req) => {
       if (!data.pdf_path) return json(409, { error: 'Primero crea el PDF de la cotización' });
     }
 
-    const workshopId = (quote?.workshop_id ?? original!.workshop_id) as string;
-    const contactId = (quote?.contact_id ?? original!.contact_id) as string;
+    const workshopId = (quote?.workshop_id ?? original?.workshop_id ?? lead!.workshop_id) as string;
+    const contactId = (quote?.contact_id ?? original?.contact_id ?? lead!.contact_id) as string;
     const { data: allowed } = await userClient.rpc('can_work_quote', { _workshop_id: workshopId, _contact_id: contactId });
     if (allowed !== true) return json(403, { error: 'Acceso denegado' });
     if (!(await fetchWorkshopFeatures(supabase, workshopId)).commercial) return json(403, { error: 'Módulo comercial no activo' });
@@ -159,7 +171,7 @@ serve(async (req) => {
 
     await graph(token, `/me/messages/${encodeURIComponent(draft.id)}/send`, { method: 'POST' });
 
-    const requestId = quote?.service_request_id ?? original?.service_request_id ?? null;
+    const requestId = quote?.service_request_id ?? original?.service_request_id ?? lead?.service_request_id ?? null;
     const { error: insertError } = await supabase.from('contact_emails').insert({
       workshop_id: workshopId,
       contact_id: contactId,
