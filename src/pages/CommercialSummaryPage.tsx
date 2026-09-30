@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, ChevronDown, Info, Loader2, RefreshCw, TrendingDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Info, Loader2, RefreshCw, TrendingDown, UserRound } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestFactList } from '@/components/commercial/RequestFactList';
-import { useCommercialFacts } from '@/hooks/useCommercialFacts';
+import { useCommercialFacts, useTeamActivity } from '@/hooks/useCommercialFacts';
 import { useServiceRequests } from '@/hooks/useServiceRequests';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
-import { buildTeamInsights, closeRates, type Insight, type Severity } from '@/lib/insights';
+import { buildTeamActivity, buildTeamInsights, closeRates, type Insight, type SellerCard, type Severity } from '@/lib/insights';
 import { cn } from '@/lib/utils';
 
 const SEVERITY: Record<Severity, { icon: typeof Info; card: string; icon_class: string }> = {
@@ -76,6 +76,49 @@ function RateTable({ title, rows }: { title: string; rows: ReturnType<typeof clo
   );
 }
 
+function SellerActivityCard({ card }: { card: SellerCard }) {
+  const style = SEVERITY[card.severity];
+  const Icon = card.severity === 'good' || card.severity === 'info' ? UserRound : style.icon;
+  return (
+    <Card className={style.card}>
+      <CardContent className="p-4 space-y-2">
+        <div className="flex items-start gap-3">
+          <Icon className={cn('w-5 h-5 mt-0.5 flex-shrink-0', card.severity === 'info' ? 'text-muted-foreground' : style.icon_class)} />
+          <div className="min-w-0 space-y-1">
+            <p className="font-semibold">{card.name}</p>
+            <p className="text-[15px] leading-relaxed">{card.headline}</p>
+            {card.lines.map(line => <p key={line} className="text-sm text-muted-foreground">{line}</p>)}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TeamActivitySection() {
+  const { data, isLoading, error } = useTeamActivity(30);
+  const cards = useMemo(() => (data ? buildTeamActivity(data) : []), [data]);
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold">Cómo trabaja el equipo</h2>
+        <p className="text-sm text-muted-foreground">Últimos 30 días. Primero quien necesita ayuda hoy. La velocidad se compara con el equipo solo cuando hay casos suficientes.</p>
+      </div>
+      {isLoading ? (
+        <p className="text-muted-foreground flex items-center gap-2 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Calculando…</p>
+      ) : error ? (
+        <p className="text-sm text-destructive">No se pudo calcular la actividad del equipo.</p>
+      ) : cards.length === 0 ? (
+        <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4">Todavía no hay vendedores con solicitudes.</p>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {cards.map(card => <SellerActivityCard key={card.staffId} card={card} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function CommercialSummaryPage() {
   const { features, isLoading: featuresLoading } = useWorkshopFeatures();
   const { data: facts, isLoading, isFetching, error, refetch, dataUpdatedAt } = useCommercialFacts('team');
@@ -115,6 +158,8 @@ export default function CommercialSummaryPage() {
             <h2 className="text-lg font-semibold">Hoy</h2>
             {insights.map(insight => <InsightCard key={insight.key} insight={insight} facts={facts} onOpen={setOpenId} />)}
           </section>
+
+          <TeamActivitySection />
 
           <section className="space-y-3">
             <div>

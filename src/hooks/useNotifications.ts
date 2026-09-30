@@ -15,13 +15,15 @@ export interface Notification {
   is_read: boolean;
   read_at: string | null;
   notes: string | null;
+  link?: string | null;
   created_at: string;
 }
 
 export function useNotifications() {
   const { user, profile } = useAuth();
+  const userId = user?.id;
   const queryClient = useQueryClient();
-  const { notifyHumanRequest, permissionStatus, requestPermission } = useBrowserNotifications();
+  const { notifyHumanRequest, showNotification, permissionStatus, requestPermission } = useBrowserNotifications();
 
   const { data: notifications = [], isLoading, refetch } = useQuery({
     queryKey: ['notifications', profile?.workshop_id],
@@ -70,6 +72,15 @@ export function useNotifications() {
               newNotification.title,
               newNotification.message || undefined
             );
+          } else if (
+            (newNotification.type.startsWith('commercial_') || newNotification.type === 'quote_reply') &&
+            newNotification.user_id === userId
+          ) {
+            // Personal commercial notices (commercial module): also as a browser alert.
+            showNotification(newNotification.title, {
+              body: newNotification.message || undefined,
+              tag: newNotification.id,
+            });
           }
         }
       )
@@ -78,7 +89,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.workshop_id, queryClient, notifyHumanRequest]);
+  }, [profile?.workshop_id, queryClient, notifyHumanRequest, showNotification, userId]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 

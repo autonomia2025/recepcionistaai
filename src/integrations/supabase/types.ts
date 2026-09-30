@@ -2187,6 +2187,7 @@ export type Database = {
           created_at: string
           id: string
           is_read: boolean
+          link: string | null
           message: string | null
           notes: string | null
           read_at: string | null
@@ -2200,6 +2201,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          link?: string | null
           message?: string | null
           notes?: string | null
           read_at?: string | null
@@ -2213,6 +2215,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          link?: string | null
           message?: string | null
           notes?: string | null
           read_at?: string | null
@@ -4019,6 +4022,7 @@ export type Database = {
         Returns: Json
       }
       current_staff_zone: { Args: never; Returns: string }
+      commercial_team_activity: { Args: { _days?: number }; Returns: Json }
       disconnect_my_mailbox: { Args: never; Returns: boolean }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }

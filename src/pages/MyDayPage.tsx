@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronRight, Loader2, Mail, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -21,6 +22,17 @@ export default function MyDayPage() {
   const { data: facts, isLoading, isFetching, error, refetch } = useCommercialFacts('me');
   const { data: requests = [] } = useServiceRequests();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+
+  // Notices in the bell link here with ?request=<id>.
+  useEffect(() => {
+    const id = params.get('request');
+    if (!id) return;
+    setOpenId(id);
+    const next = new URLSearchParams(params);
+    next.delete('request');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
   const { data: replies = [] } = useUnreadQuoteReplies();
   const sections = useMemo(() => (facts ? buildMyDay(facts) : []), [facts]);
   const selected = requests.find(r => r.id === openId) ?? null;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, Check, CheckCheck, MessageSquare, X, BellRing } from 'lucide-react';
+import { Bell, Check, CheckCheck, MessageSquare, X, BellRing, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -7,7 +8,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,11 +18,13 @@ import { useToast } from '@/hooks/use-toast';
 const NotificationItem = ({ 
   notification, 
   onMarkAsRead, 
-  onAddNote 
+  onAddNote,
+  onOpen,
 }: { 
   notification: Notification;
   onMarkAsRead: (id: string) => void;
   onAddNote: (id: string, notes: string) => Promise<void>;
+  onOpen?: (notification: Notification) => void;
 }) => {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState(notification.notes || '');
@@ -88,6 +90,17 @@ const NotificationItem = ({
 
           {!showNoteInput && (
             <div className="mt-2 flex gap-2">
+              {notification.link && onOpen && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-xs"
+                  onClick={() => onOpen(notification)}
+                >
+                  Ver
+                  <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              )}
               {!notification.is_read && (
                 <Button 
                   size="sm" 
@@ -128,6 +141,13 @@ export const NotificationBell = () => {
   } = useNotifications();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleOpen = (notification: Notification) => {
+    if (!notification.is_read) markAsRead(notification.id).catch(() => undefined);
+    setOpen(false);
+    if (notification.link) navigate(notification.link);
+  };
 
   const handleEnableNotifications = async () => {
     const granted = await requestBrowserNotificationPermission();
@@ -200,7 +220,7 @@ export const NotificationBell = () => {
             </div>
           </div>
         )}
-        <ScrollArea className="max-h-[400px]">
+        <div className="max-h-[400px] overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -213,10 +233,11 @@ export const NotificationBell = () => {
                 notification={notification}
                 onMarkAsRead={markAsRead}
                 onAddNote={(id, notes) => addNote({ notificationId: id, notes })}
+                onOpen={handleOpen}
               />
             ))
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

@@ -15,6 +15,7 @@ export interface OpenRequestFact {
   status: string;
   created_at: string;
   assigned_at: string | null;
+  quoted_at?: string | null; // set when quoted with the older "Marcar cotización enviada" button too
   quote_status: string | null;
   quote_number: string | null;
   sent_at: string | null;
@@ -43,7 +44,9 @@ export interface Insight {
 const HOUR = 3_600_000;
 const hoursSince = (iso: string, now: Date) => (now.getTime() - new Date(iso).getTime()) / HOUR;
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-const waitingQuote = (r: OpenRequestFact) => r.quote_status === null || r.quote_status === 'draft' || r.quote_status === 'issued';
+const waitingQuote = (r: OpenRequestFact) => (r.quote_status === null && !r.quoted_at) || r.quote_status === 'draft' || r.quote_status === 'issued';
+// Quote out with the client: sent from the system, or marked as sent with the older button.
+const sentAt = (r: OpenRequestFact) => (r.quote_status === 'sent' ? r.sent_at : r.quote_status === null ? r.quoted_at ?? null : null);
 
 export function moneyPhrase(requests: OpenRequestFact[]): string | null {
   const withAmount = requests.filter(r => r.amount != null && Number(r.amount) > 0);
@@ -95,7 +98,7 @@ export function buildTeamInsights(facts: CommercialFacts, now = new Date()): Ins
   }
 
   // 3. Quotes sent with no answer, per zone.
-  const cold = facts.open_requests.filter(r => r.quote_status === 'sent' && r.sent_at && hoursSince(r.sent_at, now) > t.followup_days * 24);
+  const cold = facts.open_requests.filter(r => { const at = sentAt(r); return !!at && hoursSince(at, now) > t.followup_days * 24; });
   for (const [zone, group] of groupBy(cold, r => r.zone_label ?? 'Sin zona')) {
     const n = group.length;
     const money = moneyPhrase(group);
@@ -178,7 +181,7 @@ export function buildMyDay(facts: CommercialFacts, now = new Date()): MyDaySecti
     const h = hoursSince(iso, now);
     return h < 24 ? `hace ${Math.max(1, Math.floor(h))} ${plural(Math.max(1, Math.floor(h)), 'hora', 'horas')}` : `hace ${Math.floor(h / 24)} ${plural(Math.floor(h / 24), 'día', 'días')}`;
   };
-  const newOnes = facts.open_requests.filter(r => hoursSince(r.assigned_at ?? r.created_at, now) <= 24 && !r.quote_status);
+  const newOnes = facts.open_requests.filter(r => hoursSince(r.assigned_at ?? r.created_at, now) <= 24 && !r.quote_status && !r.quoted_at);
   const newIds = new Set(newOnes.map(r => r.id));
   return [
     {
@@ -204,8 +207,137 @@ export function buildMyDay(facts: CommercialFacts, now = new Date()): MyDaySecti
       title: 'Hacer seguimiento',
       empty: 'No tienes cotizaciones esperando respuesta.',
       items: facts.open_requests
-        .filter(r => r.quote_status === 'sent' && r.sent_at)
-        .map(r => ({ ...r, late: hoursSince(r.sent_at!, now) > t.followup_days * 24, note: `${r.quote_number} enviada ${age(r.sent_at!)}` })),
+        .filter(r => !!sentAt(r))
+        .map(r => ({ ...r, late: hoursSince(sentAt(r)!, now) > t.followup_days * 24, note: `${r.quote_number ?? 'Cotización'} enviada ${age(sentAt(r)!)}` })),
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// "Cómo trabaja el equipo": per-seller facts (public.commercial_team_activity)
+// turned into short sentences, compared with the rest of the team.
+
+export interface SellerActivity {
+  staff_id: string;
+  staff_name: string | null;
+  assigned: number;
+  quoted: number;
+  median_hours_to_quote: number | null;
+  speed_sample: number;
+  quoted_last_7_days: number;
+  open_now: number;
+  waiting_late_now: number;
+  followup_late_now: number;
+  won: number;
+  lost: number;
+  won_amount: number;
+  guide_feedback: number;
+}
+
+export interface TeamActivity {
+  days: number;
+  unquoted_hours: number;
+  followup_days: number;
+  sellers: SellerActivity[];
+}
+
+export interface SellerCard {
+  staffId: string;
+  name: string;
+  severity: Severity;
+  headline: string;
+  lines: string[];
+  stats: { assigned: number; quoted: number; speed: string | null; openNow: number; late: number };
+}
+
+const MIN_SPEED_SAMPLE = 3;
+
+export function durationPhrase(hours: number): string {
+  if (hours < 1) return 'menos de 1 hora';
+  if (hours < 24) { const h = Math.round(hours); return `${h} ${plural(h, 'hora', 'horas')}`; }
+  const days = Math.floor(hours / 24);
+  const rest = Math.round(hours - days * 24);
+  if (rest === 0 || days >= 5) { const d = Math.round(hours / 24); return `${d} ${plural(d, 'día', 'días')}`; }
+  return `${days} ${plural(days, 'día', 'días')} y ${rest} ${plural(rest, 'hora', 'horas')}`;
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
+  const sellers = activity.sellers.map(s => ({
+    ...s,
+    assigned: Number(s.assigned), quoted: Number(s.quoted), speed_sample: Number(s.speed_sample),
+    median_hours_to_quote: s.median_hours_to_quote == null ? null : Number(s.median_hours_to_quote),
+    quoted_last_7_days: Number(s.quoted_last_7_days), open_now: Number(s.open_now),
+    waiting_late_now: Number(s.waiting_late_now), followup_late_now: Number(s.followup_late_now),
+    won: Number(s.won), lost: Number(s.lost), won_amount: Number(s.won_amount), guide_feedback: Number(s.guide_feedback),
+  }));
+  const measured = sellers.filter(s => s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE);
+  const teamSpeed = measured.length >= 2 ? median(measured.map(s => s.median_hours_to_quote!)) : null;
+
+  const cards = sellers.map((s): SellerCard => {
+    const name = s.staff_name ?? 'Sin nombre';
+    const lines: string[] = [];
+    const late = s.waiting_late_now + s.followup_late_now;
+
+    // Right now
+    let headline: string;
+    let severity: Severity;
+    if (s.waiting_late_now > 0) {
+      severity = 'high';
+      headline = `Hoy tiene ${s.waiting_late_now} ${plural(s.waiting_late_now, 'cliente esperando', 'clientes esperando')} cotización hace más de ${activity.unquoted_hours} horas.`;
+    } else if (s.followup_late_now > 0) {
+      severity = 'medium';
+      headline = `Hoy tiene ${s.followup_late_now} ${plural(s.followup_late_now, 'cotización', 'cotizaciones')} sin seguimiento hace más de ${activity.followup_days} días.`;
+    } else if (s.open_now > 0) {
+      severity = 'good';
+      headline = `Al día: ${s.open_now} ${plural(s.open_now, 'solicitud abierta', 'solicitudes abiertas')}, ninguna atrasada.`;
+    } else {
+      severity = 'info';
+      headline = 'No tiene solicitudes abiertas.';
+    }
+    if (s.waiting_late_now > 0 && s.followup_late_now > 0) {
+      lines.push(`Además, ${s.followup_late_now} ${plural(s.followup_late_now, 'cotización', 'cotizaciones')} sin seguimiento hace más de ${activity.followup_days} días.`);
+    }
+
+    // Volume
+    lines.push(s.assigned === 0
+      ? `No recibió solicitudes en los últimos ${activity.days} días.`
+      : `En ${activity.days} días recibió ${s.assigned} ${plural(s.assigned, 'solicitud', 'solicitudes')} y cotizó ${s.quoted}.${s.quoted_last_7_days > 0 ? ` Esta semana envió ${s.quoted_last_7_days}.` : ''}`);
+
+    // Speed, compared with the team only when both samples are big enough
+    if (s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE) {
+      let compare = '';
+      if (teamSpeed != null && measured.length >= 2) {
+        if (s.median_hours_to_quote > teamSpeed * 1.5) compare = ` Más lento que el equipo (${durationPhrase(teamSpeed)}).`;
+        else if (s.median_hours_to_quote < teamSpeed / 1.5) compare = ` Más rápido que el equipo (${durationPhrase(teamSpeed)}).`;
+        else compare = ' Similar al equipo.';
+      }
+      lines.push(`Tarda ${durationPhrase(s.median_hours_to_quote)} en cotizar (mitad de los casos).${compare}`);
+    } else if (s.speed_sample > 0) {
+      lines.push(`Aún pocos casos para medir su velocidad (${s.speed_sample} de ${MIN_SPEED_SAMPLE}).`);
+    }
+
+    // Closes
+    if (s.won + s.lost > 0) {
+      lines.push(`Cerró ${s.won + s.lost}: ganó ${s.won}${s.won_amount > 0 ? ` por ${formatCLP(s.won_amount)} neto` : ''} y perdió ${s.lost}.`);
+    }
+
+    return {
+      staffId: s.staff_id, name, severity, headline, lines,
+      stats: {
+        assigned: s.assigned, quoted: s.quoted,
+        speed: s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE ? durationPhrase(s.median_hours_to_quote) : null,
+        openNow: s.open_now, late,
+      },
+    };
+  });
+
+  const rank: Record<Severity, number> = { high: 0, medium: 1, good: 2, info: 3 };
+  return cards.sort((a, b) => rank[a.severity] - rank[b.severity] || b.stats.late - a.stats.late || a.name.localeCompare(b.name));
 }
