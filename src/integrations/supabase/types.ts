@@ -1413,7 +1413,50 @@ export type Database = {
           unanswered?: string[]
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "email_reviews_contact_email_id_fkey"
+            columns: ["contact_email_id"]
+            isOneToOne: true
+            referencedRelation: "contact_emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reviews_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reviews_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reviews_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reviews_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_reviews_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       health_logs: {
         Row: {
@@ -4103,6 +4146,10 @@ export type Database = {
     Functions: {
       accept_invite: { Args: { invite_token: string }; Returns: Json }
       apply_safe_column_grants: { Args: { _table: string }; Returns: string[] }
+      business_hours_between: {
+        Args: { _from: string; _to: string; _workshop: string }
+        Returns: number
+      }
       can_work_quote: {
         Args: { _contact_id: string; _workshop_id: string }
         Returns: boolean
@@ -4209,6 +4256,7 @@ export type Database = {
           timezone: string
           unquoted_lead_alert_hours: number
           updated_at: string
+          urgent_attention_hours: number
           vat_rate: number
           workshop_id: string
         }
@@ -4336,6 +4384,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hours_text: { Args: { _value: number }; Returns: string }
       invoke_scheduled_task: { Args: { _task: string }; Returns: number }
       is_credential_column: { Args: { _column_name: string }; Returns: boolean }
       is_number_blocked: {
@@ -4346,11 +4395,11 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
+      lead_priority: { Args: { _request_id: string }; Returns: Json }
       mark_contact_emails_read: {
         Args: { _contact_id: string }
         Returns: number
       }
-      take_interested_lead: { Args: { _contact_id: string }; Returns: string }
       mark_quote_sent: {
         Args: { _quote_id: string; _sent_via?: string }
         Returns: Json
@@ -4373,10 +4422,24 @@ export type Database = {
         Args: { _max?: number; _names: string[] }
         Returns: string
       }
+      pending_email_reviews: {
+        Args: { _limit?: number }
+        Returns: {
+          id: string
+        }[]
+      }
       rebuild_workshops_safe_view: { Args: never; Returns: undefined }
       revise_quote: { Args: { _quote_id: string }; Returns: Json }
       run_commercial_alerts: { Args: { _now?: string }; Returns: Json }
+      seller_attention_stats: {
+        Args: { _from: string; _staff: string; _workshop: string }
+        Returns: Json
+      }
       seller_email_stats: {
+        Args: { _from: string; _staff: string; _workshop: string }
+        Returns: Json
+      }
+      seller_review_stats: {
         Args: { _from: string; _staff: string; _workshop: string }
         Returns: Json
       }
@@ -4392,6 +4455,7 @@ export type Database = {
         Args: { _path: string; _quote_id: string }
         Returns: string
       }
+      take_interested_lead: { Args: { _contact_id: string }; Returns: string }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }
       void_quote: {
         Args: { _quote_id: string; _reason: string }
