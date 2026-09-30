@@ -188,3 +188,36 @@ export function splitAddresses(value: string): string[] {
 }
 
 export const looksLikeEmail = (value: string) => /^[^\s@<>(),;:]+@[^\s@<>(),;:]+\.[a-z]{2,}$/i.test(value);
+
+export type EmailReview = Database['public']['Tables']['email_reviews']['Row'];
+
+// AI reviews of the seller emails with a client (F5), by email id.
+export function useEmailReviews(contactId: string | null) {
+  return useQuery({
+    queryKey: ['email-reviews', contactId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('email_reviews').select('*, contact_emails(internet_message_id)').eq('contact_id', contactId!).eq('status', 'done');
+      if (error) throw error;
+      // By email id, and by message id (the same email can be in two mailboxes).
+      const map = new Map<string, EmailReview>();
+      for (const row of (data ?? []) as unknown as Array<EmailReview & { contact_emails: { internet_message_id: string | null } | null }>) {
+        const { contact_emails: email, ...review } = row;
+        map.set(review.contact_email_id, review);
+        if (email?.internet_message_id) map.set(email.internet_message_id, review);
+      }
+      return map;
+    },
+    enabled: !!contactId,
+    refetchInterval: 120_000,
+  });
+}
+
+// "Sugerir con IA": a draft of the next email to the client.
+export function useDraftReply() {
+  return useMutation({
+    mutationFn: (input: { contactId: string; requestId: string | null; intent: 'answer' | 'follow_up' }) =>
+      invoke<{ draft: string; checks: string[] }>('draft-client-reply', {
+        contact_id: input.contactId, request_id: input.requestId ?? undefined, intent: input.intent,
+      }),
+  });
+}

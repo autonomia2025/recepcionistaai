@@ -31,6 +31,15 @@ function normalizeText(value: string): string {
 const clip = (value: unknown, max: number) =>
   typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : ''
 
+// For text the seller reads: never cut a word in half.
+export const clipWords = (value: unknown, max: number) => {
+  const text = clip(value, 10_000)
+  if (text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.(-]+$/, '')}…`
+}
+
 // Quote must appear in what the customer wrote and carry at least two words.
 export function isBackedByCustomer(evidence: string, customerMessages: string[]): boolean {
   const normalized = normalizeText(evidence.replace(/^["“”']+|["“”']+$/g, ''))
@@ -44,13 +53,13 @@ export function sanitizeCallGuide(raw: unknown, customerMessages: string[], play
 
   const known: CallGuide['known'] = []
   for (const item of Array.isArray(data.known) ? data.known : []) {
-    const fact = clip((item as Record<string, unknown>)?.fact, 160)
+    const fact = clipWords((item as Record<string, unknown>)?.fact, 160)
     const evidence = clip((item as Record<string, unknown>)?.evidence, 200).replace(/^["“”']+|["“”']+$/g, '')
     if (fact && evidence && isBackedByCustomer(evidence, customerMessages)) known.push({ fact, evidence })
     if (known.length === 6) break
   }
 
-  const missing = [...new Set((Array.isArray(data.missing) ? data.missing : []).map((m) => clip(m, 120)).filter(Boolean))].slice(0, 5)
+  const missing = [...new Set((Array.isArray(data.missing) ? data.missing : []).map((m) => clipWords(m, 180)).filter(Boolean))].slice(0, 5)
 
   let profile: CallGuide['profile'] = null
   const rawProfile = data.profile as Record<string, unknown> | null | undefined
@@ -63,13 +72,13 @@ export function sanitizeCallGuide(raw: unknown, customerMessages: string[], play
   const objections: CallGuide['objections'] = []
   for (const item of Array.isArray(data.objections) ? data.objections : []) {
     const record = item as Record<string, unknown>
-    const objection = clip(record?.objection, 160)
-    const answer = clip(record?.answer, 400)
+    const objection = clipWords(record?.objection, 160)
+    const answer = clipWords(record?.answer, 450)
     if (!objection || !answer) continue
     const source = titles.get(normalizeText(clip(record?.source, 160))) ?? null
     objections.push({ objection, answer, source })
     if (objections.length === 3) break
   }
 
-  return { opening: clip(data.opening, 240) || null, known, missing, profile, objections }
+  return { opening: clipWords(data.opening, 260) || null, known, missing, profile, objections }
 }

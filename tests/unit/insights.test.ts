@@ -196,6 +196,13 @@ describe("cómo trabaja el equipo", () => {
     expect(few.lines).toContain("Urgentes: atendió 1 de 1 dentro del plazo.");
   });
 
+  it("calidad de correos según la IA; promesas riesgosas suben la alerta", () => {
+    const [card] = buildTeamActivity(team([seller({ staff_name: "J", open_now: 1, reviewed: 10, tone_avg: 4.3, answered_all: 6, answer_expected: 8, with_next_step: 7, with_risks: 2 })]));
+    expect(card.lines).toContain("Calidad de correos (IA, 10 revisados): tono 4,3/5; respondió todo en 6 de 8; propuso siguiente paso en 7 de 10.");
+    expect(card.lines).toContain("2 correos tienen promesas o datos que no calzan con la cotización. Revísalos en Correos del equipo.");
+    expect(card.severity).toBe("medium");
+  });
+
   it("la base entrega números como texto: se convierten", () => {
     const [card] = buildTeamActivity(team([seller({ staff_name: "Z", assigned: "3" as unknown as number, quoted: "3" as unknown as number, median_hours_to_quote: "12.5" as unknown as number, speed_sample: "3" as unknown as number })]));
     expect(card.lines[1]).toBe("Tarda 13 horas en cotizar (mitad de los casos).");

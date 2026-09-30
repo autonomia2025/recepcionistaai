@@ -4,6 +4,7 @@
 // cron.schedule() row calling public.invoke_scheduled_task('<name>').
 
 import { syncAllMailboxes } from './mailSync.ts'
+import { reviewPendingEmails } from './emailReviewTask.ts'
 
 export interface TaskContext {
   // deno-lint-ignore no-explicit-any
@@ -30,9 +31,13 @@ export const heartbeat: ScheduledTask = async ({ supabase, trigger }) => {
 // Emails with clients from the sellers' connected Outlook mailboxes (F4).
 export const mailSync: ScheduledTask = ({ supabase }) => syncAllMailboxes(supabase)
 
+// AI review of the emails sellers send to clients (F5).
+export const emailReview: ScheduledTask = ({ supabase }) => reviewPendingEmails(supabase)
+
 export const SCHEDULED_TASKS: Record<string, ScheduledTask> = {
   heartbeat,
   'mail-sync': mailSync,
+  'email-review': emailReview,
 }
 
 export interface HandlerDeps {

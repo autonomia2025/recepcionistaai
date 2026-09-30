@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Mail, Paperclip, Send } from 'lucide-react';
+import { AlertTriangle, Loader2, Mail, Paperclip, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import type { Quote } from '@/hooks/useQuotes';
-import { type ContactEmail, looksLikeEmail, splitAddresses, useMailbox, useSendClientEmail } from '@/hooks/useClientEmail';
+import { type ContactEmail, looksLikeEmail, splitAddresses, useDraftReply, useMailbox, useSendClientEmail } from '@/hooks/useClientEmail';
 import { defaultAnswerSubject, defaultQuoteMessage, defaultQuoteSubject } from '@/lib/quoteEmailText';
 import { ConnectOutlookButton } from './MailboxConnection';
 
@@ -27,6 +27,8 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
 }) {
   const { data: mailbox, isLoading: mailboxLoading } = useMailbox();
   const send = useSendClientEmail();
+  const draftReply = useDraftReply();
+  const [checks, setChecks] = useState<string[]>([]);
   const quote = target?.kind === 'quote' ? target.quote : null;
   const email = target?.kind === 'answer' ? target.email : null;
   const note = target?.kind === 'message' ? target : null;
@@ -68,6 +70,7 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
     }
     setCc('');
     setTouched(false);
+    setChecks([]);
   }, [open, target, companyName]);
 
   const toList = useMemo(() => splitAddresses(to), [to]);
@@ -78,8 +81,28 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
     invalid.length > 0 && `Revisa: ${invalid.join(', ')}`,
     !subject.trim() && 'Falta el asunto',
     !message.trim() && 'Escribe el mensaje',
+    /\[[^\]\n]{2,60}\]/.test(message) && 'Completa los datos entre [corchetes]',
   ].filter(Boolean) as string[];
   const ready = mailbox?.status === 'active';
+
+  // "Sugerir con IA" (answers and follow-ups; the quote email has its own text).
+  const canSuggest = target?.kind === 'answer' || target?.kind === 'message';
+  const suggest = async () => {
+    if (!target || target.kind === 'quote') return;
+    const contactId = target.kind === 'answer' ? target.email.contact_id : target.contactId;
+    const requestId = target.kind === 'answer' ? target.email.service_request_id : target.requestId;
+    const typed = message.trim();
+    const untouched = !typed || /^Hola[^\n]*,$/.test(typed);
+    if (!untouched && !window.confirm('¿Reemplazar lo que escribiste por la sugerencia de la IA?')) return;
+    try {
+      const result = await draftReply.mutateAsync({ contactId, requestId, intent: target.kind === 'answer' ? 'answer' : 'follow_up' });
+      setMessage(result.draft);
+      setChecks(result.checks);
+      messageRef.current?.focus();
+    } catch (err) {
+      toast.error('La IA no pudo sugerir', { description: err instanceof Error ? err.message : undefined });
+    }
+  };
 
   const handleSend = async () => {
     if (!target) return;
@@ -159,11 +182,25 @@ export function SendClientEmailDialog({ target, open, onOpenChange }: {
                 <Input id="mail-subject" value={subject} maxLength={200} onChange={event => setSubject(event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="mail-message">Mensaje</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="mail-message">Mensaje</Label>
+                  {canSuggest && (
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={suggest} disabled={draftReply.isPending}>
+                      {draftReply.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
+                      {draftReply.isPending ? 'Escribiendo…' : 'Sugerir con IA'}
+                    </Button>
+                  )}
+                </div>
                 <Textarea id="mail-message" ref={messageRef} rows={quote ? 7 : 6} value={message}
                   placeholder={email ? 'Escribe tu respuesta…' : undefined}
                   onChange={event => setMessage(event.target.value)} />
                 <p className="text-xs text-muted-foreground">Al final se agrega tu firma con los datos de la empresa.</p>
+                {checks.length > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-2.5 text-xs space-y-1">
+                    <p className="font-medium flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Revisa antes de enviar</p>
+                    <ul className="list-disc pl-5 space-y-0.5">{checks.map(c => <li key={c}>{c}</li>)}</ul>
+                  </div>
+                )}
               </div>
               {quote && (
                 <p className="flex items-center gap-2 text-sm rounded-md border bg-muted/40 px-3 py-2">

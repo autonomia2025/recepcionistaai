@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isBackedByCustomer, sanitizeCallGuide } from "../../supabase/functions/_shared/callGuide.ts";
+import { clipWords } from "../../supabase/functions/_shared/callGuide.ts";
 
 const customer = [
   "Hola, necesito una hidrolavadora para lavar una sala de ordeña",
@@ -62,5 +63,17 @@ describe("sanitizeCallGuide", () => {
   it("tolera una respuesta vacía o rota de la IA", () => {
     expect(sanitizeCallGuide(null, customer, [])).toEqual({ opening: null, known: [], missing: [], profile: null, objections: [] });
     expect(sanitizeCallGuide({ known: "no es lista", objections: [null] }, customer, []).known).toEqual([]);
+  });
+});
+
+describe("textos largos", () => {
+  it("se cortan al final de una palabra, con puntos suspensivos", () => {
+    const long = "Confirmar disponibilidad de toma monofásica 220V en la sala y capacidad del circuito (enchufe directo o necesitan instalación)";
+    const out = clipWords(long, 100);
+    expect(out.length).toBeLessThanOrEqual(100);
+    expect(out.endsWith("…")).toBe(true);
+    expect(long.startsWith(out.slice(0, -1))).toBe(true);
+    expect(out).not.toMatch(/\binstal…$/);
+    expect(clipWords("corto", 100)).toBe("corto");
   });
 });

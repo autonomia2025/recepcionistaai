@@ -1355,6 +1355,66 @@ export type Database = {
           },
         ]
       }
+      email_reviews: {
+        Row: {
+          answered: string | null
+          contact_email_id: string
+          contact_id: string
+          created_at: string
+          improve: string | null
+          model: string | null
+          next_step: boolean | null
+          next_step_text: string | null
+          risks: string[]
+          seller_id: string | null
+          status: string
+          strengths: string[]
+          summary: string | null
+          tone: number | null
+          tone_label: string | null
+          unanswered: string[]
+          workshop_id: string
+        }
+        Insert: {
+          answered?: string | null
+          contact_email_id: string
+          contact_id: string
+          created_at?: string
+          improve?: string | null
+          model?: string | null
+          next_step?: boolean | null
+          next_step_text?: string | null
+          risks?: string[]
+          seller_id?: string | null
+          status?: string
+          strengths?: string[]
+          summary?: string | null
+          tone?: number | null
+          tone_label?: string | null
+          unanswered?: string[]
+          workshop_id: string
+        }
+        Update: {
+          answered?: string | null
+          contact_email_id?: string
+          contact_id?: string
+          created_at?: string
+          improve?: string | null
+          model?: string | null
+          next_step?: boolean | null
+          next_step_text?: string | null
+          risks?: string[]
+          seller_id?: string | null
+          status?: string
+          strengths?: string[]
+          summary?: string | null
+          tone?: number | null
+          tone_label?: string | null
+          unanswered?: string[]
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       health_logs: {
         Row: {
           category: string

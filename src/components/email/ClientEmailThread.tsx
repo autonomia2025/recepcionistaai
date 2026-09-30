@@ -8,14 +8,15 @@ import { Button } from '@/components/ui/button';
 import { openQuotePdf } from '@/hooks/useQuotePdf';
 import { useWorkshopFeatures } from '@/hooks/useWorkshopFeatures';
 import { useAuth } from '@/contexts/AuthContext';
-import { type ContactEmail, useContactEmails, useMarkContactEmailsRead } from '@/hooks/useClientEmail';
+import { type ContactEmail, type EmailReview, useContactEmails, useEmailReviews, useMarkContactEmailsRead } from '@/hooks/useClientEmail';
+import { EmailReviewNote } from './EmailReviewNote';
 import { cn } from '@/lib/utils';
 import { SendClientEmailDialog, type SendTarget } from './SendClientEmailDialog';
 
 const when = (value: string) => format(new Date(value), "d MMM, HH:mm", { locale: es });
 const firstLine = (text: string) => text.split('\n').find(line => line.trim()) ?? '';
 
-function EmailItem({ email, onAnswer }: { email: ContactEmail; onAnswer: () => void }) {
+function EmailItem({ email, review, onAnswer }: { email: ContactEmail; review?: EmailReview; onAnswer: () => void }) {
   const incoming = email.direction === 'in';
   const unread = incoming && !email.read_at;
   const long = email.body_text.split('\n').filter(line => line.trim()).length > 3 || email.body_text.length > 280;
@@ -42,6 +43,7 @@ function EmailItem({ email, onAnswer }: { email: ContactEmail; onAnswer: () => v
           </button>
         )}
       </p>
+      {!incoming && review && <EmailReviewNote review={review} />}
       {(email.attachments.length > 0 || incoming) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {email.attachments.map(file => (
@@ -73,6 +75,7 @@ export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el 
   const { features } = useWorkshopFeatures();
   const { user } = useAuth();
   const { data } = useContactEmails(features.commercial ? contactId : null);
+  const { data: reviews } = useEmailReviews(features.commercial ? contactId : null);
   const markRead = useMarkContactEmailsRead();
   const [target, setTarget] = useState<SendTarget | null>(null);
 
@@ -108,7 +111,7 @@ export function ClientEmailThread({ contactId, quoteId, title = 'Correos con el 
         <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4">{emptyText}</p>
       ) : (
         <ul className="rounded-lg border divide-y">
-          {emails.map(email => <EmailItem key={email.id} email={email} onAnswer={() => setTarget({ kind: 'answer', email })} />)}
+          {emails.map(email => <EmailItem key={email.id} email={email} review={reviews?.get(email.id) ?? (email.internet_message_id ? reviews?.get(email.internet_message_id) : undefined)} onAnswer={() => setTarget({ kind: 'answer', email })} />)}
         </ul>
       )}
       <SendClientEmailDialog target={target} open={!!target} onOpenChange={open => !open && setTarget(null)} />

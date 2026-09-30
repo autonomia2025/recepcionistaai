@@ -243,6 +243,13 @@ export interface SellerActivity {
   urgent_on_time?: number;
   urgent_attend_median_hours?: number | null;
   urgent_unattended?: number;
+  // AI review of their emails
+  reviewed?: number;
+  tone_avg?: number | null;
+  answered_all?: number;
+  answer_expected?: number;
+  with_next_step?: number;
+  with_risks?: number;
 }
 
 export interface TeamActivity {
@@ -293,6 +300,9 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
     urgent_leads: Number(s.urgent_leads ?? 0), urgent_on_time: Number(s.urgent_on_time ?? 0),
     urgent_attend_median_hours: s.urgent_attend_median_hours == null ? null : Number(s.urgent_attend_median_hours),
     urgent_unattended: Number(s.urgent_unattended ?? 0),
+    reviewed: Number(s.reviewed ?? 0), tone_avg: s.tone_avg == null ? null : Number(s.tone_avg),
+    answered_all: Number(s.answered_all ?? 0), answer_expected: Number(s.answer_expected ?? 0),
+    with_next_step: Number(s.with_next_step ?? 0), with_risks: Number(s.with_risks ?? 0),
   }));
   const measured = sellers.filter(s => s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE);
   const teamSpeed = measured.length >= 2 ? median(measured.map(s => s.median_hours_to_quote!)) : null;
@@ -370,6 +380,18 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
       if (s.urgent_attend_median_hours != null && attended >= MIN_SPEED_SAMPLE) line += ` (mitad en ${durationPhrase(s.urgent_attend_median_hours)} hábiles)`;
       line += s.urgent_unattended > 0 ? `; ${s.urgent_unattended} ${plural(s.urgent_unattended, 'sigue', 'siguen')} sin atender.` : '.';
       lines.push(line);
+    }
+
+    // Quality of their emails (AI review)
+    if (s.reviewed > 0) {
+      const bits = [`tono ${String(s.tone_avg ?? '—').replace('.', ',')}/5`];
+      if (s.answer_expected > 0) bits.push(`respondió todo en ${s.answered_all} de ${s.answer_expected}`);
+      bits.push(`propuso siguiente paso en ${s.with_next_step} de ${s.reviewed}`);
+      lines.push(`Calidad de correos (IA, ${s.reviewed} ${plural(s.reviewed, 'revisado', 'revisados')}): ${bits.join('; ')}.`);
+      if (s.with_risks > 0) {
+        lines.push(`${s.with_risks} ${plural(s.with_risks, 'correo tiene', 'correos tienen')} promesas o datos que no calzan con la cotización. Revísalos en Correos del equipo.`);
+        if (severity === 'good' || severity === 'info') severity = 'medium';
+      }
     }
 
     // Closes
