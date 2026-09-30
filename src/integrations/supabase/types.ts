@@ -904,7 +904,64 @@ export type Database = {
           to_addresses?: string[]
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contact_emails_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_mailbox_user_id_fkey"
+            columns: ["mailbox_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_read_by_fkey"
+            columns: ["read_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_service_request_id_fkey"
+            columns: ["service_request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_emails_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contacts: {
         Row: {
@@ -3136,7 +3193,36 @@ export type Database = {
           user_id?: string
           workshop_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_mailboxes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_mailboxes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "superadmin_workshops_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_mailboxes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_mailboxes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -3918,6 +4004,7 @@ export type Database = {
         }
         Returns: Json
       }
+      commercial_facts: { Args: { _scope?: string }; Returns: Json }
       create_hot_lead_request: {
         Args: {
           _contact_id: string
@@ -3932,6 +4019,7 @@ export type Database = {
         Returns: Json
       }
       current_staff_zone: { Args: never; Returns: string }
+      disconnect_my_mailbox: { Args: never; Returns: boolean }
       ensure_commercial_settings: {
         Args: { _workshop_id: string }
         Returns: {
@@ -4097,9 +4185,10 @@ export type Database = {
       is_valid_rut: { Args: { _rut: string }; Returns: boolean }
       is_workshop_active: { Args: { _workshop_id: string }; Returns: boolean }
       issue_quote: { Args: { _quote_id: string }; Returns: Json }
-      commercial_facts: { Args: { _scope?: string }; Returns: Json }
-      disconnect_my_mailbox: { Args: never; Returns: boolean }
-      mark_contact_emails_read: { Args: { _contact_id: string }; Returns: number }
+      mark_contact_emails_read: {
+        Args: { _contact_id: string }
+        Returns: number
+      }
       mark_quote_sent: {
         Args: { _quote_id: string; _sent_via?: string }
         Returns: Json
