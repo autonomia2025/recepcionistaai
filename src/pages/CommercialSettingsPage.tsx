@@ -69,7 +69,7 @@ const EDITABLE_FIELDS = [
   'quote_prefix', 'next_quote_number', 'quote_number_padding', 'quote_number_includes_year',
   'quote_validity_days', 'default_payment_terms', 'default_delivery_terms', 'legal_footer', 'vat_rate',
   'timezone', 'business_days', 'business_opens_at', 'business_closes_at', 'unquoted_lead_alert_hours',
-  'discount_approval_threshold', 'lost_reasons',
+  'discount_approval_threshold', 'lost_reasons', 'urgent_attention_hours',
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
@@ -794,6 +794,18 @@ export default function CommercialSettingsPage() {
                   onChange={(event) => set('unquoted_lead_alert_hours', Number(event.target.value))}
                 />
               </Field>
+              {draft.urgent_attention_hours !== undefined && (
+                <Field label="Plazo para atender un lead urgente (horas hábiles)" hint="Si pidió cotizar y nadie lo atiende en este plazo, se le recuerda al vendedor y se avisa al admin.">
+                  <Input
+                    type="number"
+                    min={0.5}
+                    max={72}
+                    step="0.5"
+                    value={draft.urgent_attention_hours}
+                    onChange={(event) => set('urgent_attention_hours', Number(event.target.value))}
+                  />
+                </Field>
+              )}
               <Field label="Descuento que requiere aprobación (%)" hint="Descuentos por encima de este valor quedan pendientes de aprobación del admin.">
                 <Input
                   type="number"

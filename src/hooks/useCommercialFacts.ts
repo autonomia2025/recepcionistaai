@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CommercialFacts, TeamActivity } from '@/lib/insights';
-import type { LeadInbox } from '@/lib/leads';
+import type { InterestedRow, LeadInbox } from '@/lib/leads';
 
 // Facts are computed by the database when the screen opens (and on refresh),
 // so the sentences are always current.
@@ -80,5 +80,36 @@ export function useEmailThreads(staffId: string | null, days = 30) {
     },
     enabled: !!profile?.id,
     refetchInterval: 60_000,
+  });
+}
+
+// "Interesados": clients with questions or asking prices, not yet a lead.
+export function useInterested() {
+  const { profile } = useAuth();
+  return useQuery({
+    queryKey: ['interested', profile?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('commercial_interested');
+      if (error) throw error;
+      return (data ?? []) as unknown as InterestedRow[];
+    },
+    enabled: !!profile?.id,
+    refetchInterval: 120_000,
+  });
+}
+
+export function useTakeInterested() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (contactId: string) => {
+      const { data, error } = await supabase.rpc('take_interested_lead', { _contact_id: contactId });
+      if (error) throw error;
+      return data as unknown as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['interested'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-inbox'] });
+      queryClient.invalidateQueries({ queryKey: ['service-requests'] });
+    },
   });
 }

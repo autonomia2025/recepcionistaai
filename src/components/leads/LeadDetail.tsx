@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Building2, ExternalLink, Mail, MapPin, PenSquare, Phone, UserRound } from 'lucide-react';
+import { ArrowLeft, Building2, ExternalLink, Flame, Mail, MapPin, PenSquare, Phone, UserRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CallGuideCard } from '@/components/requests/CallGuideCard';
@@ -12,15 +12,16 @@ import { ClientEmailThread } from '@/components/email/ClientEmailThread';
 import { SendClientEmailDialog, type SendTarget } from '@/components/email/SendClientEmailDialog';
 import type { ServiceRequest } from '@/hooks/useServiceRequests';
 import { formatCLP } from '@/lib/quoteTotals';
-import { type LeadRow, type LeadStage, leadAmount } from '@/lib/leads';
+import { type LeadRow, type LeadStage, type PriorityView, leadAmount } from '@/lib/leads';
 import { cn } from '@/lib/utils';
 import { STAGE_STYLE } from './stageStyle';
 
 // Everything about one lead on one screen: why it arrived, the call guide,
 // the quotes and the emails with the client.
-export function LeadDetail({ lead, stage, request, requestLoading = false, onBack }: {
+export function LeadDetail({ lead, stage, priority, request, requestLoading = false, onBack }: {
   lead: LeadRow;
   stage: LeadStage;
+  priority?: PriorityView;
   request: ServiceRequest | null;
   requestLoading?: boolean;
   onBack?: () => void;
@@ -50,8 +51,17 @@ export function LeadDetail({ lead, stage, request, requestLoading = false, onBac
               <h2 className="text-xl font-semibold truncate">{title}</h2>
               <Badge variant="outline" className={cn('text-[11px]', STAGE_STYLE[stage.key].badge)}>{stage.label}</Badge>
               {stage.late && <Badge variant="outline" className="text-[11px] border-red-300 bg-red-50 text-red-700">Atrasado</Badge>}
+              {priority?.urgent && stage.key !== 'won' && stage.key !== 'lost' && (
+                <Badge variant="outline" className="text-[11px] border-orange-300 bg-orange-50 text-orange-700"><Flame className="w-3 h-3 mr-0.5" />Urgente</Badge>
+              )}
             </div>
             <p className={cn('text-sm', stage.late ? 'text-destructive' : 'text-muted-foreground')}>{stage.note}</p>
+            {priority?.attention && (
+              <p className={cn('text-sm font-medium', priority.attention.overdue ? 'text-destructive' : 'text-orange-700')}>{priority.attention.text}</p>
+            )}
+            {(priority?.kind || priority?.why) && (
+              <p className="text-sm"><span className="font-medium">{priority.kind}</span>{priority.why ? <span className="italic">{priority.kind ? ': ' : ''}{priority.why}</span> : null}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={writeEmail} disabled={!request}>

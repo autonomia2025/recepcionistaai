@@ -238,6 +238,11 @@ export interface SellerActivity {
   email_reply_median_hours?: number | null;
   email_reply_sample?: number;
   emails_waiting_now?: number;
+  // Urgent leads (asked for a quote or gave a deadline)
+  urgent_leads?: number;
+  urgent_on_time?: number;
+  urgent_attend_median_hours?: number | null;
+  urgent_unattended?: number;
 }
 
 export interface TeamActivity {
@@ -285,6 +290,9 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
     emails_sent: Number(s.emails_sent ?? 0), emails_received: Number(s.emails_received ?? 0),
     email_reply_median_hours: s.email_reply_median_hours == null ? null : Number(s.email_reply_median_hours),
     email_reply_sample: Number(s.email_reply_sample ?? 0), emails_waiting_now: Number(s.emails_waiting_now ?? 0),
+    urgent_leads: Number(s.urgent_leads ?? 0), urgent_on_time: Number(s.urgent_on_time ?? 0),
+    urgent_attend_median_hours: s.urgent_attend_median_hours == null ? null : Number(s.urgent_attend_median_hours),
+    urgent_unattended: Number(s.urgent_unattended ?? 0),
   }));
   const measured = sellers.filter(s => s.median_hours_to_quote != null && s.speed_sample >= MIN_SPEED_SAMPLE);
   const teamSpeed = measured.length >= 2 ? median(measured.map(s => s.median_hours_to_quote!)) : null;
@@ -353,6 +361,15 @@ export function buildTeamActivity(activity: TeamActivity): SellerCard[] {
         } else reply += '.';
       }
       lines.push(`Correos: envió ${s.emails_sent} y recibió ${s.emails_received}.${reply}`);
+    }
+
+    // Urgent leads: promise of attention
+    if (s.urgent_leads > 0) {
+      const attended = s.urgent_leads - s.urgent_unattended;
+      let line = `Urgentes: atendió ${s.urgent_on_time} de ${s.urgent_leads} dentro del plazo`;
+      if (s.urgent_attend_median_hours != null && attended >= MIN_SPEED_SAMPLE) line += ` (mitad en ${durationPhrase(s.urgent_attend_median_hours)} hábiles)`;
+      line += s.urgent_unattended > 0 ? `; ${s.urgent_unattended} ${plural(s.urgent_unattended, 'sigue', 'siguen')} sin atender.` : '.';
+      lines.push(line);
     }
 
     // Closes

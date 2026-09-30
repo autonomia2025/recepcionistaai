@@ -790,6 +790,7 @@ export type Database = {
           timezone: string
           unquoted_lead_alert_hours: number
           updated_at: string
+          urgent_attention_hours: number
           vat_rate: number
           workshop_id: string
         }
@@ -819,6 +820,7 @@ export type Database = {
           timezone?: string
           unquoted_lead_alert_hours?: number
           updated_at?: string
+          urgent_attention_hours?: number
           vat_rate?: number
           workshop_id: string
         }
@@ -848,6 +850,7 @@ export type Database = {
           timezone?: string
           unquoted_lead_alert_hours?: number
           updated_at?: string
+          urgent_attention_hours?: number
           vat_rate?: number
           workshop_id?: string
         }
@@ -4063,6 +4066,7 @@ export type Database = {
         Returns: Json
       }
       commercial_facts: { Args: { _scope?: string }; Returns: Json }
+      commercial_interested: { Args: never; Returns: Json }
       commercial_lead_inbox: {
         Args: { _days?: number; _scope?: string; _staff?: string }
         Returns: Json
@@ -4286,6 +4290,7 @@ export type Database = {
         Args: { _contact_id: string }
         Returns: number
       }
+      take_interested_lead: { Args: { _contact_id: string }; Returns: string }
       mark_quote_sent: {
         Args: { _quote_id: string; _sent_via?: string }
         Returns: Json

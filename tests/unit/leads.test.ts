@@ -78,3 +78,40 @@ it("monto: la cotización manda; si no, estimado del catálogo", () => {
   expect(leadAmount(lead({ catalog_amount: "5000" as unknown as number }))).toEqual({ value: 5000, estimate: true });
   expect(leadAmount(lead({}))).toBeNull();
 });
+
+describe("prioridad y plazo de atención", () => {
+  const quote = { urgent: true, kind: "quote_requested" as const, reasons: [{ code: "quote_requested" as const, text: "Cotízame la MH130" }] };
+
+  it("urgente por pedir cotización: muestra la frase y el plazo que queda", async () => {
+    const { priorityView } = await import("@/lib/leads");
+    expect(priorityView(lead({ priority: quote, unattended_business_hours: 0.5 }), { sla_hours: 2 }))
+      .toEqual({ urgent: true, kind: "Pidió cotización", why: '"Cotízame la MH130"', attention: { overdue: false, text: "Quedan 2 horas hábiles para atenderlo" } });
+    expect(priorityView(lead({ priority: quote, unattended_business_hours: 0.8 }), { sla_hours: 2 }).attention!.text).toBe("Queda 1 hora hábil para atenderlo");
+    expect(priorityView(lead({ priority: quote, unattended_business_hours: 1.8 }), { sla_hours: 2 }).attention!.text).toBe("Queda menos de 1 hora hábil para atenderlo");
+  });
+
+  it("plazo vencido", async () => {
+    const { priorityView } = await import("@/lib/leads");
+    expect(priorityView(lead({ priority: quote, unattended_business_hours: 3.2 }), { sla_hours: 2 }).attention)
+      .toEqual({ overdue: true, text: "Sin atender hace 3 horas hábiles (plazo 2 h)" });
+  });
+
+  it("atendido o no urgente: sin plazo", async () => {
+    const { priorityView } = await import("@/lib/leads");
+    expect(priorityView(lead({ priority: quote, unattended_business_hours: null }), { sla_hours: 2 }).attention).toBeNull();
+    expect(priorityView(lead({ priority: { urgent: false, kind: "billing_data", reasons: [] } }), { sla_hours: 2 }))
+      .toEqual({ urgent: false, kind: "Dejó datos para facturar", why: null, attention: null });
+  });
+
+  it("dentro de un día, los urgentes primero; filtro 'Urgentes'", () => {
+    const items = [
+      lead({ id: "normal", created_at: hoursAgo(1) }),
+      lead({ id: "urgente", created_at: hoursAgo(3), priority: quote }),
+    ].map(l => ({ lead: l }));
+    expect(groupByDay(items, now)[0].items.map(i => i.lead.id)).toEqual(["urgente", "normal"]);
+    const u = lead({ priority: quote });
+    expect(matchesFilter(leadStage(u, inbox, now), u, "urgent")).toBe(true);
+    const n = lead({});
+    expect(matchesFilter(leadStage(n, inbox, now), n, "urgent")).toBe(false);
+  });
+});

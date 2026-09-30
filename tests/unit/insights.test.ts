@@ -189,6 +189,13 @@ describe("cómo trabaja el equipo", () => {
     expect(card.lines[0]).toBe("1 cliente espera su respuesta por correo hace más de 24 horas.");
   });
 
+  it("urgentes: cuántos atendió a tiempo", () => {
+    const [card] = buildTeamActivity(team([seller({ staff_name: "J", open_now: 2, urgent_leads: 5, urgent_on_time: 3, urgent_attend_median_hours: 1.5, urgent_unattended: 1 })]));
+    expect(card.lines).toContain("Urgentes: atendió 3 de 5 dentro del plazo (mitad en 2 horas hábiles); 1 sigue sin atender.");
+    const [few] = buildTeamActivity(team([seller({ staff_name: "K", urgent_leads: 1, urgent_on_time: 1, urgent_attend_median_hours: 0.3 })]));
+    expect(few.lines).toContain("Urgentes: atendió 1 de 1 dentro del plazo.");
+  });
+
   it("la base entrega números como texto: se convierten", () => {
     const [card] = buildTeamActivity(team([seller({ staff_name: "Z", assigned: "3" as unknown as number, quoted: "3" as unknown as number, median_hours_to_quote: "12.5" as unknown as number, speed_sample: "3" as unknown as number })]));
     expect(card.lines[1]).toBe("Tarda 13 horas en cotizar (mitad de los casos).");

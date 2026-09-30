@@ -29,6 +29,15 @@ export interface LeadRow {
   last_direction: 'in' | 'out' | null;
   last_preview: string | null;
   last_from_name: string | null;
+  priority?: LeadPriority | null;
+  first_contact_at?: string | null;
+  unattended_business_hours?: number | null;
+}
+
+export interface LeadPriority {
+  urgent: boolean;
+  kind: 'quote_requested' | 'billing_data' | 'taken' | 'auto' | 'manual';
+  reasons: Array<{ code: 'quote_requested' | 'deadline' | 'billing_data'; text: string }>;
 }
 
 export interface LeadInbox {
@@ -36,6 +45,7 @@ export interface LeadInbox {
   scope: 'me' | 'team';
   unquoted_hours: number;
   followup_days: number;
+  sla_hours?: number;
   leads: LeadRow[];
 }
 
@@ -48,8 +58,11 @@ export interface LeadStage {
   note: string;
 }
 
-export const STAGE_FILTERS: Array<{ key: 'all' | StageKey | 'closed'; label: string }> = [
+export type LeadFilter = 'all' | 'urgent' | StageKey | 'closed';
+
+export const STAGE_FILTERS: Array<{ key: LeadFilter; label: string }> = [
   { key: 'all', label: 'Abiertos' },
+  { key: 'urgent', label: 'Urgentes' },
   { key: 'replied', label: 'Te escribieron' },
   { key: 'to_quote', label: 'Por cotizar' },
   { key: 'waiting_client', label: 'Esperando al cliente' },
@@ -106,10 +119,11 @@ export function leadStage(lead: LeadRow, inbox: Pick<LeadInbox, 'unquoted_hours'
   };
 }
 
-export function matchesFilter(stage: LeadStage, lead: LeadRow, filter: 'all' | StageKey | 'closed'): boolean {
+export function matchesFilter(stage: LeadStage, lead: LeadRow, filter: LeadFilter): boolean {
   if (filter === 'closed') return isClosed(lead);
   if (isClosed(lead)) return false;
   if (filter === 'all') return true;
+  if (filter === 'urgent') return !!lead.priority?.urgent;
   if (filter === 'to_quote') return stage.key === 'to_quote' || stage.key === 'new' || stage.key === 'ready';
   return stage.key === filter;
 }
@@ -133,9 +147,10 @@ export interface DayGroup<T> {
   items: T[];
 }
 
-// Newest day first; inside a day, newest lead first.
+// Newest day first; inside a day, urgent leads first, then newest.
 export function groupByDay<T extends { lead: LeadRow }>(items: T[], now = new Date()): DayGroup<T>[] {
   const sorted = [...items].sort((a, b) => b.lead.created_at.localeCompare(a.lead.created_at));
+  const withinDay = (a: T, b: T) => Number(!!b.lead.priority?.urgent) - Number(!!a.lead.priority?.urgent) || b.lead.created_at.localeCompare(a.lead.created_at);
   const groups: DayGroup<T>[] = [];
   for (const item of sorted) {
     const label = dayLabel(item.lead.created_at, now);
@@ -143,7 +158,78 @@ export function groupByDay<T extends { lead: LeadRow }>(items: T[], now = new Da
     if (last && last.label === label) last.items.push(item);
     else groups.push({ label, items: [item] });
   }
+  for (const g of groups) g.items.sort(withinDay);
   return groups;
+}
+
+export const KIND_LABELS: Record<LeadPriority['kind'], string> = {
+  quote_requested: 'Pidió cotización',
+  billing_data: 'Dejó datos para facturar',
+  taken: 'Tomado de Interesados',
+  auto: 'Lead del bot',
+  manual: 'Ingresado a mano',
+};
+
+export interface PriorityView {
+  urgent: boolean;
+  kind: string | null;
+  // The client's own words that make it urgent, if any.
+  why: string | null;
+  // Promise of attention for urgent leads not yet attended.
+  attention: { overdue: boolean; text: string } | null;
+}
+
+// "1 hora hábil", "3 horas hábiles", "menos de 1 hora hábil"
+const businessHours = (h: number) => {
+  if (h < 1) return 'menos de 1 hora hábil';
+  const n = Math.round(h);
+  return n === 1 ? '1 hora hábil' : `${n} horas hábiles`;
+};
+
+export function priorityView(lead: LeadRow, inbox: Pick<LeadInbox, 'sla_hours'>): PriorityView {
+  const p = lead.priority;
+  if (!p) return { urgent: false, kind: null, why: null, attention: null };
+  const quote = p.reasons.find(r => r.code === 'quote_requested');
+  const deadline = p.reasons.find(r => r.code === 'deadline');
+  const why = quote ? `"${quote.text}"` : deadline ? `"${deadline.text}"` : null;
+  let attention: PriorityView['attention'] = null;
+  const sla = Number(inbox.sla_hours ?? 2);
+  if (p.urgent && lead.unattended_business_hours != null && !isClosed(lead)) {
+    const h = Number(lead.unattended_business_hours);
+    const left = Math.max(0, sla - h);
+    attention = h > sla
+      ? { overdue: true, text: `Sin atender hace ${businessHours(h)} (plazo ${sla} h)` }
+      : { overdue: false, text: `${left < 1.5 ? 'Queda' : 'Quedan'} ${businessHours(left)} para atenderlo` };
+  }
+  return { urgent: p.urgent, kind: KIND_LABELS[p.kind] ?? null, why, attention };
+}
+
+// ---------------------------------------------------------------------------
+// "Interesados": clients with questions or asking prices, no request yet.
+export interface InterestedRow {
+  contact_id: string;
+  client: string;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+  zone_label: string | null;
+  intent: string | null;
+  lead_score: number | null;
+  lead_score_reasoning: string | null;
+  last_inbound_at: string;
+  last_inbound_text: string | null;
+  conversation_id: string | null;
+  products: string[] | null;
+}
+
+export const INTENT_LABELS: Record<string, string> = {
+  cotizacion: 'Consultó precios',
+  consulta: 'Tiene dudas',
+  agendar_cita: 'Quiere una visita',
+};
+
+export function interestLabel(row: InterestedRow): string {
+  return (row.intent && INTENT_LABELS[row.intent]) || 'Mostró interés';
 }
 
 export function leadAmount(lead: LeadRow): { value: number; estimate: boolean } | null {
