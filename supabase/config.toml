@@ -116,3 +116,6 @@ verify_jwt = false
 
 [functions.mail-sync]
 verify_jwt = false
+
+[functions.draft-client-reply]
+verify_jwt = false
